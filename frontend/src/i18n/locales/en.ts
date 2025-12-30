@@ -265,7 +265,7 @@ export default {
     paymentSuccess: 'Payment successful. Credits applied.',
     paymentFailed: 'Payment failed. Please try again.',
     paymentExpired: 'Order expired. Please create a new order.',
-    noQRCode: 'QR code is unavailable. Please click "Open payment page" to continue.',
+    noQRCode: 'Payment QR code is unavailable.',
     statusPending: 'Pending',
     statusPaid: 'Paid',
     statusFailed: 'Failed',
