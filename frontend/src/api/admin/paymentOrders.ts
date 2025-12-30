@@ -13,6 +13,7 @@ export interface AdminPaymentOrder {
   order_no: string
   order_type: string
   user_id: number
+  user_email?: string
   provider: AdminPaymentProvider
   status: string
   amount_cny: number

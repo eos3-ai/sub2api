@@ -52,6 +52,22 @@ export async function list(
   return data
 }
 
+export async function exportRecords(filters?: {
+  status?: 'active' | 'disabled'
+  role?: 'admin' | 'user'
+  search?: string
+}): Promise<Blob> {
+  const { data } = await apiClient.get('/admin/users/export', {
+    params: {
+      status: filters?.status || undefined,
+      role: filters?.role || undefined,
+      search: filters?.search || undefined
+    },
+    responseType: 'blob'
+  })
+  return data as Blob
+}
+
 /**
  * Get user by ID
  * @param id - User ID
@@ -177,6 +193,7 @@ export async function getUserUsageStats(
 
 export const usersAPI = {
   list,
+  exportRecords,
   getById,
   create,
   update,

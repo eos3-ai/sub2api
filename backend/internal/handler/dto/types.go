@@ -244,6 +244,7 @@ type PaymentOrder struct {
 	OrderNo   string    `json:"order_no"`
 	OrderType string    `json:"order_type"`
 	UserID    int64     `json:"user_id"`
+	UserEmail string    `json:"user_email,omitempty"`
 	Username  string    `json:"username"`
 	Provider  string    `json:"provider"`
 	Status    string    `json:"status"`
