@@ -75,6 +75,8 @@
 - 配置层已支持 `discount_rate`（支付倍率）与基于 `amount_usd` 的套餐配置；示例见 `deploy/config.example.yaml` 与 `deploy/.env.example`。
 - 支付渠道字段已统一为 “支付宝/微信 → zpay/stripe” 映射：前端下单传 `channel=alipay|wechat`，后端内部归一化为 `provider=zpay|stripe`。
 - 订单过期清理已接入后台任务：当 `payment.enabled=true` 时启动 `PaymentMaintenanceService` 定期调用 `PaymentService.CancelExpiredOrders`（见 `backend/internal/service/payment_maintenance_service.go`）。
+- **已修复：`payment_orders.discount_rate` 非空约束导致下单失败**：订单创建时写入 `discount_rate`（支付倍率），并在 GORM 模型补齐 `DiscountRate` 字段，避免数据库已存在该列且无默认值时插入报错（`SQLSTATE 23502`）。
+- **已补齐：旧环境变量兼容**：除 `PAYMENT_ZPAY_* / PAYMENT_STRIPE_*` 外，额外支持 `ZPAY_* / STRIPE_*` 变量名映射到 `payment.*` 配置（避免因环境变量命名不一致导致下单时报 “zpay/stripe is disabled”）。
 
 ### 待迁移
 - 前端仍未消费 `pay_url/qr_url`：需要在创建订单后展示二维码/跳转收银台，并提供轮询/刷新订单状态能力。

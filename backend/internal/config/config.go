@@ -236,6 +236,7 @@ func Load() (*Config, error) {
 	// 环境变量支持
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	bindLegacyEnvAliases(viper.GetViper())
 
 	// 默认值
 	setDefaults()
@@ -259,6 +260,47 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// bindLegacyEnvAliases binds legacy (non-namespaced) env vars to the current config keys.
+//
+// This repo primarily uses Viper's `.` -> `_` mapping, so config keys like:
+//   payment.zpay.enabled -> PAYMENT_ZPAY_ENABLED
+// But some deployments already use:
+//   ZPAY_ENABLED / STRIPE_SECRET_KEY / ...
+// This helper keeps backwards compatibility.
+func bindLegacyEnvAliases(v *viper.Viper) {
+	if v == nil {
+		return
+	}
+
+	// ZPay
+	_ = v.BindEnv("payment.zpay.enabled", "ZPAY_ENABLED")
+	_ = v.BindEnv("payment.zpay.pid", "ZPAY_PID")
+	_ = v.BindEnv("payment.zpay.key", "ZPAY_KEY")
+	_ = v.BindEnv("payment.zpay.api_url", "ZPAY_API_URL")
+	_ = v.BindEnv("payment.zpay.submit_url", "ZPAY_SUBMIT_URL")
+	_ = v.BindEnv("payment.zpay.query_url", "ZPAY_QUERY_URL")
+	_ = v.BindEnv("payment.zpay.payment_methods", "ZPAY_PAYMENT_METHODS")
+	_ = v.BindEnv("payment.zpay.order_prefix", "ZPAY_ORDER_PREFIX")
+	_ = v.BindEnv("payment.zpay.notify_url", "ZPAY_NOTIFY_URL")
+	_ = v.BindEnv("payment.zpay.return_url", "ZPAY_RETURN_URL")
+	_ = v.BindEnv("payment.zpay.notify_user", "ZPAY_NOTIFY_USER")
+	_ = v.BindEnv("payment.zpay.ip_whitelist", "ZPAY_IP_WHITELIST")
+	_ = v.BindEnv("payment.zpay.require_https", "ZPAY_REQUIRE_HTTPS")
+
+	// Stripe
+	_ = v.BindEnv("payment.stripe.enabled", "STRIPE_ENABLED")
+	// Common naming: STRIPE_SECRET_KEY is the Stripe API key.
+	_ = v.BindEnv("payment.stripe.api_key", "STRIPE_API_KEY", "STRIPE_SECRET_KEY")
+	_ = v.BindEnv("payment.stripe.webhook_secret", "STRIPE_WEBHOOK_SECRET")
+	_ = v.BindEnv("payment.stripe.api_version", "STRIPE_API_VERSION")
+	_ = v.BindEnv("payment.stripe.payment_methods", "STRIPE_PAYMENT_METHODS")
+	_ = v.BindEnv("payment.stripe.currency", "STRIPE_CURRENCY")
+	_ = v.BindEnv("payment.stripe.success_url", "STRIPE_SUCCESS_URL")
+	_ = v.BindEnv("payment.stripe.cancel_url", "STRIPE_CANCEL_URL")
+	_ = v.BindEnv("payment.stripe.wechat_client", "STRIPE_WECHAT_CLIENT")
+	_ = v.BindEnv("payment.stripe.wechat_app_id", "STRIPE_WECHAT_APP_ID")
 }
 
 func setDefaults() {
