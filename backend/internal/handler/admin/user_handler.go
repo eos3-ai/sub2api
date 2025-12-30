@@ -1,7 +1,12 @@
 package admin
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
+	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -74,6 +79,66 @@ func (h *UserHandler) List(c *gin.Context) {
 		out = append(out, *dto.UserFromService(&users[i]))
 	}
 	response.Paginated(c, out, total, page, pageSize)
+}
+
+// Export exports filtered users as CSV.
+// GET /api/v1/admin/users/export?status=active&role=user&search=foo
+func (h *UserHandler) Export(c *gin.Context) {
+	status := c.Query("status")
+	role := c.Query("role")
+	search := c.Query("search")
+
+	pageSize := 200
+	page := 1
+
+	all := make([]service.User, 0, pageSize)
+	for {
+		items, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, status, role, search)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		all = append(all, items...)
+		if int64(len(all)) >= total || len(items) == 0 {
+			break
+		}
+		page++
+		if page > 10000 {
+			break
+		}
+	}
+
+	var buf bytes.Buffer
+	w := csv.NewWriter(&buf)
+	_ = w.Write([]string{
+		"id",
+		"email",
+		"username",
+		"role",
+		"status",
+		"balance",
+		"concurrency",
+		"created_at",
+	})
+	for i := range all {
+		u := all[i]
+		_ = w.Write([]string{
+			strconv.FormatInt(u.ID, 10),
+			u.Email,
+			u.Username,
+			u.Role,
+			u.Status,
+			fmt.Sprintf("%.8f", u.Balance),
+			strconv.Itoa(u.Concurrency),
+			u.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	w.Flush()
+
+	filename := "users.csv"
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.String(http.StatusOK, buf.String())
 }
 
 // GetByID handles getting a user by ID

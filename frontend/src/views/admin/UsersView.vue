@@ -79,6 +79,13 @@
             class="w-36"
             @change="loadUsers"
           />
+          <button
+            class="btn btn-secondary"
+            :disabled="loading || exporting"
+            @click="exportFiltered"
+          >
+            {{ exporting ? t('common.loading') : t('admin.users.exportRecords') }}
+          </button>
         </div>
       </div>
       </template>
@@ -1188,6 +1195,7 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { formatDateTime } from '@/utils/format'
+import { saveAs } from 'file-saver'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
@@ -1206,6 +1214,7 @@ import GroupBadge from '@/components/common/GroupBadge.vue'
 
 const appStore = useAppStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
+const exporting = ref(false)
 
 const columns = computed<Column[]>(() => [
   { key: 'email', label: t('admin.users.columns.user'), sortable: true },
@@ -1249,6 +1258,26 @@ const pagination = reactive({
   total: 0,
   pages: 0
 })
+
+async function exportFiltered() {
+  exporting.value = true
+  try {
+    const blob = await adminAPI.users.exportRecords({
+      status: (filters.status || undefined) as any,
+      role: (filters.role || undefined) as any,
+      search: searchQuery.value || undefined
+    })
+    const now = new Date()
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(
+      now.getHours()
+    ).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    saveAs(blob, `users_${stamp}.csv`)
+  } catch (error) {
+    appStore.showError((error as { message?: string }).message || t('common.error'))
+  } finally {
+    exporting.value = false
+  }
+}
 
 const showCreateModal = ref(false)
 const showEditModal = ref(false)

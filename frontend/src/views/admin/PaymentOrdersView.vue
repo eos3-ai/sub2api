@@ -142,7 +142,7 @@ const methodOptions = computed(() => [
 
 const columns = computed<Column[]>(() => [
   { key: 'order_no', label: t('payment.orderNo') },
-  { key: 'user_id', label: t('admin.paymentOrders.userId') },
+  { key: 'user_email', label: t('admin.paymentOrders.userEmail') },
   { key: 'order_type', label: t('payment.orderType') },
   { key: 'provider', label: t('payment.channel') },
   { key: 'total_usd', label: t('payment.creditsAmount') },

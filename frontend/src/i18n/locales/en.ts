@@ -151,7 +151,7 @@ export default {
     dashboard: 'Dashboard',
     apiKeys: 'API Keys',
     usage: 'Usage',
-    payment: 'Recharge',
+    payment: 'Online Recharge',
     redeem: 'Redeem',
     profile: 'Profile',
     users: 'Users',
@@ -652,8 +652,8 @@ export default {
       description: 'View all users recharge records (payment orders)',
       method: 'Method',
       user: 'User',
-      userId: 'User ID',
-      userPlaceholder: 'Enter user ID or email',
+      userEmail: 'User Email',
+      userPlaceholder: 'Enter user email',
       export: 'Export Records'
     },
 
@@ -664,6 +664,7 @@ export default {
       createUser: 'Create User',
       editUser: 'Edit User',
       deleteUser: 'Delete User',
+      exportRecords: 'Export Records',
       searchUsers: 'Search users...',
       allRoles: 'All Roles',
       allStatus: 'All Status',

@@ -148,7 +148,7 @@ export default {
     dashboard: '仪表盘',
     apiKeys: 'API 密钥',
     usage: '使用记录',
-    payment: '充值',
+    payment: '在线充值',
     redeem: '兑换',
     profile: '个人资料',
     users: '用户管理',
@@ -664,8 +664,8 @@ export default {
       description: '查看所有用户的充值记录（支付订单）',
       method: '充值方式',
       user: '用户',
-      userId: '用户ID',
-      userPlaceholder: '输入用户ID或邮箱',
+      userEmail: '用户邮箱',
+      userPlaceholder: '输入用户邮箱',
       export: '导出记录'
     },
 
@@ -676,6 +676,7 @@ export default {
       createUser: '创建用户',
       editUser: '编辑用户',
       deleteUser: '删除用户',
+      exportRecords: '导出记录',
       deleteConfirmMessage: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       searchPlaceholder: '搜索用户...',
       searchUsers: '搜索用户...',
