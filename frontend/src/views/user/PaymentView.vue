@@ -318,17 +318,117 @@
         </button>
       </template>
     </Modal>
+
+    <!-- Pay Modal -->
+    <Modal
+      :show="payOpen"
+      :title="t('payment.payTitle')"
+      size="lg"
+      closeOnClickOutside
+      @close="closePay"
+    >
+      <template v-if="payOrder">
+        <div class="space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gray-50 px-4 py-3 dark:bg-dark-900/30">
+            <div class="space-y-1">
+              <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('payment.orderNo') }}</p>
+              <p class="font-mono text-sm font-semibold text-gray-900 dark:text-white">
+                {{ payOrder.order_no }}
+              </p>
+            </div>
+            <div class="space-y-1 text-right">
+              <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('payment.status') }}</p>
+              <p
+                class="text-sm font-semibold"
+                :class="
+                  payOrder.status === 'paid'
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : payOrder.status === 'failed' || payOrder.status === 'expired'
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : 'text-amber-600 dark:text-amber-400'
+                "
+              >
+                {{ payOrder.status }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-6 sm:grid-cols-2">
+            <div class="space-y-3">
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.scanToPay') }}</p>
+              <div
+                class="flex items-center justify-center rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
+              >
+                <div v-if="qrImage" class="flex flex-col items-center gap-3">
+                  <img :src="qrImage" alt="qr" class="h-56 w-56 rounded-2xl bg-white p-2" />
+                  <p v-if="polling && payOrder.status === 'pending'" class="text-xs text-gray-500 dark:text-dark-400">
+                    {{ t('payment.waitingForPayment') }}
+                  </p>
+                </div>
+                <div v-else class="text-sm text-gray-500 dark:text-dark-400">
+                  {{ t('payment.noQRCode') }}
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.payActions') }}</p>
+              <div class="space-y-3 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
+                <div class="text-sm text-gray-700 dark:text-dark-200">
+                  <div class="flex items-center justify-between">
+                    <span>{{ t('payment.payAmountLabel') }}</span>
+                    <span class="font-semibold">{{ formatUSD2(payOrder.amount_usd) }}</span>
+                  </div>
+                  <div class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
+                    <span>{{ t('payment.channel') }}</span>
+                    <span>{{ providerLabel(payOrder.provider) }}</span>
+                  </div>
+                </div>
+
+                <button
+                  v-if="payURL"
+                  type="button"
+                  class="w-full rounded-2xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-700"
+                  @click="openPayPage"
+                >
+                  {{ t('payment.openPayPage') }}
+                </button>
+
+                <button
+                  type="button"
+                  class="w-full rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:hover:bg-dark-800"
+                  :disabled="polling"
+                  @click="pollOrderStatus(payOrder.order_no)"
+                >
+                  {{ polling ? t('payment.refreshing') : t('payment.refreshStatus') }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #footer>
+        <button
+          class="w-full rounded-2xl bg-gray-900 px-6 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-gray-800 dark:bg-dark-700 dark:hover:bg-dark-600"
+          @click="closePay"
+        >
+          {{ t('common.close') }}
+        </button>
+      </template>
+    </Modal>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Modal from '@/components/common/Modal.vue'
 import { useAppStore } from '@/stores'
 import { paymentAPI, type PaymentChannel, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
+import QRCode from 'qrcode'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -347,6 +447,14 @@ const customAmountUSDInput = ref('')
 const payMethod = ref<PaymentPayMethod>('alipay')
 const creatingOrder = ref(false)
 const checkoutOpen = ref(false)
+
+const payOpen = ref(false)
+const payOrder = ref<PaymentOrder | null>(null)
+const payURL = ref('')
+const qrPayload = ref('')
+const qrImage = ref('')
+const polling = ref(false)
+let pollTimer: number | null = null
 
 const wechatMinCNY = 100
 
@@ -460,6 +568,88 @@ function closeCheckout() {
   checkoutOpen.value = false
 }
 
+function closePay() {
+  payOpen.value = false
+}
+
+function openPayPage() {
+  if (!payURL.value) return
+  window.open(payURL.value, '_blank')
+}
+
+function stopPolling() {
+  polling.value = false
+  if (pollTimer != null) {
+    window.clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+function isLikelyImageSrc(value: string): boolean {
+  const v = value.trim().toLowerCase()
+  if (!v) return false
+  if (v.startsWith('data:image/')) return true
+  if (v.endsWith('.png') || v.endsWith('.jpg') || v.endsWith('.jpeg') || v.endsWith('.webp') || v.endsWith('.gif'))
+    return true
+  return false
+}
+
+async function refreshPayQR() {
+  const payload = qrPayload.value.trim() || payURL.value.trim()
+  if (!payload) {
+    qrImage.value = ''
+    return
+  }
+  if (isLikelyImageSrc(payload)) {
+    qrImage.value = payload
+    return
+  }
+  try {
+    qrImage.value = await QRCode.toDataURL(payload, { width: 280, margin: 1 })
+  } catch {
+    qrImage.value = ''
+  }
+}
+
+async function pollOrderStatus(orderNo: string) {
+  if (!orderNo) return
+  stopPolling()
+  polling.value = true
+
+  const tick = async () => {
+    try {
+      const latest = await paymentAPI.getPaymentOrder(orderNo)
+      payOrder.value = latest
+
+      if (latest.status === 'paid') {
+        stopPolling()
+        appStore.showSuccess(t('payment.paymentSuccess'))
+        await loadOrders()
+        return
+      }
+      if (latest.status === 'failed') {
+        stopPolling()
+        appStore.showError(t('payment.paymentFailed'))
+        await loadOrders()
+        return
+      }
+      if (latest.status === 'expired') {
+        stopPolling()
+        appStore.showWarning(t('payment.paymentExpired'))
+        await loadOrders()
+      }
+    } catch (error) {
+      const status = (error as { status?: number }).status
+      if (status === 404) {
+        stopPolling()
+      }
+    }
+  }
+
+  await tick()
+  pollTimer = window.setInterval(tick, 2500)
+}
+
 async function loadOrders() {
   loadingOrders.value = true
   try {
@@ -508,6 +698,13 @@ async function payNow() {
     appStore.showSuccess(t('payment.orderCreated') + ` (${resp.order.order_no})`)
     await loadOrders()
     closeCheckout()
+
+    payOrder.value = resp.order
+    payURL.value = resp.pay_url || ''
+    qrPayload.value = resp.qr_url || resp.pay_url || ''
+    payOpen.value = true
+    await refreshPayQR()
+    await pollOrderStatus(resp.order.order_no)
   } catch (error) {
     if (isNotFoundError(error)) {
       appStore.showWarning(t('payment.apiNotEnabledToast'))
@@ -518,6 +715,24 @@ async function payNow() {
     creatingOrder.value = false
   }
 }
+
+watch(
+  () => payOpen.value,
+  async (open) => {
+    if (!open) {
+      stopPolling()
+      return
+    }
+    await refreshPayQR()
+  }
+)
+
+watch(
+  () => qrPayload.value,
+  async () => {
+    if (payOpen.value) await refreshPayQR()
+  }
+)
 
 function providerLabel(provider: PaymentChannel): string {
   if (provider === 'zpay') return t('payment.alipay')
@@ -537,5 +752,9 @@ async function copyOrderNo(orderNo: string) {
 onMounted(() => {
   loadPlans()
   loadOrders()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>

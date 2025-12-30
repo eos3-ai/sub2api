@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Frontend Builder
 # -----------------------------------------------------------------------------
-FROM node:24-alpine AS frontend-builder
+FROM docker.1ms.run/library/node:24-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -24,12 +24,17 @@ RUN npm run build
 # -----------------------------------------------------------------------------
 # Stage 2: Backend Builder
 # -----------------------------------------------------------------------------
-FROM golang:1.25-alpine AS backend-builder
+FROM docker.1ms.run/library/golang:1.25-alpine AS backend-builder
 
 # Build arguments for version info (set by CI)
 ARG VERSION=docker
 ARG COMMIT=docker
 ARG DATE
+
+# 设置 GOPROXY 使用国内镜像
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOPRIVATE=git.mycompany.com
+ENV GOSUMDB=off
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -56,7 +61,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # -----------------------------------------------------------------------------
 # Stage 3: Final Runtime Image
 # -----------------------------------------------------------------------------
-FROM alpine:3.19
+FROM docker.1ms.run/library/alpine:3.19
 
 # Labels
 LABEL maintainer="Wei-Shaw <github.com/Wei-Shaw>"

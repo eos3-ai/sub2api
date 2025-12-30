@@ -30,6 +30,7 @@ func RegisterUserRoutes(
 			payment.GET("/plans", h.Payment.GetPlans)
 			payment.POST("/orders", h.Payment.CreateOrder)
 			payment.GET("/orders", h.Payment.ListMyOrders)
+			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
 		}
 
 		// API Key管理
