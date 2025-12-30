@@ -91,6 +91,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 		AmountUSD:     amountUSD,
 		TotalUSD:      creditsUSD,
 		ExchangeRate:  s.cfg.ExchangeRate,
+		DiscountRate:  discount,
 		Provider:      strings.ToLower(req.Provider),
 		PaymentMethod: req.PaymentMethod,
 		Status:        PaymentStatusPending,

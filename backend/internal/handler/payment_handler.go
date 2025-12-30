@@ -141,7 +141,9 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 	if err != nil {
 		_, _ = h.paymentService.MarkOrderFailed(c.Request.Context(), order.OrderNo, err.Error())
-		response.ErrorFrom(c, err)
+		// Most errors here are configuration issues (disabled/missing keys/base_url).
+		// Return 400 so frontend can surface a clear actionable message.
+		response.BadRequest(c, err.Error())
 		return
 	}
 	if payURL != "" {

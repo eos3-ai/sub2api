@@ -145,6 +145,7 @@ type paymentOrderModel struct {
 	BonusUSD      float64 `gorm:"type:decimal(20,8);not null;default:0"`
 	TotalUSD      float64 `gorm:"type:decimal(20,8);not null"`
 	ExchangeRate  float64 `gorm:"type:decimal(10,4);not null"`
+	DiscountRate  float64 `gorm:"type:decimal(10,4);not null;default:1"`
 	Provider      string  `gorm:"size:20;not null"`
 	PaymentMethod string  `gorm:"size:50"`
 	PaymentURL    string  `gorm:"size:1000"`
@@ -178,6 +179,7 @@ func paymentOrderModelToService(m *paymentOrderModel) *service.PaymentOrder {
 		BonusUSD:      m.BonusUSD,
 		TotalUSD:      m.TotalUSD,
 		ExchangeRate:  m.ExchangeRate,
+		DiscountRate:  m.DiscountRate,
 		Provider:      m.Provider,
 		PaymentMethod: m.PaymentMethod,
 		PaymentURL:    m.PaymentURL,
@@ -210,6 +212,7 @@ func paymentOrderModelFromService(o *service.PaymentOrder) *paymentOrderModel {
 		BonusUSD:      o.BonusUSD,
 		TotalUSD:      o.TotalUSD,
 		ExchangeRate:  o.ExchangeRate,
+		DiscountRate:  o.DiscountRate,
 		Provider:      o.Provider,
 		PaymentMethod: o.PaymentMethod,
 		PaymentURL:    o.PaymentURL,
@@ -234,4 +237,5 @@ func applyPaymentOrderModelToService(dst *service.PaymentOrder, src *paymentOrde
 	dst.ID = src.ID
 	dst.CreatedAt = src.CreatedAt
 	dst.UpdatedAt = src.UpdatedAt
+	dst.DiscountRate = src.DiscountRate
 }

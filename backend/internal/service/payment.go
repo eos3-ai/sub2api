@@ -22,6 +22,7 @@ type PaymentOrder struct {
 	BonusUSD     float64
 	TotalUSD     float64
 	ExchangeRate float64
+	DiscountRate float64
 
 	Provider      string
 	PaymentMethod string
