@@ -91,8 +91,23 @@
               </button>
               </div>
 
-              <div class="text-sm text-gray-500 dark:text-dark-400">
-                {{ t('payment.wechatMinRecharge', { amount: wechatMinCNY.toFixed(2) }) }}
+              <div
+                v-if="payMethod === 'wechat'"
+                class="text-sm"
+                :class="
+                  computedPayCNY > 0 && computedPayCNY < wechatMinCNY
+                    ? 'text-rose-600 dark:text-rose-400'
+                    : 'text-gray-500 dark:text-dark-400'
+                "
+              >
+                {{
+                  computedPayCNY > 0 && computedPayCNY < wechatMinCNY
+                    ? t('payment.wechatMinRechargeWarn', {
+                        min: wechatMinCNY.toFixed(2),
+                        current: computedPayCNY.toFixed(2)
+                      })
+                    : t('payment.wechatMinRecharge', { amount: wechatMinCNY.toFixed(2) })
+                }}
               </div>
             </div>
 
@@ -205,10 +220,16 @@
                       {{ t('payment.orderNo') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
+                      {{ t('payment.orderType') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
                       {{ t('payment.channel') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
-                      {{ t('payment.amount') }}
+                      {{ t('payment.creditsAmount') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
+                      {{ t('payment.payAmountCny') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
                       {{ t('payment.status') }}
@@ -224,13 +245,19 @@
                       <span class="font-mono text-xs">{{ o.order_no }}</span>
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
+                      {{ orderTypeLabel(o.order_type) }}
+                    </td>
+                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ providerLabel(o.provider) }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      ${{ o.amount_usd.toFixed(2) }}
+                      ${{ o.total_usd.toFixed(2) }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      {{ o.status }}
+                      ¥{{ o.amount_cny.toFixed(2) }}
+                    </td>
+                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
+                      {{ paymentStatusLabel(o.status) }}
                     </td>
                     <td class="px-5 py-4 text-right text-sm">
                       <button class="btn btn-secondary btn-sm" @click="copyOrderNo(o.order_no)">
@@ -348,43 +375,27 @@
                       : 'text-amber-600 dark:text-amber-400'
                 "
               >
-                {{ payOrder.status }}
+                {{ paymentStatusLabel(payOrder.status) }}
               </p>
             </div>
           </div>
 
-          <div class="grid gap-6 sm:grid-cols-2">
-            <div class="space-y-3">
-              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.scanToPay') }}</p>
-              <div
-                class="flex items-center justify-center rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
-              >
-                <div v-if="qrImage" class="flex flex-col items-center gap-3">
-                  <img :src="qrImage" alt="qr" class="h-56 w-56 rounded-2xl bg-white p-2" />
-                  <p v-if="polling && payOrder.status === 'pending'" class="text-xs text-gray-500 dark:text-dark-400">
-                    {{ t('payment.waitingForPayment') }}
-                  </p>
-                </div>
-                <div v-else class="text-sm text-gray-500 dark:text-dark-400">
-                  {{ t('payment.noQRCode') }}
-                </div>
+          <div class="space-y-3">
+            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.scanToPay') }}</p>
+            <div
+              class="flex flex-col items-center justify-center gap-4 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800"
+            >
+              <div v-if="qrImage" class="flex flex-col items-center gap-3">
+                <img :src="qrImage" alt="qr" class="h-56 w-56 rounded-2xl bg-white p-2" />
+                <p v-if="polling && payOrder.status === 'pending'" class="text-xs text-gray-500 dark:text-dark-400">
+                  {{ t('payment.waitingForPayment') }}
+                </p>
               </div>
-            </div>
+              <div v-else class="text-sm text-gray-500 dark:text-dark-400">
+                {{ t('payment.noQRCode') }}
+              </div>
 
-            <div class="space-y-3">
-              <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ t('payment.payActions') }}</p>
-              <div class="space-y-3 rounded-3xl border border-gray-200 bg-white p-5 shadow-sm dark:border-dark-700 dark:bg-dark-800">
-                <div class="text-sm text-gray-700 dark:text-dark-200">
-                  <div class="flex items-center justify-between">
-                    <span>{{ t('payment.payAmountLabel') }}</span>
-                    <span class="font-semibold">{{ formatUSD2(payOrder.amount_usd) }}</span>
-                  </div>
-                  <div class="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-dark-400">
-                    <span>{{ t('payment.channel') }}</span>
-                    <span>{{ providerLabel(payOrder.provider) }}</span>
-                  </div>
-                </div>
-
+              <div class="w-full space-y-3 pt-1">
                 <button
                   v-if="payURL"
                   type="button"
@@ -396,7 +407,7 @@
 
                 <button
                   type="button"
-                  class="w-full rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:hover:bg-dark-800"
+                  class="w-full rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:hover:bg-dark-800"
                   :disabled="polling"
                   @click="pollOrderStatus(payOrder.order_no)"
                 >
@@ -506,8 +517,10 @@ const formulaText = computed(() => {
 
 const canPayNow = computed(() => {
   if (!selectedKind.value) return false
-  if (selectedKind.value === 'plan') return !!selectedPlan.value
-  return customAmountUSD.value > 0
+  if (selectedKind.value === 'plan' && !selectedPlan.value) return false
+  if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) return false
+  if (payMethod.value === 'wechat' && computedPayCNY.value > 0 && computedPayCNY.value < wechatMinCNY) return false
+  return true
 })
 
 function isNotFoundError(error: unknown): boolean {
@@ -681,6 +694,15 @@ async function payNow() {
     appStore.showWarning(t('payment.selectAmount'))
     return
   }
+  if (payMethod.value === 'wechat' && computedPayCNY.value > 0 && computedPayCNY.value < wechatMinCNY) {
+    appStore.showWarning(
+      t('payment.wechatMinRechargeWarn', {
+        min: wechatMinCNY.toFixed(2),
+        current: computedPayCNY.value.toFixed(2)
+      })
+    )
+    return
+  }
 
   try {
     creatingOrder.value = true
@@ -737,7 +759,33 @@ watch(
 function providerLabel(provider: PaymentChannel): string {
   if (provider === 'zpay') return t('payment.alipay')
   if (provider === 'stripe') return t('payment.wechat')
+  if (provider === 'admin') return t('payment.adminRecharge')
   return provider
+}
+
+function orderTypeLabel(orderType?: string): string {
+  const value = String(orderType || '').toLowerCase()
+  if (value === 'admin_recharge') return t('payment.orderTypeAdmin')
+  return t('payment.orderTypeOnline')
+}
+
+function paymentStatusLabel(status: string): string {
+  const normalized = String(status || '').toLowerCase()
+  switch (normalized) {
+    case 'pending':
+      return t('payment.statusPending')
+    case 'paid':
+      return t('payment.statusPaid')
+    case 'failed':
+      return t('payment.statusFailed')
+    case 'expired':
+      return t('payment.statusExpired')
+    case 'cancelled':
+    case 'canceled':
+      return t('payment.statusCancelled')
+    default:
+      return status
+  }
 }
 
 async function copyOrderNo(orderNo: string) {

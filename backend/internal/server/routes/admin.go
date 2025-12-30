@@ -57,6 +57,9 @@ func RegisterAdminRoutes(
 
 		// 用户属性管理
 		registerUserAttributeRoutes(admin, h)
+
+		// 充值记录（支付订单）
+		registerPaymentOrderRoutes(admin, h)
 	}
 }
 
@@ -261,5 +264,16 @@ func registerUserAttributeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		attrs.PUT("/reorder", h.Admin.UserAttribute.ReorderDefinitions)
 		attrs.PUT("/:id", h.Admin.UserAttribute.UpdateDefinition)
 		attrs.DELETE("/:id", h.Admin.UserAttribute.DeleteDefinition)
+	}
+}
+
+func registerPaymentOrderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h == nil || h.Admin == nil || h.Admin.PaymentOrders == nil {
+		return
+	}
+	payment := admin.Group("/payment")
+	{
+		payment.GET("/orders", h.Admin.PaymentOrders.List)
+		payment.GET("/orders/export", h.Admin.PaymentOrders.Export)
 	}
 }

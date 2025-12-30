@@ -54,7 +54,8 @@
           </router-link>
         </div>
 
-        <!-- Personal Section for Admin (hidden in simple mode) -->
+        <!-- Admin "My Account" section is disabled in this deployment to focus on management-only features. -->
+        <!--
         <div v-if="!authStore.isSimpleMode" class="sidebar-section">
           <div v-if="!sidebarCollapsed" class="sidebar-section-title">
             {{ t('nav.myAccount') }}
@@ -77,6 +78,7 @@
             </transition>
           </router-link>
         </div>
+        -->
       </template>
 
       <!-- Regular User View -->
@@ -396,18 +398,6 @@ const userNavItems = computed(() => {
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
 })
 
-// Personal navigation items (for admin's "My Account" section, without Dashboard)
-const personalNavItems = computed(() => {
-  const items = [
-    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
-    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
-  ]
-  return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
-})
-
 // Admin navigation items
 const adminNavItems = computed(() => {
   const baseItems = [
@@ -415,16 +405,15 @@ const adminNavItems = computed(() => {
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    { path: '/admin/payment-orders', label: t('nav.rechargeRecords'), icon: CreditCardIcon },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
   ]
 
-  // 简单模式下，在系统设置前插入 API密钥
+  // 简单模式下仅保留管理功能入口
   if (authStore.isSimpleMode) {
     const filtered = baseItems.filter(item => !item.hideInSimpleMode)
-    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
-    filtered.push({ path: '/payment', label: t('nav.payment'), icon: CreditCardIcon })
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     return filtered
   }

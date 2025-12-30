@@ -62,6 +62,10 @@
   - `POST /api/v1/payment/orders`（创建订单记录；需 `payment.enabled=true` 才允许创建）
   - `GET /api/v1/payment/orders`（查询我的订单列表，分页）
   - `GET /api/v1/payment/orders/:orderNo`（查询单个订单状态，用于前端支付弹窗轮询）
+- 已补齐管理员侧充值记录（支付订单）查询/导出：
+  - `GET /api/v1/admin/payment/orders`（分页 + 筛选：`method`/`user`）
+  - `GET /api/v1/admin/payment/orders/export`（导出筛选后的记录，CSV）
+  - 前端新增 `/admin/payment-orders` 页面，支持筛选、分页与“导出记录”。
 - 已开始接入真实支付渠道（后端可返回 `pay_url/qr_url`）：
   - ZPay：`backend/internal/service/zpay_service.go` 生成收银台链接（`submit.php`）并支持回调签名校验。
   - Stripe：`backend/internal/service/stripe_service.go` 创建 `PaymentIntent`（微信支付），可返回 `HostedInstructionsURL` 与 QR 图（`image_url_png`）。

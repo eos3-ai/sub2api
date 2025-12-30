@@ -1,6 +1,10 @@
 package dto
 
-import "github.com/Wei-Shaw/sub2api/internal/service"
+import (
+	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/service"
+)
 
 func UserFromServiceShallow(u *service.User) *User {
 	if u == nil {
@@ -328,9 +332,14 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 	if o == nil {
 		return nil
 	}
+	orderType := "online_recharge"
+	if strings.EqualFold(o.Provider, "admin") {
+		orderType = "admin_recharge"
+	}
 	return &PaymentOrder{
 		ID:        o.ID,
 		OrderNo:   o.OrderNo,
+		OrderType: orderType,
 		UserID:    o.UserID,
 		Username:  o.Username,
 		Provider:  o.Provider,

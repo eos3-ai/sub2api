@@ -242,6 +242,7 @@ type PaymentPlan struct {
 type PaymentOrder struct {
 	ID        int64     `json:"id"`
 	OrderNo   string    `json:"order_no"`
+	OrderType string    `json:"order_type"`
 	UserID    int64     `json:"user_id"`
 	Username  string    `json:"username"`
 	Provider  string    `json:"provider"`

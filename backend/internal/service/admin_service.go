@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
 
@@ -224,6 +226,8 @@ type adminServiceImpl struct {
 	redeemCodeRepo      RedeemCodeRepository
 	billingCacheService *BillingCacheService
 	proxyProber         ProxyExitInfoProber
+	paymentOrderRepo    PaymentOrderRepository
+	cfg                 *config.Config
 }
 
 // NewAdminService creates a new AdminService
@@ -236,6 +240,8 @@ func NewAdminService(
 	redeemCodeRepo RedeemCodeRepository,
 	billingCacheService *BillingCacheService,
 	proxyProber ProxyExitInfoProber,
+	paymentOrderRepo PaymentOrderRepository,
+	cfg *config.Config,
 ) AdminService {
 	return &adminServiceImpl{
 		userRepo:            userRepo,
@@ -246,6 +252,8 @@ func NewAdminService(
 		redeemCodeRepo:      redeemCodeRepo,
 		billingCacheService: billingCacheService,
 		proxyProber:         proxyProber,
+		paymentOrderRepo:    paymentOrderRepo,
+		cfg:                 cfg,
 	}
 }
 
@@ -404,6 +412,10 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 	}
 
 	balanceDiff := user.Balance - oldBalance
+	if operation == "add" && balance > 0 {
+		_ = s.createAdminRechargeOrder(ctx, user, balance, notes)
+	}
+
 	if balanceDiff != 0 {
 		code, err := GenerateRedeemCode()
 		if err != nil {
@@ -429,6 +441,57 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 
 	return user, nil
 }
+
+func (s *adminServiceImpl) createAdminRechargeOrder(ctx context.Context, user *User, amountUSD float64, notes string) error {
+	if s == nil || s.paymentOrderRepo == nil || user == nil {
+		return nil
+	}
+
+	now := time.Now()
+	exchangeRate := 1.0
+	if s.cfg != nil && s.cfg.Payment.ExchangeRate > 0 {
+		exchangeRate = s.cfg.Payment.ExchangeRate
+	}
+
+	remark := strings.TrimSpace(notes)
+	if remark == "" {
+		remark = "admin recharge"
+	}
+
+	order := &PaymentOrder{
+		OrderNo:       s.generateAdminOrderNo(now),
+		UserID:        user.ID,
+		Username:      user.Email,
+		AmountCNY:     0,
+		AmountUSD:     0,
+		BonusUSD:      0,
+		TotalUSD:      amountUSD,
+		ExchangeRate:  exchangeRate,
+		DiscountRate:  1.0,
+		Provider:      "admin",
+		PaymentMethod: "admin",
+		PaymentURL:    "",
+		Status:        PaymentStatusPaid,
+		PaidAt:        adminTimePtr(now),
+		ExpireAt:      now,
+		CallbackData:  remark,
+		CallbackAt:    adminTimePtr(now),
+		ClientIP:      "",
+		UserAgent:     "",
+		CreatedAt:     now,
+		UpdatedAt:     now,
+	}
+
+	return s.paymentOrderRepo.Create(ctx, order)
+}
+
+func (s *adminServiceImpl) generateAdminOrderNo(now time.Time) string {
+	// Use a different prefix to distinguish from gateway-created orders.
+	// Keep it short and sortable.
+	return "AO" + now.UTC().Format("20060102150405") + fmt.Sprintf("%06d", now.UnixNano()%1000000)
+}
+
+func adminTimePtr(t time.Time) *time.Time { return &t }
 
 func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]ApiKey, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
