@@ -70,6 +70,15 @@ func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountReposi
 	return svc
 }
 
+// ProvidePaymentMaintenanceService creates and starts PaymentMaintenanceService when payment module is enabled.
+func ProvidePaymentMaintenanceService(cfg *config.Config, paymentService *PaymentService) *PaymentMaintenanceService {
+	svc := NewPaymentMaintenanceService(paymentService, time.Minute)
+	if cfg != nil && cfg.Payment.Enabled {
+		svc.Start()
+	}
+	return svc
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -81,6 +90,12 @@ var ProviderSet = wire.NewSet(
 	NewProxyService,
 	NewRedeemService,
 	NewUsageService,
+	NewBalanceService,
+	NewPromotionService,
+	NewReferralService,
+	NewPaymentService,
+	NewZpayService,
+	NewStripeService,
 	NewDashboardService,
 	ProvidePricingService,
 	NewBillingService,
@@ -115,4 +130,5 @@ var ProviderSet = wire.NewSet(
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,
 	NewUsageCache,
+	ProvidePaymentMaintenanceService,
 )

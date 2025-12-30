@@ -1,0 +1,355 @@
+package handler
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
+	"github.com/Wei-Shaw/sub2api/internal/service"
+
+	"github.com/gin-gonic/gin"
+)
+
+type PaymentHandler struct {
+	cfg            *config.Config
+	paymentService *service.PaymentService
+	zpayService    *service.ZpayService
+	stripeService  *service.StripeService
+}
+
+func NewPaymentHandler(
+	cfg *config.Config,
+	paymentService *service.PaymentService,
+	zpayService *service.ZpayService,
+	stripeService *service.StripeService,
+) *PaymentHandler {
+	return &PaymentHandler{
+		cfg:            cfg,
+		paymentService: paymentService,
+		zpayService:    zpayService,
+		stripeService:  stripeService,
+	}
+}
+
+type createPaymentOrderRequest struct {
+	PlanID    string   `json:"plan_id"`
+	AmountUSD *float64 `json:"amount_usd,omitempty"`
+	Channel   string   `json:"channel" binding:"required,oneof=zpay stripe alipay wechat"`
+}
+
+// GetPlans returns configured payment packages as "plans".
+// GET /api/v1/payment/plans
+func (h *PaymentHandler) GetPlans(c *gin.Context) {
+	if h.cfg == nil {
+		response.Success(c, []dto.PaymentPlan{})
+		return
+	}
+
+	paymentCfg := h.cfg.Payment
+	discount := normalizedDiscountRate(paymentCfg.DiscountRate)
+	plans := make([]dto.PaymentPlan, 0, len(paymentCfg.Packages))
+	for i, pkg := range paymentCfg.Packages {
+		planID := fmt.Sprintf("pkg_%d", i)
+		amountUSD := pkg.AmountUSD
+		if amountUSD <= 0 && paymentCfg.ExchangeRate > 0 && pkg.AmountCNY > 0 {
+			amountUSD = pkg.AmountCNY / paymentCfg.ExchangeRate
+		}
+		creditsUSD := amountUSD
+		payUSD := creditsUSD * discount
+		plans = append(plans, dto.PaymentPlan{
+			ID:         planID,
+			Name:       pkg.Label,
+			AmountUSD:  amountUSD,
+			PayUSD:     payUSD,
+			CreditsUSD: creditsUSD,
+			ExchangeRate: paymentCfg.ExchangeRate,
+			DiscountRate: discount,
+			Enabled:    paymentCfg.Enabled,
+		})
+	}
+	response.Success(c, plans)
+}
+
+// CreateOrder creates an order record using existing PaymentService.
+// POST /api/v1/payment/orders
+func (h *PaymentHandler) CreateOrder(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	var req createPaymentOrderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if h.cfg == nil {
+		response.Error(c, http.StatusBadRequest, "payment config is missing")
+		return
+	}
+
+	var amountCNY float64
+	if req.PlanID != "" {
+		v, err := h.amountCNYFromPlanID(req.PlanID)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		amountCNY = v
+	} else if req.AmountUSD != nil && *req.AmountUSD > 0 {
+		discount := normalizedDiscountRate(h.cfg.Payment.DiscountRate)
+		payUSD := (*req.AmountUSD) * discount
+		amountCNY = payUSD * h.cfg.Payment.ExchangeRate
+	} else {
+		response.BadRequest(c, "either plan_id or amount_usd is required")
+		return
+	}
+
+	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
+		UserID:        subject.UserID,
+		Username:      "",
+		AmountCNY:     amountCNY,
+		Provider:      normalizePaymentProvider(req.Channel),
+		PaymentMethod: "web",
+		ClientIP:      c.ClientIP(),
+		UserAgent:     c.GetHeader("User-Agent"),
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	var payURL string
+	var qrURL string
+	switch strings.ToLower(strings.TrimSpace(order.Provider)) {
+	case "zpay":
+		payURL, qrURL, err = h.zpayService.CreatePayment(c.Request.Context(), order, req.Channel)
+	case "stripe":
+		payURL, qrURL, err = h.stripeService.CreatePayment(c.Request.Context(), order, req.Channel)
+	default:
+		// Provider integration is still WIP.
+	}
+	if err != nil {
+		_, _ = h.paymentService.MarkOrderFailed(c.Request.Context(), order.OrderNo, err.Error())
+		response.ErrorFrom(c, err)
+		return
+	}
+	if payURL != "" {
+		order.PaymentURL = payURL
+		_ = h.paymentService.UpdateOrder(c.Request.Context(), order)
+	}
+
+	response.Created(c, gin.H{
+		"order": dto.PaymentOrderFromService(order),
+		"pay_url": payURL,
+		"qr_url":  qrURL,
+	})
+}
+
+// ListMyOrders lists current user's payment orders.
+// GET /api/v1/payment/orders?page=1&page_size=20
+func (h *PaymentHandler) ListMyOrders(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	page, pageSize := response.ParsePagination(c)
+	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+	status := c.Query("status")
+
+	orders, result, err := h.paymentService.ListUserOrders(c.Request.Context(), subject.UserID, params, status)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	out := make([]dto.PaymentOrder, 0, len(orders))
+	for i := range orders {
+		out = append(out, *dto.PaymentOrderFromService(&orders[i]))
+	}
+	response.Paginated(c, out, result.Total, page, pageSize)
+}
+
+func (h *PaymentHandler) amountCNYFromPlanID(planID string) (float64, error) {
+	if h.cfg == nil {
+		return 0, errors.New("payment config is missing")
+	}
+	if !strings.HasPrefix(planID, "pkg_") {
+		return 0, errors.New("invalid plan_id")
+	}
+	indexStr := strings.TrimPrefix(planID, "pkg_")
+	i, err := strconv.Atoi(indexStr)
+	if err != nil {
+		return 0, errors.New("invalid plan_id")
+	}
+	if i < 0 || i >= len(h.cfg.Payment.Packages) {
+		return 0, errors.New("plan_id not found")
+	}
+	pkg := h.cfg.Payment.Packages[i]
+	if pkg.AmountCNY > 0 {
+		return pkg.AmountCNY, nil
+	}
+	if pkg.AmountUSD > 0 && h.cfg.Payment.ExchangeRate > 0 {
+		discount := normalizedDiscountRate(h.cfg.Payment.DiscountRate)
+		payUSD := pkg.AmountUSD * discount
+		return payUSD * h.cfg.Payment.ExchangeRate, nil
+	}
+	return 0, errors.New("invalid package config: amount_cny or amount_usd is required")
+}
+
+func normalizedDiscountRate(discountRate float64) float64 {
+	// discountRate is a payable multiplier in (0,1], e.g. 0.15 means "pay 15%".
+	// Compatibility: historical default was 1.0 (pay full).
+	if discountRate <= 0 {
+		return 1.0
+	}
+	if discountRate > 1 {
+		return 1.0
+	}
+	return discountRate
+}
+
+func normalizePaymentProvider(channel string) string {
+	switch strings.ToLower(strings.TrimSpace(channel)) {
+	case "alipay":
+		return "zpay"
+	case "wechat":
+		return "stripe"
+	default:
+		return strings.ToLower(strings.TrimSpace(channel))
+	}
+}
+
+// ZpayNotify handles ZPay notify callback.
+// ZPay expects plain "success" on successful processing.
+func (h *PaymentHandler) ZpayNotify(c *gin.Context) {
+	if h.cfg == nil || h.paymentService == nil || h.zpayService == nil {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+	if !h.cfg.Payment.Zpay.Enabled {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+
+	clientIP := c.ClientIP()
+	if !ipAllowed(clientIP, h.cfg.Payment.Zpay.IPWhitelist) {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+
+	data := collectCallbackParams(c)
+	orderNo, tradeNo, err := h.zpayService.VerifyCallback(c.Request.Context(), data)
+	if err != nil {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+
+	status := strings.ToUpper(strings.TrimSpace(data["trade_status"]))
+	if status == "" {
+		status = strings.ToUpper(strings.TrimSpace(data["status"]))
+	}
+	if status != "" && status != "TRADE_SUCCESS" && status != "SUCCESS" {
+		c.String(http.StatusOK, "success")
+		return
+	}
+
+	if moneyStr := strings.TrimSpace(data["money"]); moneyStr != "" {
+		if money, err := strconv.ParseFloat(moneyStr, 64); err == nil {
+			order, _ := h.paymentService.GetOrderByOrderNo(c.Request.Context(), orderNo)
+			if order != nil && !approxEqual(order.AmountCNY, money, 0.02) {
+				c.String(http.StatusOK, "fail")
+				return
+			}
+		}
+	}
+
+	if tradeNo == "" {
+		tradeNo = "zpay:" + orderNo
+	}
+	if _, err := h.paymentService.MarkOrderPaid(c.Request.Context(), orderNo, tradeNo, data); err != nil {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+	c.String(http.StatusOK, "success")
+}
+
+// StripeWebhook handles Stripe webhook callback.
+func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
+	if h.cfg == nil || h.paymentService == nil || h.stripeService == nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if !h.cfg.Payment.Stripe.Enabled {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+
+	payload, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	signature := c.GetHeader("Stripe-Signature")
+	orderNo, tradeNo, eventType, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
+	if err != nil {
+		c.Status(http.StatusBadRequest)
+		return
+	}
+	if eventType == "payment_intent.succeeded" && orderNo != "" && tradeNo != "" {
+		_, _ = h.paymentService.MarkOrderPaid(c.Request.Context(), orderNo, tradeNo, gin.H{
+			"type": eventType,
+		})
+	}
+	c.Status(http.StatusOK)
+}
+
+// PaymentReturn provides a lightweight return endpoint for payment providers.
+func (h *PaymentHandler) PaymentReturn(c *gin.Context) {
+	// Keep it simple: return to the SPA recharge page.
+	c.Redirect(http.StatusFound, "/payment")
+}
+
+func collectCallbackParams(c *gin.Context) map[string]string {
+	_ = c.Request.ParseForm()
+	out := map[string]string{}
+	for k, v := range c.Request.Form {
+		if len(v) > 0 {
+			out[k] = v[0]
+		}
+	}
+	return out
+}
+
+func approxEqual(a float64, b float64, eps float64) bool {
+	if a > b {
+		return a-b <= eps
+	}
+	return b-a <= eps
+}
+
+func ipAllowed(clientIP string, whitelist string) bool {
+	raw := strings.TrimSpace(whitelist)
+	if raw == "" {
+		return true
+	}
+	items := strings.Split(raw, ",")
+	for _, item := range items {
+		if strings.TrimSpace(item) == clientIP {
+			return true
+		}
+	}
+	return false
+}

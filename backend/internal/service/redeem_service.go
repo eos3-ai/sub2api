@@ -70,6 +70,7 @@ type RedeemCodeResponse struct {
 type RedeemService struct {
 	redeemRepo          RedeemCodeRepository
 	userRepo            UserRepository
+	balanceService      *BalanceService
 	subscriptionService *SubscriptionService
 	cache               RedeemCache
 	billingCacheService *BillingCacheService
@@ -80,6 +81,7 @@ type RedeemService struct {
 func NewRedeemService(
 	redeemRepo RedeemCodeRepository,
 	userRepo UserRepository,
+	balanceService *BalanceService,
 	subscriptionService *SubscriptionService,
 	cache RedeemCache,
 	billingCacheService *BillingCacheService,
@@ -88,6 +90,7 @@ func NewRedeemService(
 	return &RedeemService{
 		redeemRepo:          redeemRepo,
 		userRepo:            userRepo,
+		balanceService:      balanceService,
 		subscriptionService: subscriptionService,
 		cache:               cache,
 		billingCacheService: billingCacheService,
@@ -274,9 +277,32 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	// 执行兑换逻辑（兑换码已被锁定，此时可安全操作）
 	switch redeemCode.Type {
 	case RedeemTypeBalance:
-		// 增加用户余额
-		if err := s.userRepo.UpdateBalance(txCtx, userID, redeemCode.Value); err != nil {
-			return nil, fmt.Errorf("update user balance: %w", err)
+		// 增加用户余额，并写入流水（用于“充值记录”可视化）
+		if s.balanceService != nil {
+			_, err := s.balanceService.ApplyChange(txCtx, BalanceChangeRequest{
+				UserID:    userID,
+				Amount:    redeemCode.Value,
+				Type:      RechargeTypeRedeem,
+				Operator:  "system",
+				Remark:    fmt.Sprintf("redeem %s", redeemCode.Code),
+				RelatedID: &redeemCode.Code,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("apply balance: %w", err)
+			}
+		} else {
+			// 兼容：若 BalanceService 未注入，回退为旧逻辑
+			if err := s.userRepo.UpdateBalance(txCtx, userID, redeemCode.Value); err != nil {
+				return nil, fmt.Errorf("update user balance: %w", err)
+			}
+			// 失效余额缓存
+			if s.billingCacheService != nil {
+				go func() {
+					cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+					defer cancel()
+					_ = s.billingCacheService.InvalidateUserBalance(cacheCtx, userID)
+				}()
+			}
 		}
 
 	case RedeemTypeConcurrency:

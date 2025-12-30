@@ -172,3 +172,72 @@ gemini:
         pro_rpd: 2000
         flash_rpd: 0
         cooldown_minutes: 5
+
+# =============================================================================
+# Payment / Recharge (Optional)
+# =============================================================================
+# Enables the new frontend pages:
+#   - /payment (recharge plans + "my orders" as recharge records)
+#
+# Notes:
+# - When payment.enabled=false, you can still view plans, but creating orders will fail.
+# - Frontend pay methods are "Alipay / WeChat":
+#   - Alipay => provider zpay
+#   - WeChat => provider stripe
+# - Payment providers (zpay/stripe) are still WIP: orders can be created but no real pay_url/qr_url is generated yet.
+payment:
+  enabled: false
+  base_url: ""
+  min_amount: 1.0
+  max_amount: 10000.0
+  exchange_rate: 7.2
+  # Discount rate in (0,1], e.g. 0.15 means "pay 15%"
+  discount_rate: 0.15
+  order_expire_minutes: 30
+  max_orders_per_minute: 3
+
+  # Recharge packages shown in /payment
+  packages:
+    # UI displays `label` directly; recommended to keep it in USD (e.g. "$100")
+    # amount_usd is for display; CNY will be calculated at checkout: amount_usd * exchange_rate * discount_rate
+    - amount_usd: 100
+      label: "$100"
+      popular: false
+    - amount_usd: 200
+      label: "$200"
+      popular: false
+    - amount_usd: 500
+      label: "$500"
+      popular: true
+    - amount_usd: 1000
+      label: "$1000"
+      popular: false
+
+  # ZPay channel (WIP)
+  zpay:
+    enabled: false
+    pid: ""
+    key: ""
+    api_url: "https://zpayz.cn"
+    notify_url: "/api/payment/webhook/zpay"
+    return_url: "/payment/result"
+    submit_url: "https://zpayz.cn/submit.php"
+    query_url: "https://zpayz.cn/api.php"
+    payment_methods: "alipay,wxpay"
+    order_prefix: "ORD_"
+    notify_user: false
+    ip_whitelist: ""
+    require_https: true
+
+  # Stripe channel (WIP)
+  stripe:
+    enabled: false
+    api_key: ""
+    webhook_secret: ""
+    success_url: "/payment/success"
+    cancel_url: "/payment/cancel"
+    api_version: ""
+    payment_methods: "wechat_pay"
+    currency: "CNY"
+    wechat_client: "web"
+    wechat_app_id: ""

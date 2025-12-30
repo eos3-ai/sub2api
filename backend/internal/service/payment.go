@@ -1,0 +1,45 @@
+package service
+
+import "time"
+
+const (
+	PaymentStatusPending  = "pending"
+	PaymentStatusPaid     = "paid"
+	PaymentStatusFailed   = "failed"
+	PaymentStatusExpired  = "expired"
+	PaymentStatusRefunded = "refunded"
+)
+
+// PaymentOrder 表示支付订单
+type PaymentOrder struct {
+	ID           int64
+	OrderNo      string
+	TradeNo      *string
+	UserID       int64
+	Username     string
+	AmountCNY    float64
+	AmountUSD    float64
+	BonusUSD     float64
+	TotalUSD     float64
+	ExchangeRate float64
+
+	Provider      string
+	PaymentMethod string
+	PaymentURL    string
+
+	Status   string
+	PaidAt   *time.Time
+	ExpireAt time.Time
+
+	PromotionTier *int
+	PromotionUsed bool
+
+	CallbackData string
+	CallbackAt   *time.Time
+
+	ClientIP  string
+	UserAgent string
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}

@@ -216,3 +216,41 @@ type BulkAssignResult struct {
 	Subscriptions []UserSubscription `json:"subscriptions"`
 	Errors        []string           `json:"errors"`
 }
+
+type RechargeRecord struct {
+	ID            int64     `json:"id"`
+	UserID        int64     `json:"user_id"`
+	Type          string    `json:"type"`
+	Amount        float64   `json:"amount"`
+	BalanceBefore float64   `json:"balance_before"`
+	BalanceAfter  float64   `json:"balance_after"`
+	Remark        string    `json:"remark"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type PaymentPlan struct {
+	ID         string  `json:"id"`
+	Name       string  `json:"name"`
+	AmountUSD  float64 `json:"amount_usd"`
+	PayUSD     float64 `json:"pay_usd"`
+	CreditsUSD float64 `json:"credits_usd"`
+	ExchangeRate float64 `json:"exchange_rate"`
+	DiscountRate float64 `json:"discount_rate"`
+	Enabled    bool    `json:"enabled"`
+}
+
+type PaymentOrder struct {
+	ID        int64     `json:"id"`
+	OrderNo   string    `json:"order_no"`
+	UserID    int64     `json:"user_id"`
+	Username  string    `json:"username"`
+	Provider  string    `json:"provider"`
+	Status    string    `json:"status"`
+	AmountCNY float64   `json:"amount_cny"`
+	AmountUSD float64   `json:"amount_usd"`
+	TotalUSD  float64   `json:"total_usd"`
+	ExpireAt  time.Time `json:"expire_at"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	PaidAt    *time.Time `json:"paid_at,omitempty"`
+}

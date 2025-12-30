@@ -56,10 +56,11 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, title: 'Usage Statistics' }
   },
   {
-    path: '/redeem',
-    name: 'Redeem',
-    component: () => import('@/views/RedeemView.vue'),
-    meta: { requiresAuth: true, title: 'Redeem Code' }
+    // Redeem code feature is not used in this deployment:
+    // path: '/redeem',
+    // name: 'Redeem',
+    // component: () => import('@/views/RedeemView.vue'),
+    // meta: { requiresAuth: true, title: 'Redeem Code' }
   },
   {
     path: '/profile',
@@ -100,10 +101,11 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true, title: 'Proxies' }
   },
   {
-    path: '/admin/redeem-codes',
-    name: 'AdminRedeemCodes',
-    component: () => import('@/views/admin/RedeemCodesView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true, title: 'Redeem Codes' }
+    // Redeem code feature is not used in this deployment:
+    // path: '/admin/redeem-codes',
+    // name: 'AdminRedeemCodes',
+    // component: () => import('@/views/admin/RedeemCodesView.vue'),
+    // meta: { requiresAuth: true, requiresAdmin: true, title: 'Redeem Codes' }
   },
 
   // Default redirect

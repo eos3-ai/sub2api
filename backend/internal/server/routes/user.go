@@ -24,6 +24,14 @@ func RegisterUserRoutes(
 			user.PUT("", h.User.UpdateProfile)
 		}
 
+		// 支付/充值
+		payment := authenticated.Group("/payment")
+		{
+			payment.GET("/plans", h.Payment.GetPlans)
+			payment.POST("/orders", h.Payment.CreateOrder)
+			payment.GET("/orders", h.Payment.ListMyOrders)
+		}
+
 		// API Key管理
 		keys := authenticated.Group("/keys")
 		{

@@ -307,3 +307,40 @@ func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult 
 		Errors:        r.Errors,
 	}
 }
+
+func RechargeRecordFromService(r *service.RechargeRecord) *RechargeRecord {
+	if r == nil {
+		return nil
+	}
+	return &RechargeRecord{
+		ID:            r.ID,
+		UserID:        r.UserID,
+		Type:          r.Type,
+		Amount:        r.Amount,
+		BalanceBefore: r.BalanceBefore,
+		BalanceAfter:  r.BalanceAfter,
+		Remark:        r.Remark,
+		CreatedAt:     r.CreatedAt,
+	}
+}
+
+func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
+	if o == nil {
+		return nil
+	}
+	return &PaymentOrder{
+		ID:        o.ID,
+		OrderNo:   o.OrderNo,
+		UserID:    o.UserID,
+		Username:  o.Username,
+		Provider:  o.Provider,
+		Status:    o.Status,
+		AmountCNY: o.AmountCNY,
+		AmountUSD: o.AmountUSD,
+		TotalUSD:  o.TotalUSD,
+		ExpireAt:  o.ExpireAt,
+		CreatedAt: o.CreatedAt,
+		UpdatedAt: o.UpdatedAt,
+		PaidAt:    o.PaidAt,
+	}
+}

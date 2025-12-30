@@ -50,6 +50,8 @@ func registerRoutes(
 ) {
 	// 通用路由（健康检查、状态等）
 	routes.RegisterCommonRoutes(r)
+	// 支付渠道回调（无需认证）
+	routes.RegisterPaymentCallbackRoutes(r, h)
 
 	// API v1
 	v1 := r.Group("/api/v1")

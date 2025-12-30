@@ -70,6 +70,7 @@ func provideCleanup(
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
 	antigravityOAuth *service.AntigravityOAuthService,
+	paymentMaintenance *service.PaymentMaintenanceService,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -80,6 +81,10 @@ func provideCleanup(
 			name string
 			fn   func() error
 		}{
+			{"PaymentMaintenanceService", func() error {
+				paymentMaintenance.Stop()
+				return nil
+			}},
 			{"TokenRefreshService", func() error {
 				tokenRefresh.Stop()
 				return nil
