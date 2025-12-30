@@ -391,28 +391,10 @@
                   {{ t('payment.waitingForPayment') }}
                 </p>
               </div>
-              <div v-else class="text-sm text-gray-500 dark:text-dark-400">
-                {{ t('payment.noQRCode') }}
-              </div>
-
-              <div class="w-full space-y-3 pt-1">
-                <button
-                  v-if="payURL"
-                  type="button"
-                  class="w-full rounded-2xl bg-primary-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-primary-700"
-                  @click="openPayPage"
-                >
-                  {{ t('payment.openPayPage') }}
-                </button>
-
-                <button
-                  type="button"
-                  class="w-full rounded-2xl border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-dark-700 dark:bg-dark-900 dark:text-white dark:hover:bg-dark-800"
-                  :disabled="polling"
-                  @click="pollOrderStatus(payOrder.order_no)"
-                >
-                  {{ polling ? t('payment.refreshing') : t('payment.refreshStatus') }}
-                </button>
+              <div v-else class="flex flex-col items-center gap-2 py-8 text-center">
+                <p class="text-sm text-gray-600 dark:text-dark-300">
+                  {{ t('payment.noQRCode') }}
+                </p>
               </div>
             </div>
           </div>
@@ -583,11 +565,6 @@ function closeCheckout() {
 
 function closePay() {
   payOpen.value = false
-}
-
-function openPayPage() {
-  if (!payURL.value) return
-  window.open(payURL.value, '_blank')
 }
 
 function stopPolling() {

@@ -261,7 +261,7 @@ export default {
     paymentSuccess: '支付成功，余额已到账',
     paymentFailed: '支付失败，请重试',
     paymentExpired: '订单已过期，请重新下单',
-    noQRCode: '暂无法生成二维码，请点击“打开支付页面”完成支付',
+    noQRCode: '暂无法生成支付二维码',
     statusPending: '待支付',
     statusPaid: '已支付',
     statusFailed: '支付失败',

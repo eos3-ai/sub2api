@@ -2,19 +2,36 @@
   <AppLayout>
     <div class="space-y-6">
       <div class="card p-6">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div class="space-y-1">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.paymentOrders.title') }}
-            </h2>
-            <p class="text-sm text-gray-500 dark:text-dark-400">
-              {{ t('admin.paymentOrders.description') }}
-            </p>
+        <div class="space-y-6">
+          <!-- 标题和按钮行 -->
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="space-y-1">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t('admin.paymentOrders.title') }}
+              </h2>
+              <p class="text-sm text-gray-500 dark:text-dark-400">
+                {{ t('admin.paymentOrders.description') }}
+              </p>
+            </div>
+
+            <!-- 按钮组 -->
+            <div class="flex flex-wrap gap-3">
+              <button class="btn btn-secondary min-w-[100px] px-5 py-2.5" :disabled="loading" @click="applyFilters">
+                {{ t('common.filter') }}
+              </button>
+              <button class="btn btn-secondary min-w-[100px] px-5 py-2.5" :disabled="loading" @click="resetFilters">
+                {{ t('common.reset') }}
+              </button>
+              <button class="btn btn-primary min-w-[120px] px-5 py-2.5" :disabled="exporting" @click="exportRecords">
+                {{ exporting ? t('common.loading') : t('admin.paymentOrders.export') }}
+              </button>
+            </div>
           </div>
 
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div class="min-w-[180px]">
-              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+          <!-- 筛选条件网格 -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.method') }}
               </label>
               <Select
@@ -24,8 +41,8 @@
               />
             </div>
 
-            <div class="min-w-[220px]">
-              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.userEmail') }}
               </label>
               <input
@@ -37,15 +54,15 @@
               />
             </div>
 
-            <div class="min-w-[160px]">
-              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.status') }}
               </label>
               <Select v-model="filters.status" :options="statusOptions" :placeholder="t('common.all')" />
             </div>
 
-            <div class="min-w-[210px]">
-              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.from') }}
               </label>
               <input
@@ -55,8 +72,8 @@
               />
             </div>
 
-            <div class="min-w-[210px]">
-              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+            <div>
+              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.to') }}
               </label>
               <input
@@ -64,18 +81,6 @@
                 type="datetime-local"
                 class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
               />
-            </div>
-
-            <div class="flex gap-2">
-              <button class="btn btn-secondary" :disabled="loading" @click="applyFilters">
-                {{ t('common.filter') }}
-              </button>
-              <button class="btn btn-secondary" :disabled="loading" @click="resetFilters">
-                {{ t('common.reset') }}
-              </button>
-              <button class="btn btn-primary" :disabled="exporting" @click="exportRecords">
-                {{ exporting ? t('common.loading') : t('admin.paymentOrders.export') }}
-              </button>
             </div>
           </div>
         </div>
@@ -89,7 +94,7 @@
         <template v-else>
           <DataTable :columns="columns" :data="items" :loading="loading">
             <template #cell-order_no="{ row }">
-              <span class="font-mono text-xs text-gray-900 dark:text-white">{{ row.order_no }}</span>
+              <span class="font-mono text-sm font-medium text-gray-900 dark:text-white">{{ row.order_no }}</span>
             </template>
 
             <template #cell-order_type="{ row }">
@@ -101,11 +106,11 @@
             </template>
 
             <template #cell-total_usd="{ row }">
-              <span class="text-sm font-semibold text-gray-900 dark:text-white">${{ row.total_usd.toFixed(2) }}</span>
+              <span class="text-base font-bold text-gray-900 dark:text-white">${{ row.total_usd.toFixed(2) }}</span>
             </template>
 
             <template #cell-amount_cny="{ row }">
-              <span class="text-sm text-gray-900 dark:text-white">¥{{ row.amount_cny.toFixed(2) }}</span>
+              <span class="text-base font-bold text-gray-900 dark:text-white">¥{{ row.amount_cny.toFixed(2) }}</span>
             </template>
 
             <template #cell-status="{ row }">
