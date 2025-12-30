@@ -71,6 +71,11 @@ export async function getMyPaymentOrders(query?: {
   return data
 }
 
+export async function getPaymentOrder(orderNo: string): Promise<PaymentOrder> {
+  const { data } = await apiClient.get<PaymentOrder>(`/payment/orders/${orderNo}`)
+  return data
+}
+
 export async function cancelPaymentOrder(orderNo: string): Promise<{ message: string }> {
   const { data } = await apiClient.post<{ message: string }>(`/payment/orders/${orderNo}/cancel`)
   return data
@@ -80,6 +85,7 @@ export const paymentAPI = {
   getPaymentPlans,
   createPaymentOrder,
   getMyPaymentOrders,
+  getPaymentOrder,
   cancelPaymentOrder
 }
 

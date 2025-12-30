@@ -232,7 +232,18 @@ export default {
     channel: '渠道',
     amount: '金额',
     status: '状态',
-    copyOrder: '复制订单号'
+    copyOrder: '复制订单号',
+    payTitle: '请完成支付',
+    scanToPay: '扫码支付',
+    payActions: '支付操作',
+    openPayPage: '打开支付页面',
+    refreshStatus: '刷新支付状态',
+    refreshing: '刷新中...',
+    waitingForPayment: '等待支付确认中，请完成支付后稍候...',
+    paymentSuccess: '支付成功，余额已到账',
+    paymentFailed: '支付失败，请重试',
+    paymentExpired: '订单已过期，请重新下单',
+    noQRCode: '暂无法生成二维码，请点击“打开支付页面”完成支付'
   },
 
   // Auth

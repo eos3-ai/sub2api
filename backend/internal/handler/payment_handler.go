@@ -184,6 +184,34 @@ func (h *PaymentHandler) ListMyOrders(c *gin.Context) {
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
 
+// GetMyOrder returns current user's order by order_no.
+// GET /api/v1/payment/orders/:orderNo
+func (h *PaymentHandler) GetMyOrder(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	orderNo := strings.TrimSpace(c.Param("orderNo"))
+	if orderNo == "" {
+		response.BadRequest(c, "order_no is required")
+		return
+	}
+
+	order, err := h.paymentService.GetOrderByOrderNo(c.Request.Context(), orderNo)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if order == nil || order.UserID != subject.UserID {
+		response.NotFound(c, "order not found")
+		return
+	}
+
+	response.Success(c, dto.PaymentOrderFromService(order))
+}
+
 func (h *PaymentHandler) amountCNYFromPlanID(planID string) (float64, error) {
 	if h.cfg == nil {
 		return 0, errors.New("payment config is missing")

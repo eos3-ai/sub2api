@@ -236,7 +236,18 @@ export default {
     channel: 'Channel',
     amount: 'Amount',
     status: 'Status',
-    copyOrder: 'Copy'
+    copyOrder: 'Copy',
+    payTitle: 'Complete Payment',
+    scanToPay: 'Scan to pay',
+    payActions: 'Payment actions',
+    openPayPage: 'Open payment page',
+    refreshStatus: 'Refresh status',
+    refreshing: 'Refreshing...',
+    waitingForPayment: 'Waiting for confirmation. Please complete payment and wait...',
+    paymentSuccess: 'Payment successful. Credits applied.',
+    paymentFailed: 'Payment failed. Please try again.',
+    paymentExpired: 'Order expired. Please create a new order.',
+    noQRCode: 'QR code is unavailable. Please click "Open payment page" to continue.'
   },
 
   // Auth

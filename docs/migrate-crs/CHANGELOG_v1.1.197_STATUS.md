@@ -43,13 +43,13 @@
 4. **待补强：安全校验**：回调中补齐金额/币种/订单状态的严格校验、Stripe 失败事件处理、ZPay 回调 IP 白名单与签名异常日志。
 
 ### P1：前端支付体验补齐
-1. **展示二维码/跳转支付**：`createPaymentOrder` 返回 `pay_url/qr_url` 后，前端展示二维码（或跳转）并提供“已支付/刷新状态”按钮。
+1. **已完成：展示二维码/跳转支付 + 状态轮询**：`createPaymentOrder` 返回 `pay_url/qr_url` 后，前端弹窗展示二维码/支付链接，并轮询订单状态（pending → paid/failed/expired），支付成功后刷新“我的订单”。
 2. **支付结果页**：新增 `/payment/result`（或 success/cancel）页面，展示订单状态与到账提示，并可回到“我的订单”。
 3. **支付方式约束**：按渠道约束最低金额（例如微信最低 ¥100）与提示文案（目前页面已有提示文本，后端也需校验）。
 
 ### P2：配置与部署完善
 1. **配置结构体补齐**：把实际需要的字段写入 `payment.zpay.*` / `payment.stripe.*`（如 submit/query/payment_methods/api_version/currency 等），并在 `.env.example` / `config.example.yaml` 里给出一致示例。
-2. **环境变量兼容**（可选）：如需要兼容 `ZPAY_*`/`STRIPE_*` 前缀，在配置加载处增加映射或显式兼容逻辑（否则只支持 `PAYMENT_ZPAY_*`/`PAYMENT_STRIPE_*`）。
+2. **已完成：环境变量兼容**：已兼容 `ZPAY_*`/`STRIPE_*` 前缀映射到 `payment.*`（除默认的 `PAYMENT_ZPAY_*`/`PAYMENT_STRIPE_*` 之外）。
 3. **安全与排障**：补文档说明（回调域名必须 https、验签失败排查、IP 白名单等）。
 
 ## 1. 💰 支付系统
@@ -61,6 +61,7 @@
   - `GET /api/v1/payment/plans`（读取 `payment.packages` 输出套餐列表）
   - `POST /api/v1/payment/orders`（创建订单记录；需 `payment.enabled=true` 才允许创建）
   - `GET /api/v1/payment/orders`（查询我的订单列表，分页）
+  - `GET /api/v1/payment/orders/:orderNo`（查询单个订单状态，用于前端支付弹窗轮询）
 - 已开始接入真实支付渠道（后端可返回 `pay_url/qr_url`）：
   - ZPay：`backend/internal/service/zpay_service.go` 生成收银台链接（`submit.php`）并支持回调签名校验。
   - Stripe：`backend/internal/service/stripe_service.go` 创建 `PaymentIntent`（微信支付），可返回 `HostedInstructionsURL` 与 QR 图（`image_url_png`）。
