@@ -15,6 +15,7 @@ import subscriptionsAPI from './subscriptions'
 import usageAPI from './usage'
 import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
+import paymentOrdersAPI from './paymentOrders'
 
 /**
  * Unified admin API object for convenient access
@@ -31,7 +32,8 @@ export const adminAPI = {
   subscriptions: subscriptionsAPI,
   usage: usageAPI,
   gemini: geminiAPI,
-  antigravity: antigravityAPI
+  antigravity: antigravityAPI,
+  paymentOrders: paymentOrdersAPI
 }
 
 export {
@@ -46,7 +48,8 @@ export {
   subscriptionsAPI,
   usageAPI,
   geminiAPI,
-  antigravityAPI
+  antigravityAPI,
+  paymentOrdersAPI
 }
 
 export default adminAPI

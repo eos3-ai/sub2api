@@ -8,7 +8,7 @@
 import { apiClient } from './client'
 import type { PaginatedResponse } from '@/types'
 
-export type PaymentChannel = 'zpay' | 'stripe'
+export type PaymentChannel = 'zpay' | 'stripe' | 'admin'
 export type PaymentPayMethod = 'alipay' | 'wechat'
 export type PaymentCreateChannel = PaymentChannel | PaymentPayMethod
 
@@ -29,7 +29,9 @@ export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 
 export interface PaymentOrder {
   id: number
   order_no: string
+  order_type: string
   provider: PaymentChannel
+  amount_cny: number
   amount_usd: number
   total_usd: number
   status: PaymentOrderStatus

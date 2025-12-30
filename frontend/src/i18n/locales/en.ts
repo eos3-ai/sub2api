@@ -135,6 +135,8 @@ export default {
     noOptionsFound: 'No options found',
     saving: 'Saving...',
     refresh: 'Refresh',
+    createdAt: 'Created At',
+    updatedAt: 'Updated At',
     time: {
       never: 'Never',
       justNow: 'Just now',
@@ -155,6 +157,7 @@ export default {
     users: 'Users',
     groups: 'Groups',
     subscriptions: 'Subscriptions',
+    rechargeRecords: 'Recharge Records',
     accounts: 'Accounts',
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
@@ -186,6 +189,7 @@ export default {
     other: 'Other',
     customAmountSubtitle: 'Custom amount',
     wechatMinRecharge: 'WeChat minimum recharge: ¥{amount}',
+    wechatMinRechargeWarn: 'WeChat minimum is ¥{min}. Current payable is about ¥{current}. Please increase the amount.',
     payMethod: 'Payment Method',
     payNow: 'Pay Now',
     selectAmount: 'Please select an amount',
@@ -233,8 +237,13 @@ export default {
       'Order query endpoints are not available yet. Once enabled, your orders will appear here.',
     noOrders: 'No orders yet',
     orderNo: 'Order No.',
+    orderType: 'Type',
+    orderTypeOnline: 'Online Recharge',
+    orderTypeAdmin: 'Admin Recharge',
+    adminRecharge: 'Admin Recharge',
     channel: 'Channel',
     amount: 'Amount',
+    creditsAmount: 'Credits',
     status: 'Status',
     copyOrder: 'Copy',
     payTitle: 'Complete Payment',
@@ -247,7 +256,12 @@ export default {
     paymentSuccess: 'Payment successful. Credits applied.',
     paymentFailed: 'Payment failed. Please try again.',
     paymentExpired: 'Order expired. Please create a new order.',
-    noQRCode: 'QR code is unavailable. Please click "Open payment page" to continue.'
+    noQRCode: 'QR code is unavailable. Please click "Open payment page" to continue.',
+    statusPending: 'Pending',
+    statusPaid: 'Paid',
+    statusFailed: 'Failed',
+    statusExpired: 'Expired',
+    statusCancelled: 'Cancelled'
   },
 
   // Auth
@@ -631,6 +645,16 @@ export default {
       noDataAvailable: 'No data available',
       recentUsage: 'Recent Usage',
       failedToLoad: 'Failed to load dashboard statistics'
+    },
+
+    paymentOrders: {
+      title: 'Recharge Records',
+      description: 'View all users recharge records (payment orders)',
+      method: 'Method',
+      user: 'User',
+      userId: 'User ID',
+      userPlaceholder: 'Enter user ID or email',
+      export: 'Export Records'
     },
 
     // Users

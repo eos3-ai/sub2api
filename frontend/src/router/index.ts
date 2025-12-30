@@ -277,6 +277,18 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.usage.description'
     }
   },
+  {
+    path: '/admin/payment-orders',
+    name: 'AdminPaymentOrders',
+    component: () => import('@/views/admin/PaymentOrdersView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Recharge Records',
+      titleKey: 'admin.paymentOrders.title',
+      descriptionKey: 'admin.paymentOrders.description'
+    }
+  },
 
   // ==================== 404 Not Found ====================
   {

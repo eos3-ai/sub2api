@@ -132,6 +132,8 @@ export default {
     noOptionsFound: '无匹配选项',
     saving: '保存中...',
     refresh: '刷新',
+    createdAt: '创建时间',
+    updatedAt: '更新时间',
     time: {
       never: '从未',
       justNow: '刚刚',
@@ -152,6 +154,7 @@ export default {
     users: '用户管理',
     groups: '分组管理',
     subscriptions: '订阅管理',
+    rechargeRecords: '充值记录',
     accounts: '账号管理',
     proxies: 'IP管理',
     redeemCodes: '兑换码',
@@ -183,6 +186,7 @@ export default {
     other: '其他',
     customAmountSubtitle: '自定义金额',
     wechatMinRecharge: '微信支付最低充值金额：¥{amount}',
+    wechatMinRechargeWarn: '微信支付最低 ¥{min}，当前实付约 ¥{current}，请提高充值金额。',
     payMethod: '支付方式',
     payNow: '立即充值',
     rechargeNow: '立即充值',
@@ -229,8 +233,13 @@ export default {
     ordersApiNotEnabledDesc: '后端未开放订单查询接口，开启后订单会在此展示。',
     noOrders: '暂无订单',
     orderNo: '订单号',
+    orderType: '订单类型',
+    orderTypeOnline: '在线充值',
+    orderTypeAdmin: '后台充值',
+    adminRecharge: '后台充值',
     channel: '渠道',
     amount: '金额',
+    creditsAmount: '充值额度',
     status: '状态',
     copyOrder: '复制订单号',
     payTitle: '请完成支付',
@@ -243,7 +252,12 @@ export default {
     paymentSuccess: '支付成功，余额已到账',
     paymentFailed: '支付失败，请重试',
     paymentExpired: '订单已过期，请重新下单',
-    noQRCode: '暂无法生成二维码，请点击“打开支付页面”完成支付'
+    noQRCode: '暂无法生成二维码，请点击“打开支付页面”完成支付',
+    statusPending: '待支付',
+    statusPaid: '已支付',
+    statusFailed: '支付失败',
+    statusExpired: '已过期',
+    statusCancelled: '已取消'
   },
 
   // Auth
@@ -643,6 +657,16 @@ export default {
       systemSettings: '系统设置',
       configureSystem: '配置系统设置',
       failedToLoad: '加载仪表盘数据失败'
+    },
+
+    paymentOrders: {
+      title: '充值记录',
+      description: '查看所有用户的充值记录（支付订单）',
+      method: '充值方式',
+      user: '用户',
+      userId: '用户ID',
+      userPlaceholder: '输入用户ID或邮箱',
+      export: '导出记录'
     },
 
     // Users Management
