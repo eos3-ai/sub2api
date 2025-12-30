@@ -160,6 +160,18 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'payment.description'
     }
   },
+  {
+    path: '/payment/result',
+    name: 'PaymentResult',
+    component: () => import('@/views/user/PaymentResultView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Payment Result',
+      titleKey: 'payment.resultTitle',
+      descriptionKey: 'payment.resultDescription'
+    }
+  },
 
   // ==================== Admin Routes ====================
   {

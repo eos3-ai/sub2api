@@ -5,16 +5,16 @@
 ## 快速概览
 | # | 功能 | 状态 | 说明 |
 |---|------|------|------|
-| 1 | 💰 支付系统 | 部分完成 | 已补齐用户端基础 API + `/payment` 前端页面（固定套餐 + 自定义金额、支付宝/微信选择、金额计算弹窗）；后端已开始接入 ZPay/Stripe（可返回 `pay_url/qr_url`），但前端支付展示/结果页仍待补齐。 |
+| 1 | 💰 支付系统 | 部分完成 | 已补齐用户端基础 API + `/payment` 前端页面（固定套餐 + 自定义金额、支付宝/微信选择、金额计算弹窗、二维码展示 + 状态轮询）；后端已接入 ZPay/Stripe（可返回 `pay_url/qr_url`）；仍缺独立的支付结果页与回调校验补强。 |
 | 2 | 🎁 活动优惠 | 部分完成 | 服务、存储与配置已加入，但无 API/UI 展示。 |
 | 3 | 👥 邀请返利 | 部分完成 | 数据模型完成，前台入口与邀请码记录流程缺失。 |
-| 4 | 💵 用户余额 | 部分完成 | 余额/流水表与 BalanceService 已有；当前前端以“我的订单”作为充值记录展示，后台余额操作接入仍缺。 |
+| 4 | 💵 用户余额 | 部分完成 | 余额/流水表与 BalanceService 已有；当前前端以“我的订单”作为充值记录展示；管理员后台给用户加余额会生成“后台充值”订单并对用户可见，但尚未完全接入 BalanceService/recharge_records。 |
 | 5 | 📧 邮件服务 | 部分完成 | SMTP/验证码已实现，密码找回与文档缺失。 |
 | 6 | 🔐 用户认证增强 | 部分完成 | 注册/登录/改密完成，重置密码/旧格式迁移缺失。 |
 | 7 | 🔑 API Key 管理增强 | 未迁移 | 明文查看、加密存储、分钟级统计与审计均未落地。 |
-| 8 | 📊 用户管理优化 | 部分完成 | 列表检索可用，缓存/并发优化/导出等能力未见。 |
+| 8 | 📊 用户管理优化 | 部分完成 | 列表检索可用，已补齐筛选导出；缓存/并发优化等能力未见。 |
 | 9 | 🛡️ 安全修复 | 不适用 | Sub2API 采用 JWT/Admin API Key，不存在 Redis 会话缺陷。 |
-|10 | 🖥️ 前端界面改造 | 部分完成 | 已按 `docs/migrate-crs/zhifu.png`、`docs/migrate-crs/tanchuang.png` 补齐 `/payment` 样式与交互；仍缺实际支付链接/二维码展示与支付结果页。 |
+|10 | 🖥️ 前端界面改造 | 部分完成 | 已按 `docs/migrate-crs/zhifu.png`、`docs/migrate-crs/tanchuang.png` 补齐 `/payment` 样式与交互，并支持二维码展示/支付状态轮询；仍缺独立支付结果页与更完整的支付闭环提示。 |
 |11 | 🤖 钉钉机器人 | 未迁移 | 仓库内无任何 dingtalk 相关代码。 |
 |12 | 🏗️ 架构调整 | 未迁移（结构不同） | 仅有 `deploy/docker-compose.yml`，未引入 CRS 的多 Compose/脚本。 |
 |13 | 📝 其他改进 | 未迁移 | 脚本/文档/工具均缺失。 |
@@ -22,8 +22,8 @@
 > 状态含义：**已完成**（无需动作）、**部分完成**（已有部分实现但缺能力差距）、**未迁移**（完全缺失）、**不适用**（架构差异无需迁移）。
 
 ## 建议执行顺序（面向现有环境）
-1. **支付前台闭环（优先出前端效果）**：`/payment` 页面 + 套餐列表/自定义金额/下单/订单查询已具备；下一步优先补齐真实渠道（生成支付链接/二维码、回调验签、订单状态更新），让支付链路真正闭环。
-2. **余额与流水可视化**：当前前端以“充值 → 我的订单”作为充值记录展示；如需完整余额流水与后台人工充值/扣减，再让 `AdminService.UpdateUserBalance` 走 `BalanceService`，并补充对应 API/UI。
+1. **支付前台闭环（优先出前端效果）**：`/payment` 页面 + 套餐列表/自定义金额/下单/支付二维码展示/状态轮询已具备；下一步优先补齐独立支付结果页、回调安全校验（金额/币种/状态）与失败/过期分支，让链路真正闭环。
+2. **余额与流水可视化**：当前前端以“在线充值 → 我的订单”作为充值记录展示；管理员后台给用户加余额已会生成“后台充值”订单并对用户可见；如需统一账本一致性，下一步让 `AdminService.UpdateUserBalance` 走 `BalanceService.ApplyChange` 并写入 `recharge_records`。
 3. **活动优惠展示**：在现有服务上增加用户/管理员查询接口，并在 Dashboard 中放置 `PromotionBanner`、倒计时等组件，把优惠信息可视化。
 4. **邀请返利入口**：为注册流程添加邀请码字段，接入 `ReferralService`，补 `/api/v1/referral/*` 接口及前端邀请页，释放既有返利能力。
 5. **忘记密码链路**：依托 `EmailService` 增加 `forgot/reset password` API、Redis token，以及对应前端页面，完善基础认证体验。
@@ -44,8 +44,8 @@
 
 ### P1：前端支付体验补齐
 1. **已完成：展示二维码/跳转支付 + 状态轮询**：`createPaymentOrder` 返回 `pay_url/qr_url` 后，前端弹窗展示二维码/支付链接，并轮询订单状态（pending → paid/failed/expired），支付成功后刷新“我的订单”。
-2. **支付结果页**：新增 `/payment/result`（或 success/cancel）页面，展示订单状态与到账提示，并可回到“我的订单”。
-3. **支付方式约束**：按渠道约束最低金额（例如微信最低 ¥100）与提示文案（目前页面已有提示文本，后端也需校验）。
+2. **已完成：支付结果页**：新增 `/payment/result` 页面，展示订单状态与到账提示；后端 return 回跳会携带 `order/status` 并跳转到该页面。
+3. **已完成：支付方式约束（微信最低 ¥100）**：前端提示 + 按钮禁用已实现，后端创建订单也会对微信（Stripe）最低金额进行兜底校验。
 
 ### P2：配置与部署完善
 1. **配置结构体补齐**：把实际需要的字段写入 `payment.zpay.*` / `payment.stripe.*`（如 submit/query/payment_methods/api_version/currency 等），并在 `.env.example` / `config.example.yaml` 里给出一致示例。
@@ -84,7 +84,6 @@
 - **已补齐：旧环境变量兼容**：除 `PAYMENT_ZPAY_* / PAYMENT_STRIPE_*` 外，额外支持 `ZPAY_* / STRIPE_*` 变量名映射到 `payment.*` 配置（避免因环境变量命名不一致导致下单时报 “zpay/stripe is disabled”）。
 
 ### 待迁移
-- 前端仍未消费 `pay_url/qr_url`：需要在创建订单后展示二维码/跳转收银台，并提供轮询/刷新订单状态能力。
 - ZPay 回调依赖公网可访问地址：若 `payment.zpay.notify_url/return_url` 为相对路径，需要配置 `payment.base_url`（否则后端无法拼接出完整回调 URL）。
 - Stripe Webhook 事件对象解析目前仅取 `payment_intent.succeeded` 的 `metadata.order_no`，可按需要补齐失败事件处理与更多校验（金额/币种/订单状态等）。
 
@@ -116,10 +115,10 @@
 - 兑换码充值已写入流水：`RedeemService` 的余额类兑换改为走 `BalanceService.ApplyChange`（用于数据一致性，前端当前不单独展示流水页）。
 
 ### 待迁移
-- 管理员操作未接入 BalanceService：`internal/service/admin_service.go` 的 `UpdateUserBalance` 直接改写 `users.balance` 并以 `RedeemCode` 记录，既没有调用 `BalanceService`，也不会写入 `recharge_records`。
-- 缺乏 `POST /admin/users/:userId/recharge`、`…/deduct`、`GET /admin/users/:userId/recharge-records`、`GET /admin/recharge-records` 等 API；`internal/server/routes` 中也没有任何 `recharge`/`balance` handler。
+- 管理员操作尚未接入 BalanceService：`internal/service/admin_service.go` 的 `UpdateUserBalance` 仍是直接改写 `users.balance` 并以 `RedeemCode` 记录；虽然已额外创建 “后台充值” `payment_orders` 让用户可见，但不会写入 `recharge_records`。
+- 余额流水（`recharge_records`）仍缺少可用的管理员查询/导出 API；当前后台的“充值记录”页面使用的是 `payment_orders`（在线充值 + 后台充值），不等同于完整账本流水。
 - 当前前端不单独提供“充值记录”页面：以“充值 → 我的订单”作为充值记录展示；如需展示完整余额流水，再补 `/user/recharge-records` 与对应页面。
-- 没有导出/筛选功能，后台无法按类型/日期查看流水。
+- 若未来需要 `recharge_records` 层面的筛选/导出（按类型/日期/来源），需补相应 API 与后台页面/导出按钮。
 
 ## 5. 📧 邮件服务
 ### 已落地
@@ -156,11 +155,12 @@
 ## 8. 📊 用户管理优化
 ### 已落地
 - `internal/repository/user_repo.go` 的 `ListWithFilters` 已包含状态/角色/关键字模糊检索，`frontend/src/views/admin/UsersView.vue` 支持筛选与余额调整。
+- 已补齐筛选导出：`GET /api/v1/admin/users/export` 导出当前筛选条件下的全部用户记录（前端按钮名为“导出记录”）。
 
 ### 待迁移
 - 用户列表/统计未做缓存：仓库中没有 `user:list`、`user:stats` 类 Redis 缓存，也没有 TTL 设置。
 - 并发控制/分页优化缺失，代码中未使用 changelog 中提及的 `p-limit` 或类似并发限制库，仍是直接 DB 查询。
-- `UserManagementView`、`UserDashboardView` 等页面没有体现 changelog 中的 UI/UX 调整（导出、禁用分页、增强图表等）。
+- `UserManagementView`、`UserDashboardView` 等页面没有体现 changelog 中的 UI/UX 调整（禁用分页、增强图表等）。
 
 ## 9. 🛡️ 鉴权检测安全修复
 ### 状态

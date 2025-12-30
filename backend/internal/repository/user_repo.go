@@ -47,6 +47,33 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service
 	return userModelToService(&m), nil
 }
 
+func (r *userRepository) GetEmailsByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	if r == nil || r.db == nil || len(ids) == 0 {
+		return out, nil
+	}
+
+	type row struct {
+		ID    int64  `gorm:"column:id"`
+		Email string `gorm:"column:email"`
+	}
+	var rows []row
+	if err := r.db.WithContext(ctx).
+		Model(&userModel{}).
+		Select("id", "email").
+		Where("id IN ?", ids).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for i := range rows {
+		if rows[i].ID <= 0 {
+			continue
+		}
+		out[rows[i].ID] = rows[i].Email
+	}
+	return out, nil
+}
+
 func (r *userRepository) Update(ctx context.Context, user *service.User) error {
 	m := userModelFromService(user)
 	err := r.db.WithContext(ctx).Save(m).Error
