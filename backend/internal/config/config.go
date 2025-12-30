@@ -501,8 +501,9 @@ func setDefaults() {
 	viper.SetDefault("payment.zpay.query_url", "https://zpayz.cn/api.php")
 	viper.SetDefault("payment.zpay.payment_methods", "alipay,wxpay")
 	viper.SetDefault("payment.zpay.order_prefix", "")
-	viper.SetDefault("payment.zpay.notify_url", "/api/payment/webhook/zpay")
-	viper.SetDefault("payment.zpay.return_url", "/payment/result")
+	// Notify can be either /api/payment/webhook/zpay or /payment/zpay/notify (both are routed).
+	viper.SetDefault("payment.zpay.notify_url", "/payment/zpay/notify")
+	viper.SetDefault("payment.zpay.return_url", "/payment/zpay/return")
 	viper.SetDefault("payment.zpay.notify_user", false)
 	viper.SetDefault("payment.zpay.ip_whitelist", "")
 	viper.SetDefault("payment.zpay.require_https", true)
@@ -513,8 +514,9 @@ func setDefaults() {
 	viper.SetDefault("payment.stripe.api_version", "")
 	viper.SetDefault("payment.stripe.payment_methods", "wechat_pay")
 	viper.SetDefault("payment.stripe.currency", "CNY")
-	viper.SetDefault("payment.stripe.success_url", "/payment/success")
-	viper.SetDefault("payment.stripe.cancel_url", "/payment/cancel")
+	// Currently these URLs are mainly for compatibility with existing deployments.
+	viper.SetDefault("payment.stripe.success_url", "/payment/return/stripe?order={ORDER_ID}&status=success")
+	viper.SetDefault("payment.stripe.cancel_url", "/payment/return/stripe?order={ORDER_ID}&status=cancel")
 	viper.SetDefault("payment.stripe.wechat_client", "web")
 	viper.SetDefault("payment.stripe.wechat_app_id", "")
 

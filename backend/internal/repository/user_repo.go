@@ -110,6 +110,24 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service
 	return out, nil
 }
 
+func (r *userRepository) GetEmailsByIDs(ctx context.Context, ids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(ids))
+	if len(ids) == 0 {
+		return out, nil
+	}
+	users, err := r.client.User.Query().
+		Where(dbuser.IDIn(ids...)).
+		Select(dbuser.FieldID, dbuser.FieldEmail).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range users {
+		out[users[i].ID] = users[i].Email
+	}
+	return out, nil
+}
+
 func (r *userRepository) Update(ctx context.Context, userIn *service.User) error {
 	if userIn == nil {
 		return nil

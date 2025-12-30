@@ -26,6 +26,8 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id int64) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
+	// GetEmailsByIDs returns a mapping from user_id to email for batch display/export use cases.
+	GetEmailsByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 	GetFirstAdmin(ctx context.Context) (*User, error)
 	Update(ctx context.Context, user *User) error
 	Delete(ctx context.Context, id int64) error

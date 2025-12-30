@@ -184,9 +184,11 @@ gemini:
 # - Frontend pay methods are "Alipay / WeChat":
 #   - Alipay => provider zpay
 #   - WeChat => provider stripe
-# - Payment providers (zpay/stripe) are still WIP: orders can be created but no real pay_url/qr_url is generated yet.
+# - When providers are enabled and configured correctly, creating an order will return `pay_url` (and sometimes `qr_url`).
+#   The frontend will render QR code from `pay_url` and poll order status until paid/expired/failed.
 payment:
   enabled: false
+  # Public base URL used to resolve relative notify/return URLs (required if you keep notify/return as relative paths)
   base_url: ""
   min_amount: 1.0
   max_amount: 10000.0
@@ -219,8 +221,9 @@ payment:
     pid: ""
     key: ""
     api_url: "https://zpayz.cn"
-    notify_url: "/api/payment/webhook/zpay"
-    return_url: "/payment/result"
+    # You can use either `/api/payment/webhook/zpay` or `/payment/zpay/notify` (both are routed to the same handler)
+    notify_url: "/payment/zpay/notify"
+    return_url: "/payment/zpay/return"
     submit_url: "https://zpayz.cn/submit.php"
     query_url: "https://zpayz.cn/api.php"
     payment_methods: "alipay,wxpay"
@@ -234,8 +237,8 @@ payment:
     enabled: false
     api_key: ""
     webhook_secret: ""
-    success_url: "/payment/success"
-    cancel_url: "/payment/cancel"
+    success_url: "/payment/return/stripe?order={ORDER_ID}&status=success"
+    cancel_url: "/payment/return/stripe?order={ORDER_ID}&status=cancel"
     api_version: ""
     payment_methods: "wechat_pay"
     currency: "CNY"

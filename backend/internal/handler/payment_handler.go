@@ -115,11 +115,19 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	provider := normalizePaymentProvider(req.Channel)
+	// Business rule: WeChat Pay (Stripe) minimum payable is ¥100.
+	// Frontend also enforces it, but backend must validate to prevent bypass.
+	if provider == "stripe" && amountCNY > 0 && amountCNY < 100 {
+		response.BadRequest(c, "wechat pay minimum amount is 100 CNY")
+		return
+	}
+
 	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
 		UserID:        subject.UserID,
 		Username:      "",
 		AmountCNY:     amountCNY,
-		Provider:      normalizePaymentProvider(req.Channel),
+		Provider:      provider,
 		PaymentMethod: "web",
 		ClientIP:      c.ClientIP(),
 		UserAgent:     c.GetHeader("User-Agent"),
@@ -348,7 +356,41 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 
 // PaymentReturn provides a lightweight return endpoint for payment providers.
 func (h *PaymentHandler) PaymentReturn(c *gin.Context) {
-	// Keep it simple: return to the SPA recharge page.
+	// Return endpoints are for external redirects; keep it lightweight and safe.
+	// If order_no is provided by the channel, redirect to the SPA result page to show status.
+	orderNo := strings.TrimSpace(c.Query("order"))
+	if orderNo == "" {
+		orderNo = strings.TrimSpace(c.Query("order_no"))
+	}
+	if orderNo == "" {
+		// ZPay commonly uses out_trade_no.
+		orderNo = strings.TrimSpace(c.Query("out_trade_no"))
+	}
+
+	status := strings.TrimSpace(c.Query("status"))
+	if status == "" {
+		// Some providers use trade_status.
+		status = strings.TrimSpace(c.Query("trade_status"))
+	}
+	if status == "" {
+		// Fallback based on path for legacy /payment/success|/payment/cancel.
+		p := strings.ToLower(strings.TrimSpace(c.Request.URL.Path))
+		if strings.Contains(p, "success") {
+			status = "success"
+		} else if strings.Contains(p, "cancel") {
+			status = "cancel"
+		}
+	}
+
+	if orderNo != "" {
+		target := fmt.Sprintf("/payment/result?order=%s", orderNo)
+		if status != "" {
+			target = target + "&status=" + status
+		}
+		c.Redirect(http.StatusFound, target)
+		return
+	}
+
 	c.Redirect(http.StatusFound, "/payment")
 }
 

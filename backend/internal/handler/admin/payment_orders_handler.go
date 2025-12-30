@@ -6,7 +6,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,7 +27,7 @@ func NewPaymentOrdersHandler(paymentService *service.PaymentService, userRepo se
 }
 
 // List lists all payment orders for admins.
-// GET /api/v1/admin/payment/orders?page=1&page_size=20&provider=zpay|stripe&user_id=123
+// GET /api/v1/admin/payment/orders?page=1&page_size=20&provider=zpay|stripe&user_email=user@example.com
 func (h *PaymentOrdersHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
@@ -58,7 +57,7 @@ func (h *PaymentOrdersHandler) List(c *gin.Context) {
 }
 
 // Export exports filtered orders as CSV.
-// GET /api/v1/admin/payment/orders/export?provider=zpay|stripe&user_id=123
+// GET /api/v1/admin/payment/orders/export?provider=zpay|stripe&user_email=user@example.com
 func (h *PaymentOrdersHandler) Export(c *gin.Context) {
 	filter, err := h.parsePaymentOrderFilter(c)
 	if err != nil {
@@ -166,20 +165,15 @@ func parsePaymentOrderFilter(c *gin.Context) (service.PaymentOrderFilter, error)
 
 	userQuery := strings.TrimSpace(c.Query("user_email"))
 	if userQuery == "" {
+		// Backward compatible param name in frontend: `user`
 		userQuery = strings.TrimSpace(c.Query("user"))
 	}
-	if userQuery == "" {
-		userQuery = strings.TrimSpace(c.Query("user_id"))
-	}
 	if userQuery != "" {
-		// Support both user ID and email.
-		if id, err := strconv.ParseInt(userQuery, 10, 64); err == nil && id > 0 {
-			filter.UserID = &id
-		} else if strings.Contains(userQuery, "@") {
-			return filter, fmt.Errorf("user email filter requires user repository")
-		} else {
-			return filter, fmt.Errorf("invalid user (use user_id or email)")
+		// Only accept email-based filtering in this deployment.
+		if !strings.Contains(userQuery, "@") {
+			return filter, fmt.Errorf("invalid user_email (must be an email)")
 		}
+		return filter, fmt.Errorf("user email filter requires user repository")
 	}
 
 	if s := strings.TrimSpace(c.Query("from")); s != "" {
@@ -215,9 +209,6 @@ func (h *PaymentOrdersHandler) parsePaymentOrderFilter(c *gin.Context) (service.
 	if userQuery == "" {
 		userQuery = strings.TrimSpace(c.Query("user"))
 	}
-	if userQuery == "" {
-		userQuery = strings.TrimSpace(c.Query("user_id"))
-	}
 	if userQuery == "" || !strings.Contains(userQuery, "@") {
 		return filter, nil
 	}
@@ -244,6 +235,7 @@ func (h *PaymentOrdersHandler) resolveUserEmails(ctx context.Context, orders []s
 	}
 
 	seen := make(map[int64]struct{}, len(orders))
+	ids := make([]int64, 0, len(orders))
 	for i := range orders {
 		userID := orders[i].UserID
 		if userID <= 0 {
@@ -253,11 +245,15 @@ func (h *PaymentOrdersHandler) resolveUserEmails(ctx context.Context, orders []s
 			continue
 		}
 		seen[userID] = struct{}{}
-		user, err := h.userRepo.GetByID(ctx, userID)
-		if err != nil || user == nil {
-			continue
-		}
-		out[userID] = user.Email
+		ids = append(ids, userID)
+	}
+
+	emailByID, err := h.userRepo.GetEmailsByIDs(ctx, ids)
+	if err != nil {
+		return out
+	}
+	for id, email := range emailByID {
+		out[id] = email
 	}
 	return out
 }
