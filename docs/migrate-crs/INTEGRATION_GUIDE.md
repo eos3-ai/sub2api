@@ -730,7 +730,7 @@ await RechargeRecord.create({
 | `/users/balance` | GET | 获取用户余额 |
 | `/admin/users/:userId/recharge` | POST | 管理员充值 |
 | `/admin/users/:userId/deduct` | POST | 管理员扣款 |
-| `/users/recharge-records` | GET | 获取充值记录 |
+| （不单独提供） | - | 充值记录以 `/payment` 的“我的订单”展示 |
 
 #### 支付相关
 

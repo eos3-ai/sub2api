@@ -610,6 +610,8 @@
                   </svg>
                 </button>
 
+                <!-- Redeem code entry is not needed in this deployment -->
+                <!--
                 <button
                   @click="navigateTo('/redeem')"
                   class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800"
@@ -641,6 +643,51 @@
                   </div>
                   <svg
                     class="h-5 w-5 text-gray-400 transition-colors group-hover:text-amber-500 dark:text-dark-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M8.25 4.5l7.5 7.5-7.5 7.5"
+                    />
+                  </svg>
+                </button>
+                -->
+
+                <button
+                  @click="navigateTo('/payment')"
+                  class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800"
+                >
+                  <div
+                    class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-violet-100 transition-transform group-hover:scale-105 dark:bg-violet-900/30"
+                  >
+                    <svg
+                      class="h-6 w-6 text-violet-600 dark:text-violet-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="1.5"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium text-gray-900 dark:text-white">
+                      {{ t('dashboard.recharge') }}
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-dark-400">
+                      {{ t('dashboard.topUpBalance') }}
+                    </p>
+                  </div>
+                  <svg
+                    class="h-5 w-5 text-gray-400 transition-colors group-hover:text-violet-500 dark:text-dark-500"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"

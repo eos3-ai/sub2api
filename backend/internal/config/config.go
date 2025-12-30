@@ -23,6 +23,9 @@ type Config struct {
 	Gateway      GatewayConfig      `mapstructure:"gateway"`
 	TokenRefresh TokenRefreshConfig `mapstructure:"token_refresh"`
 	RunMode      string             `mapstructure:"run_mode" yaml:"run_mode"`
+	Promotion    PromotionConfig    `mapstructure:"promotion"`
+	Referral     ReferralConfig     `mapstructure:"referral"`
+	Payment      PaymentConfig      `mapstructure:"payment"`
 	Timezone     string             `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
 	Gemini       GeminiConfig       `mapstructure:"gemini"`
 }
@@ -137,6 +140,78 @@ type DefaultConfig struct {
 	RateMultiplier  float64 `mapstructure:"rate_multiplier"`
 }
 
+type PromotionConfig struct {
+	Enabled       bool            `mapstructure:"enabled"`
+	DurationHours int             `mapstructure:"duration_hours"`
+	MinAmount     float64         `mapstructure:"min_amount"`
+	Tiers         []PromotionTier `mapstructure:"tiers"`
+}
+
+type PromotionTier struct {
+	Hours        int     `mapstructure:"hours"`
+	BonusPercent float64 `mapstructure:"bonus_percent"`
+}
+
+type ReferralConfig struct {
+	Enabled              bool    `mapstructure:"enabled"`
+	LinkBaseURL          string  `mapstructure:"link_base_url"`
+	RewardUSD            float64 `mapstructure:"reward_usd"`
+	QualifiedRechargeCNY float64 `mapstructure:"qualified_recharge_cny"`
+	QualifiedRechargeUSD float64 `mapstructure:"qualified_recharge_usd"`
+	CodeLength           int     `mapstructure:"code_length"`
+	MaxInviteesPerUser   int     `mapstructure:"max_invitees_per_user"`
+}
+
+type PaymentConfig struct {
+	Enabled            bool             `mapstructure:"enabled"`
+	BaseURL            string           `mapstructure:"base_url"`
+	MinAmount          float64          `mapstructure:"min_amount"`
+	MaxAmount          float64          `mapstructure:"max_amount"`
+	ExchangeRate       float64          `mapstructure:"exchange_rate"`
+	DiscountRate       float64          `mapstructure:"discount_rate"`
+	OrderExpireMinutes int              `mapstructure:"order_expire_minutes"`
+	MaxOrdersPerMinute int              `mapstructure:"max_orders_per_minute"`
+	Packages           []PaymentPackage `mapstructure:"packages"`
+	Zpay               ZpayConfig       `mapstructure:"zpay"`
+	Stripe             StripeConfig     `mapstructure:"stripe"`
+}
+
+type PaymentPackage struct {
+	AmountCNY float64 `mapstructure:"amount_cny"`
+	AmountUSD float64 `mapstructure:"amount_usd"`
+	Label     string  `mapstructure:"label"`
+	Popular   bool    `mapstructure:"popular"`
+}
+
+type ZpayConfig struct {
+	Enabled         bool   `mapstructure:"enabled"`
+	PID             string `mapstructure:"pid"`
+	Key             string `mapstructure:"key"`
+	APIURL          string `mapstructure:"api_url"`
+	SubmitURL       string `mapstructure:"submit_url"`
+	QueryURL        string `mapstructure:"query_url"`
+	PaymentMethods  string `mapstructure:"payment_methods"`
+	OrderPrefix     string `mapstructure:"order_prefix"`
+	NotifyURL       string `mapstructure:"notify_url"`
+	ReturnURL       string `mapstructure:"return_url"`
+	NotifyUser      bool   `mapstructure:"notify_user"`
+	IPWhitelist     string `mapstructure:"ip_whitelist"`
+	RequireHTTPS    bool   `mapstructure:"require_https"`
+}
+
+type StripeConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	APIKey        string `mapstructure:"api_key"`
+	WebhookSecret string `mapstructure:"webhook_secret"`
+	APIVersion    string `mapstructure:"api_version"`
+	PaymentMethods string `mapstructure:"payment_methods"`
+	Currency      string `mapstructure:"currency"`
+	SuccessURL    string `mapstructure:"success_url"`
+	CancelURL     string `mapstructure:"cancel_url"`
+	WechatClient  string `mapstructure:"wechat_client"`
+	WechatAppID   string `mapstructure:"wechat_app_id"`
+}
+
 type RateLimitConfig struct {
 	OverloadCooldownMinutes int `mapstructure:"overload_cooldown_minutes"` // 529过载冷却时间(分钟)
 }
@@ -221,6 +296,66 @@ func setDefaults() {
 	viper.SetDefault("default.user_balance", 0)
 	viper.SetDefault("default.api_key_prefix", "sk-")
 	viper.SetDefault("default.rate_multiplier", 1.0)
+
+	// Promotion
+	viper.SetDefault("promotion.enabled", false)
+	viper.SetDefault("promotion.duration_hours", 72)
+	viper.SetDefault("promotion.min_amount", 0.0)
+	viper.SetDefault("promotion.tiers", []map[string]any{
+		{"hours": 24, "bonus_percent": 30},
+		{"hours": 36, "bonus_percent": 20},
+		{"hours": 48, "bonus_percent": 10},
+		{"hours": 72, "bonus_percent": 5},
+	})
+
+	// Referral
+	viper.SetDefault("referral.enabled", false)
+	viper.SetDefault("referral.link_base_url", "")
+	viper.SetDefault("referral.reward_usd", 0.0)
+	viper.SetDefault("referral.qualified_recharge_cny", 0.0)
+	viper.SetDefault("referral.qualified_recharge_usd", 0.0)
+	viper.SetDefault("referral.code_length", 8)
+	viper.SetDefault("referral.max_invitees_per_user", 0)
+
+	// Payment
+	viper.SetDefault("payment.enabled", false)
+	viper.SetDefault("payment.base_url", "")
+	viper.SetDefault("payment.min_amount", 1.0)
+	viper.SetDefault("payment.max_amount", 10000.0)
+	viper.SetDefault("payment.exchange_rate", 7.2)
+	viper.SetDefault("payment.discount_rate", 1.0)
+	viper.SetDefault("payment.order_expire_minutes", 30)
+	viper.SetDefault("payment.max_orders_per_minute", 3)
+	viper.SetDefault("payment.packages", []map[string]any{
+		{"amount_usd": 100, "label": "$100", "popular": false},
+		{"amount_usd": 200, "label": "$200", "popular": false},
+		{"amount_usd": 500, "label": "$500", "popular": true},
+		{"amount_usd": 1000, "label": "$1000", "popular": false},
+	})
+	viper.SetDefault("payment.zpay.enabled", false)
+	viper.SetDefault("payment.zpay.pid", "")
+	viper.SetDefault("payment.zpay.key", "")
+	viper.SetDefault("payment.zpay.api_url", "https://zpayz.cn")
+	viper.SetDefault("payment.zpay.submit_url", "https://zpayz.cn/submit.php")
+	viper.SetDefault("payment.zpay.query_url", "https://zpayz.cn/api.php")
+	viper.SetDefault("payment.zpay.payment_methods", "alipay,wxpay")
+	viper.SetDefault("payment.zpay.order_prefix", "")
+	viper.SetDefault("payment.zpay.notify_url", "/api/payment/webhook/zpay")
+	viper.SetDefault("payment.zpay.return_url", "/payment/result")
+	viper.SetDefault("payment.zpay.notify_user", false)
+	viper.SetDefault("payment.zpay.ip_whitelist", "")
+	viper.SetDefault("payment.zpay.require_https", true)
+
+	viper.SetDefault("payment.stripe.enabled", false)
+	viper.SetDefault("payment.stripe.api_key", "")
+	viper.SetDefault("payment.stripe.webhook_secret", "")
+	viper.SetDefault("payment.stripe.api_version", "")
+	viper.SetDefault("payment.stripe.payment_methods", "wechat_pay")
+	viper.SetDefault("payment.stripe.currency", "CNY")
+	viper.SetDefault("payment.stripe.success_url", "/payment/success")
+	viper.SetDefault("payment.stripe.cancel_url", "/payment/cancel")
+	viper.SetDefault("payment.stripe.wechat_client", "web")
+	viper.SetDefault("payment.stripe.wechat_app_id", "")
 
 	// RateLimit
 	viper.SetDefault("rate_limit.overload_cooldown_minutes", 10)

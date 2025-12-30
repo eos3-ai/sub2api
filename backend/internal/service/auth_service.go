@@ -43,6 +43,8 @@ type AuthService struct {
 	emailService      *EmailService
 	turnstileService  *TurnstileService
 	emailQueueService *EmailQueueService
+	promotionService  *PromotionService
+	referralService   *ReferralService
 }
 
 // NewAuthService 创建认证服务实例
@@ -53,6 +55,8 @@ func NewAuthService(
 	emailService *EmailService,
 	turnstileService *TurnstileService,
 	emailQueueService *EmailQueueService,
+	promotionService *PromotionService,
+	referralService *ReferralService,
 ) *AuthService {
 	return &AuthService{
 		userRepo:          userRepo,
@@ -61,6 +65,8 @@ func NewAuthService(
 		emailService:      emailService,
 		turnstileService:  turnstileService,
 		emailQueueService: emailQueueService,
+		promotionService:  promotionService,
+		referralService:   referralService,
 	}
 }
 
@@ -126,6 +132,10 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		log.Printf("[Auth] Database error creating user: %v", err)
 		return "", nil, ErrServiceUnavailable
+	}
+
+	if s.promotionService != nil && s.cfg.Promotion.Enabled {
+		_ = s.promotionService.InitUserPromotion(ctx, user.ID, user.Username)
 	}
 
 	// 生成token

@@ -835,7 +835,7 @@ CREATE TABLE payment_orders_2024_02 PARTITION OF payment_orders
 
 | 序号 | 文件 | API 路由 | 状态 |
 |-----|------|---------|------|
-| 1 | `handler/balance_handler.go` | GET /users/balance, /recharge-records | ⬜ |
+| 1 | `handler/balance_handler.go` | （不单独提供）充值记录统一在 `/payment` 的“我的订单”展示 | ⬜ |
 | 2 | `handler/promotion_handler.go` | GET /users/promotion/status | ⬜ |
 | 3 | `handler/referral_handler.go` | GET /users/referral/info, /invitees | ⬜ |
 | 4 | `handler/payment_handler.go` | POST/GET /payment/* | ⬜ |

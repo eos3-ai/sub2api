@@ -109,6 +109,8 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'usage.description'
     }
   },
+  // Redeem code feature is not used in this deployment:
+  /*
   {
     path: '/redeem',
     name: 'Redeem',
@@ -121,6 +123,7 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'redeem.description'
     }
   },
+  */
   {
     path: '/profile',
     name: 'Profile',
@@ -143,6 +146,18 @@ const routes: RouteRecordRaw[] = [
       title: 'My Subscriptions',
       titleKey: 'userSubscriptions.title',
       descriptionKey: 'userSubscriptions.description'
+    }
+  },
+  {
+    path: '/payment',
+    name: 'Payment',
+    component: () => import('@/views/user/PaymentView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Payment',
+      titleKey: 'payment.title',
+      descriptionKey: 'payment.description'
     }
   },
 
@@ -223,6 +238,8 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.proxies.description'
     }
   },
+  // Redeem code feature is not used in this deployment:
+  /*
   {
     path: '/admin/redeem',
     name: 'AdminRedeem',
@@ -235,6 +252,7 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'admin.redeem.description'
     }
   },
+  */
   {
     path: '/admin/settings',
     name: 'AdminSettings',

@@ -47,7 +47,13 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	turnstileVerifier := repository.NewTurnstileVerifier()
 	turnstileService := service.NewTurnstileService(settingService, turnstileVerifier)
 	emailQueueService := service.ProvideEmailQueueService(emailService)
-	authService := service.NewAuthService(userRepository, configConfig, settingService, emailService, turnstileService, emailQueueService)
+	promotionRepository := repository.NewPromotionRepository(db)
+	promotionCache := repository.NewPromotionCache(client)
+	promotionService := service.NewPromotionService(configConfig, promotionRepository, promotionCache)
+	referralRepository := repository.NewReferralRepository(db)
+	referralCache := repository.NewReferralCache(client)
+	referralService := service.NewReferralService(configConfig, referralRepository, referralCache)
+	authService := service.NewAuthService(userRepository, configConfig, settingService, emailService, turnstileService, emailQueueService, promotionService, referralService)
 	userService := service.NewUserService(userRepository)
 	authHandler := handler.NewAuthHandler(configConfig, authService, userService)
 	userHandler := handler.NewUserHandler(userService)
@@ -61,13 +67,21 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	usageService := service.NewUsageService(usageLogRepository, userRepository)
 	usageHandler := handler.NewUsageHandler(usageService, apiKeyService)
 	redeemCodeRepository := repository.NewRedeemCodeRepository(db)
+	rechargeRecordRepository := repository.NewRechargeRecordRepository(db)
 	billingCache := repository.NewBillingCache(client)
 	billingCacheService := service.NewBillingCacheService(billingCache, userRepository, userSubscriptionRepository, configConfig)
+	balanceService := service.NewBalanceService(userRepository, rechargeRecordRepository, billingCacheService)
 	subscriptionService := service.NewSubscriptionService(groupRepository, userSubscriptionRepository, billingCacheService)
 	redeemCache := repository.NewRedeemCache(client)
-	redeemService := service.NewRedeemService(redeemCodeRepository, userRepository, subscriptionService, redeemCache, billingCacheService)
+	redeemService := service.NewRedeemService(redeemCodeRepository, userRepository, balanceService, subscriptionService, redeemCache, billingCacheService)
 	redeemHandler := handler.NewRedeemHandler(redeemService)
 	subscriptionHandler := handler.NewSubscriptionHandler(subscriptionService)
+	paymentOrderRepository := repository.NewPaymentOrderRepository(db)
+	paymentCache := repository.NewPaymentCache(client)
+	paymentService := service.NewPaymentService(configConfig, paymentOrderRepository, paymentCache, balanceService, promotionService, referralService)
+	zpayService := service.NewZpayService(configConfig)
+	stripeService := service.NewStripeService(configConfig)
+	paymentHandler := handler.NewPaymentHandler(configConfig, paymentService, zpayService, stripeService)
 	dashboardService := service.NewDashboardService(usageLogRepository)
 	dashboardHandler := admin.NewDashboardHandler(dashboardService)
 	accountRepository := repository.NewAccountRepository(db)
@@ -129,7 +143,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	openAIGatewayService := service.NewOpenAIGatewayService(accountRepository, usageLogRepository, userRepository, userSubscriptionRepository, gatewayCache, configConfig, billingService, rateLimitService, billingCacheService, httpUpstream, deferredService)
 	openAIGatewayHandler := handler.NewOpenAIGatewayHandler(openAIGatewayService, concurrencyService, billingCacheService)
 	handlerSettingHandler := handler.ProvideSettingHandler(settingService, buildInfo)
-	handlers := handler.ProvideHandlers(authHandler, userHandler, apiKeyHandler, usageHandler, redeemHandler, subscriptionHandler, adminHandlers, gatewayHandler, openAIGatewayHandler, handlerSettingHandler)
+	handlers := handler.ProvideHandlers(authHandler, userHandler, apiKeyHandler, usageHandler, redeemHandler, subscriptionHandler, paymentHandler, adminHandlers, gatewayHandler, openAIGatewayHandler, handlerSettingHandler)
 	jwtAuthMiddleware := middleware.NewJWTAuthMiddleware(authService, userService)
 	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService, userService, settingService)
 	apiKeyAuthMiddleware := middleware.NewApiKeyAuthMiddleware(apiKeyService, subscriptionService, configConfig)
@@ -137,7 +151,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	httpServer := server.ProvideHTTPServer(configConfig, engine)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, configConfig)
 	antigravityQuotaRefresher := service.ProvideAntigravityQuotaRefresher(accountRepository, proxyRepository, antigravityOAuthService, configConfig)
-	v := provideCleanup(db, client, tokenRefreshService, pricingService, emailQueueService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, antigravityQuotaRefresher)
+	paymentMaintenanceService := service.ProvidePaymentMaintenanceService(configConfig, paymentService)
+	v := provideCleanup(db, client, tokenRefreshService, pricingService, emailQueueService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, antigravityQuotaRefresher, paymentMaintenanceService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -170,6 +185,7 @@ func provideCleanup(
 	geminiOAuth *service.GeminiOAuthService,
 	antigravityOAuth *service.AntigravityOAuthService,
 	antigravityQuota *service.AntigravityQuotaRefresher,
+	paymentMaintenance *service.PaymentMaintenanceService,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -179,6 +195,10 @@ func provideCleanup(
 			name string
 			fn   func() error
 		}{
+			{"PaymentMaintenanceService", func() error {
+				paymentMaintenance.Stop()
+				return nil
+			}},
 			{"TokenRefreshService", func() error {
 				tokenRefresh.Stop()
 				return nil
