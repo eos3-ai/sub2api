@@ -8,7 +8,7 @@
 | 1 | 💰 支付系统 | 部分完成 | 已补齐用户端基础 API + `/payment` 前端页面（固定套餐 + 自定义金额、支付宝/微信选择、金额计算弹窗、二维码展示 + 状态轮询）；后端已接入 ZPay/Stripe（可返回 `pay_url/qr_url`）；仍缺独立的支付结果页与回调校验补强。 |
 | 2 | 🎁 活动优惠 | 部分完成 | 服务、存储与配置已加入，但无 API/UI 展示。 |
 | 3 | 👥 邀请返利 | 部分完成 | 数据模型完成，前台入口与邀请码记录流程缺失。 |
-| 4 | 💵 用户余额 | 部分完成 | 余额/流水表与 BalanceService 已有；当前前端以“我的订单”作为充值记录展示；管理员后台给用户加余额会生成“后台充值”订单并对用户可见，但尚未完全接入 BalanceService/recharge_records。 |
+| 4 | 💵 用户余额 | 部分完成 | 余额/流水表与 BalanceService 已有；当前前端以“我的订单”作为充值记录展示；管理员后台加/减/设置余额已接入 BalanceService 写入账本，并在“加余额”时额外生成“后台充值”订单对用户可见；仍缺账本流水的后台查询/导出 UI。 |
 | 5 | 📧 邮件服务 | 部分完成 | SMTP/验证码已实现，密码找回与文档缺失。 |
 | 6 | 🔐 用户认证增强 | 部分完成 | 注册/登录/改密完成，重置密码/旧格式迁移缺失。 |
 | 7 | 🔑 API Key 管理增强 | 未迁移 | 明文查看、加密存储、分钟级统计与审计均未落地。 |
@@ -23,7 +23,7 @@
 
 ## 建议执行顺序（面向现有环境）
 1. **支付前台闭环（优先出前端效果）**：`/payment` 页面 + 套餐列表/自定义金额/下单/支付二维码展示/状态轮询已具备；下一步优先补齐独立支付结果页、回调安全校验（金额/币种/状态）与失败/过期分支，让链路真正闭环。
-2. **余额与流水可视化**：当前前端以“在线充值 → 我的订单”作为充值记录展示；管理员后台给用户加余额已会生成“后台充值”订单并对用户可见；如需统一账本一致性，下一步让 `AdminService.UpdateUserBalance` 走 `BalanceService.ApplyChange` 并写入 `recharge_records`。
+2. **余额与流水可视化**：当前前端以“在线充值 → 我的订单”作为充值记录展示；管理员后台加/减/设置余额已写入 `recharge_records`（并在加余额时生成“后台充值”订单对用户可见）；下一步若要对账/审计，补齐 `recharge_records` 的管理员查询/导出 API/UI。
 3. **活动优惠展示**：在现有服务上增加用户/管理员查询接口，并在 Dashboard 中放置 `PromotionBanner`、倒计时等组件，把优惠信息可视化。
 4. **邀请返利入口**：为注册流程添加邀请码字段，接入 `ReferralService`，补 `/api/v1/referral/*` 接口及前端邀请页，释放既有返利能力。
 5. **忘记密码链路**：依托 `EmailService` 增加 `forgot/reset password` API、Redis token，以及对应前端页面，完善基础认证体验。
@@ -40,7 +40,7 @@
 1. **已完成：ZPay/Stripe 基础下单**：可生成 `pay_url/qr_url`（ZPay 收银台链接 / Stripe 微信支付指引页与二维码）。
 2. **已完成：回调路由与验签入口**：已提供 ZPay notify 与 Stripe webhook 回调入口，并在支付成功事件中调用 `PaymentService.MarkOrderPaid`。
 3. **已完成：订单过期任务**：`payment.enabled=true` 时启动后台定时清理过期订单。
-4. **待补强：安全校验**：回调中补齐金额/币种/订单状态的严格校验、Stripe 失败事件处理、ZPay 回调 IP 白名单与签名异常日志。
+4. **已补强：安全校验（第一阶段）**：回调中已增加金额/币种/订单状态的基础校验，并补齐 Stripe `payment_failed/canceled` 事件将订单落库为失败/取消；后续可继续加强日志与更严格的幂等/重复回调审计。
 
 ### P1：前端支付体验补齐
 1. **已完成：展示二维码/跳转支付 + 状态轮询**：`createPaymentOrder` 返回 `pay_url/qr_url` 后，前端弹窗展示二维码/支付链接，并轮询订单状态（pending → paid/failed/expired），支付成功后刷新“我的订单”。
@@ -85,7 +85,7 @@
 
 ### 待迁移
 - ZPay 回调依赖公网可访问地址：若 `payment.zpay.notify_url/return_url` 为相对路径，需要配置 `payment.base_url`（否则后端无法拼接出完整回调 URL）。
-- Stripe Webhook 事件对象解析目前仅取 `payment_intent.succeeded` 的 `metadata.order_no`，可按需要补齐失败事件处理与更多校验（金额/币种/订单状态等）。
+- Stripe Webhook 目前已覆盖 `payment_intent.succeeded/payment_failed/canceled`，但仍可继续补齐更多事件（如退款）与更严格的对账校验/审计日志。
 
 ## 2. 🎁 活动优惠系统
 ### 已落地
@@ -113,9 +113,9 @@
 - `backend/internal/service/balance_service.go` + `internal/repository/recharge_record_repo.go` + `backend/migrations/005_recharge_record.sql` 已实现充值流水及扣减 API。
 - 支付/返利路径会调用 `BalanceService.ApplyChange` 记账（见 `PaymentService` 中对 `RechargeTypePayment` 与 `RechargeTypeReferral` 的调用）。
 - 兑换码充值已写入流水：`RedeemService` 的余额类兑换改为走 `BalanceService.ApplyChange`（用于数据一致性，前端当前不单独展示流水页）。
+- **已补齐：后台充值写入账本**：管理员后台给用户加/减/设置余额会优先走 `BalanceService.ApplyChange` 写入 `recharge_records`（类型 `admin`），并在“加余额”场景额外创建一条 `payment_orders(provider=admin)` 以便用户侧“我的订单”可见“后台充值”。
 
 ### 待迁移
-- 管理员操作尚未接入 BalanceService：`internal/service/admin_service.go` 的 `UpdateUserBalance` 仍是直接改写 `users.balance` 并以 `RedeemCode` 记录；虽然已额外创建 “后台充值” `payment_orders` 让用户可见，但不会写入 `recharge_records`。
 - 余额流水（`recharge_records`）仍缺少可用的管理员查询/导出 API；当前后台的“充值记录”页面使用的是 `payment_orders`（在线充值 + 后台充值），不等同于完整账本流水。
 - 当前前端不单独提供“充值记录”页面：以“充值 → 我的订单”作为充值记录展示；如需展示完整余额流水，再补 `/user/recharge-records` 与对应页面。
 - 若未来需要 `recharge_records` 层面的筛选/导出（按类型/日期/来源），需补相应 API 与后台页面/导出按钮。

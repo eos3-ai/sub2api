@@ -224,6 +224,7 @@ type adminServiceImpl struct {
 	proxyRepo           ProxyRepository
 	apiKeyRepo          ApiKeyRepository
 	redeemCodeRepo      RedeemCodeRepository
+	balanceService      *BalanceService
 	billingCacheService *BillingCacheService
 	proxyProber         ProxyExitInfoProber
 	paymentOrderRepo    PaymentOrderRepository
@@ -238,6 +239,7 @@ func NewAdminService(
 	proxyRepo ProxyRepository,
 	apiKeyRepo ApiKeyRepository,
 	redeemCodeRepo RedeemCodeRepository,
+	balanceService *BalanceService,
 	billingCacheService *BillingCacheService,
 	proxyProber ProxyExitInfoProber,
 	paymentOrderRepo PaymentOrderRepository,
@@ -250,6 +252,7 @@ func NewAdminService(
 		proxyRepo:           proxyRepo,
 		apiKeyRepo:          apiKeyRepo,
 		redeemCodeRepo:      redeemCodeRepo,
+		balanceService:      balanceService,
 		billingCacheService: billingCacheService,
 		proxyProber:         proxyProber,
 		paymentOrderRepo:    paymentOrderRepo,
@@ -384,62 +387,83 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 
 	oldBalance := user.Balance
 
+	if operation != "set" && operation != "add" && operation != "subtract" {
+		return nil, fmt.Errorf("invalid operation")
+	}
+
+	var delta float64
 	switch operation {
 	case "set":
-		user.Balance = balance
+		delta = balance - oldBalance
 	case "add":
-		user.Balance += balance
+		if balance < 0 {
+			return nil, fmt.Errorf("amount must be positive for add")
+		}
+		delta = balance
 	case "subtract":
-		user.Balance -= balance
+		if balance < 0 {
+			return nil, fmt.Errorf("amount must be positive for subtract")
+		}
+		delta = -balance
 	}
 
-	if user.Balance < 0 {
-		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", oldBalance, user.Balance)
+	if delta == 0 {
+		return user, nil
 	}
 
-	if err := s.userRepo.Update(ctx, user); err != nil {
-		return nil, err
+	newBalance := oldBalance + delta
+	if newBalance < 0 {
+		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", oldBalance, newBalance)
 	}
 
-	if s.billingCacheService != nil {
-		go func() {
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
-				log.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
-			}
-		}()
-	}
-
-	balanceDiff := user.Balance - oldBalance
-	if operation == "add" && balance > 0 {
-		_ = s.createAdminRechargeOrder(ctx, user, balance, notes)
-	}
-
-	if balanceDiff != 0 {
-		code, err := GenerateRedeemCode()
+	// Prefer BalanceService to keep a consistent ledger (recharge_records) + cache invalidation.
+	if s.balanceService != nil {
+		_, err := s.balanceService.ApplyChange(ctx, BalanceChangeRequest{
+			UserID:    userID,
+			Amount:    delta,
+			Type:      RechargeTypeAdmin,
+			Operator:  "admin",
+			Remark:    strings.TrimSpace(notes),
+			RelatedID: nil,
+		})
 		if err != nil {
-			log.Printf("failed to generate adjustment redeem code: %v", err)
-			return user, nil
+			return nil, err
+		}
+	} else {
+		// Fallback: directly update user balance (legacy behavior).
+		user.Balance = newBalance
+		if err := s.userRepo.Update(ctx, user); err != nil {
+			return nil, err
 		}
 
-		adjustmentRecord := &RedeemCode{
-			Code:   code,
-			Type:   AdjustmentTypeAdminBalance,
-			Value:  balanceDiff,
-			Status: StatusUsed,
-			UsedBy: &user.ID,
-			Notes:  notes,
-		}
-		now := time.Now()
-		adjustmentRecord.UsedAt = &now
-
-		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
-			log.Printf("failed to create balance adjustment redeem code: %v", err)
+		if s.billingCacheService != nil {
+			go func() {
+				cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := s.billingCacheService.InvalidateUserBalance(cacheCtx, userID); err != nil {
+					log.Printf("invalidate user balance cache failed: user_id=%d err=%v", userID, err)
+				}
+			}()
 		}
 	}
 
-	return user, nil
+	// Mark admin top-up as an order visible to the user (only for explicit "add" operations).
+	if operation == "add" && balance > 0 {
+		updatedUser, _ := s.userRepo.GetByID(ctx, userID)
+		if updatedUser != nil {
+			_ = s.createAdminRechargeOrder(ctx, updatedUser, balance, notes)
+		} else {
+			_ = s.createAdminRechargeOrder(ctx, user, balance, notes)
+		}
+	}
+
+	updated, err := s.userRepo.GetByID(ctx, userID)
+	if err != nil {
+		// Even if reload failed, return the original user object with optimistic balance update.
+		user.Balance = newBalance
+		return user, nil
+	}
+	return updated, nil
 }
 
 func (s *adminServiceImpl) createAdminRechargeOrder(ctx context.Context, user *User, amountUSD float64, notes string) error {

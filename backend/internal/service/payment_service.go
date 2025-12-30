@@ -154,6 +154,34 @@ func (s *PaymentService) MarkOrderFailed(ctx context.Context, orderNo string, re
 	return order, nil
 }
 
+// MarkOrderCancelled marks a pending order as cancelled and stores the reason/message.
+func (s *PaymentService) MarkOrderCancelled(ctx context.Context, orderNo string, reason string) (*PaymentOrder, error) {
+	if s == nil {
+		return nil, nil
+	}
+	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
+	if err != nil {
+		return nil, fmt.Errorf("get order: %w", err)
+	}
+	if order == nil {
+		return nil, fmt.Errorf("order not found")
+	}
+	if order.Status != PaymentStatusPending {
+		return order, nil
+	}
+
+	now := timePtr(time.Now())
+	order.Status = PaymentStatusCancelled
+	order.CallbackAt = now
+	if reason != "" {
+		order.CallbackData = reason
+	}
+	if err := s.orderRepo.Update(ctx, order); err != nil {
+		return nil, fmt.Errorf("update order: %w", err)
+	}
+	return order, nil
+}
+
 // ListUserOrders 用户订单列表
 func (s *PaymentService) ListUserOrders(ctx context.Context, userID int64, params pagination.PaginationParams, status string) ([]PaymentOrder, *pagination.PaginationResult, error) {
 	if s == nil {

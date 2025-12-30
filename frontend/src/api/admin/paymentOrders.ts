@@ -30,6 +30,9 @@ export async function list(
   filters?: {
     method?: AdminPaymentMethod | ''
     user?: string
+    status?: string
+    from?: string
+    to?: string
   }
 ): Promise<PaginatedResponse<AdminPaymentOrder>> {
   const { data } = await apiClient.get<PaginatedResponse<AdminPaymentOrder>>('/admin/payment/orders', {
@@ -37,17 +40,29 @@ export async function list(
       page,
       page_size: pageSize,
       method: filters?.method || undefined,
-      user: filters?.user || undefined
+      user: filters?.user || undefined,
+      status: filters?.status || undefined,
+      from: filters?.from || undefined,
+      to: filters?.to || undefined
     }
   })
   return data
 }
 
-export async function exportRecords(filters?: { method?: AdminPaymentMethod | ''; user?: string }): Promise<Blob> {
+export async function exportRecords(filters?: {
+  method?: AdminPaymentMethod | ''
+  user?: string
+  status?: string
+  from?: string
+  to?: string
+}): Promise<Blob> {
   const { data } = await apiClient.get('/admin/payment/orders/export', {
     params: {
       method: filters?.method || undefined,
-      user: filters?.user || undefined
+      user: filters?.user || undefined,
+      status: filters?.status || undefined,
+      from: filters?.from || undefined,
+      to: filters?.to || undefined
     },
     responseType: 'blob'
   })

@@ -26,7 +26,7 @@
 
             <div class="min-w-[220px]">
               <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
-                {{ t('admin.paymentOrders.user') }}
+                {{ t('admin.paymentOrders.userEmail') }}
               </label>
               <input
                 v-model.trim="filters.user"
@@ -34,6 +34,35 @@
                 class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
                 :placeholder="t('admin.paymentOrders.userPlaceholder')"
                 @keydown.enter.prevent="applyFilters"
+              />
+            </div>
+
+            <div class="min-w-[160px]">
+              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+                {{ t('admin.paymentOrders.status') }}
+              </label>
+              <Select v-model="filters.status" :options="statusOptions" :placeholder="t('common.all')" />
+            </div>
+
+            <div class="min-w-[210px]">
+              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+                {{ t('admin.paymentOrders.from') }}
+              </label>
+              <input
+                v-model="filters.from"
+                type="datetime-local"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
+              />
+            </div>
+
+            <div class="min-w-[210px]">
+              <label class="mb-1 block text-xs font-semibold text-gray-600 dark:text-dark-300">
+                {{ t('admin.paymentOrders.to') }}
+              </label>
+              <input
+                v-model="filters.to"
+                type="datetime-local"
+                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
               />
             </div>
 
@@ -121,9 +150,12 @@ const { t } = useI18n()
 const loading = ref(false)
 const exporting = ref(false)
 
-const filters = reactive<{ method: AdminPaymentMethod | ''; user: string }>({
+const filters = reactive<{ method: AdminPaymentMethod | ''; user: string; status: string; from: string; to: string }>({
   method: '',
-  user: ''
+  user: '',
+  status: '',
+  from: '',
+  to: ''
 })
 
 const pagination = reactive({
@@ -138,6 +170,15 @@ const methodOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: t('payment.alipay'), value: 'alipay' },
   { label: t('payment.wechat'), value: 'wechat' }
+])
+
+const statusOptions = computed(() => [
+  { label: t('common.all'), value: '' },
+  { label: t('payment.statusPending'), value: 'pending' },
+  { label: t('payment.statusPaid'), value: 'paid' },
+  { label: t('payment.statusFailed'), value: 'failed' },
+  { label: t('payment.statusExpired'), value: 'expired' },
+  { label: t('payment.statusCancelled'), value: 'cancelled' }
 ])
 
 const columns = computed<Column[]>(() => [
@@ -188,7 +229,10 @@ async function load() {
   try {
     const resp = await adminAPI.paymentOrders.list(pagination.page, pagination.page_size, {
       method: filters.method || '',
-      user: filters.user || ''
+      user: filters.user || '',
+      status: filters.status || '',
+      from: filters.from ? new Date(filters.from).toISOString() : '',
+      to: filters.to ? new Date(filters.to).toISOString() : ''
     })
     items.value = resp.items
     pagination.total = resp.total
@@ -205,6 +249,9 @@ function applyFilters() {
 function resetFilters() {
   filters.method = ''
   filters.user = ''
+  filters.status = ''
+  filters.from = ''
+  filters.to = ''
   applyFilters()
 }
 
@@ -224,7 +271,10 @@ async function exportRecords() {
   try {
     const blob = await adminAPI.paymentOrders.exportRecords({
       method: filters.method || '',
-      user: filters.user || ''
+      user: filters.user || '',
+      status: filters.status || '',
+      from: filters.from ? new Date(filters.from).toISOString() : '',
+      to: filters.to ? new Date(filters.to).toISOString() : ''
     })
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(
