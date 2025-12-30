@@ -660,9 +660,11 @@ export default {
       title: 'Recharge Records',
       description: 'View all users recharge records (payment orders)',
       method: 'Method',
-      user: 'User',
       userEmail: 'User Email',
       userPlaceholder: 'Enter user email',
+      status: 'Status',
+      from: 'From',
+      to: 'To',
       export: 'Export Records'
     },
 

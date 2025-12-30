@@ -295,6 +295,12 @@ func (h *PaymentHandler) ZpayNotify(c *gin.Context) {
 		return
 	}
 
+	order, _ := h.paymentService.GetOrderByOrderNo(c.Request.Context(), orderNo)
+	if order == nil || !strings.EqualFold(order.Provider, "zpay") {
+		c.String(http.StatusOK, "fail")
+		return
+	}
+
 	status := strings.ToUpper(strings.TrimSpace(data["trade_status"]))
 	if status == "" {
 		status = strings.ToUpper(strings.TrimSpace(data["status"]))
@@ -306,8 +312,7 @@ func (h *PaymentHandler) ZpayNotify(c *gin.Context) {
 
 	if moneyStr := strings.TrimSpace(data["money"]); moneyStr != "" {
 		if money, err := strconv.ParseFloat(moneyStr, 64); err == nil {
-			order, _ := h.paymentService.GetOrderByOrderNo(c.Request.Context(), orderNo)
-			if order != nil && !approxEqual(order.AmountCNY, money, 0.02) {
+			if !approxEqual(order.AmountCNY, money, 0.02) {
 				c.String(http.StatusOK, "fail")
 				return
 			}
@@ -341,15 +346,55 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 		return
 	}
 	signature := c.GetHeader("Stripe-Signature")
-	orderNo, tradeNo, eventType, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
+	info, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
 	if err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
-	if eventType == "payment_intent.succeeded" && orderNo != "" && tradeNo != "" {
-		_, _ = h.paymentService.MarkOrderPaid(c.Request.Context(), orderNo, tradeNo, gin.H{
-			"type": eventType,
+
+	if info == nil || strings.TrimSpace(info.OrderNo) == "" {
+		c.Status(http.StatusOK)
+		return
+	}
+
+	order, _ := h.paymentService.GetOrderByOrderNo(c.Request.Context(), info.OrderNo)
+	if order == nil || !strings.EqualFold(order.Provider, "stripe") {
+		c.Status(http.StatusOK)
+		return
+	}
+	if info.Amount > 0 {
+		money := float64(info.Amount) / 100
+		if !approxEqual(order.AmountCNY, money, 0.02) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+	}
+	if info.Currency != "" {
+		expected := strings.ToLower(strings.TrimSpace(h.cfg.Payment.Stripe.Currency))
+		if expected != "" && strings.ToLower(expected) != strings.ToLower(info.Currency) {
+			c.Status(http.StatusBadRequest)
+			return
+		}
+	}
+
+	switch info.EventType {
+	case "payment_intent.succeeded":
+		_, _ = h.paymentService.MarkOrderPaid(c.Request.Context(), info.OrderNo, info.TradeNo, gin.H{
+			"type": info.EventType,
 		})
+	case "payment_intent.payment_failed":
+		reason := info.EventType
+		if strings.TrimSpace(info.FailureMessage) != "" {
+			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
+		}
+		_, _ = h.paymentService.MarkOrderFailed(c.Request.Context(), info.OrderNo, reason)
+	case "payment_intent.canceled":
+		reason := info.EventType
+		if strings.TrimSpace(info.FailureMessage) != "" {
+			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
+		}
+		_, _ = h.paymentService.MarkOrderCancelled(c.Request.Context(), info.OrderNo, reason)
+	default:
 	}
 	c.Status(http.StatusOK)
 }

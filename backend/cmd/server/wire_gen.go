@@ -87,7 +87,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	accountRepository := repository.NewAccountRepository(db)
 	proxyRepository := repository.NewProxyRepository(db)
 	proxyExitInfoProber := repository.NewProxyExitInfoProber()
-	adminService := service.NewAdminService(userRepository, groupRepository, accountRepository, proxyRepository, apiKeyRepository, redeemCodeRepository, billingCacheService, proxyExitInfoProber, paymentOrderRepository, configConfig)
+	adminService := service.NewAdminService(userRepository, groupRepository, accountRepository, proxyRepository, apiKeyRepository, redeemCodeRepository, balanceService, billingCacheService, proxyExitInfoProber, paymentOrderRepository, configConfig)
 	adminUserHandler := admin.NewUserHandler(adminService)
 	groupHandler := admin.NewGroupHandler(adminService)
 	claudeOAuthClient := repository.NewClaudeOAuthClient()

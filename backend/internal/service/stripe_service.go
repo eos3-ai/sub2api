@@ -19,6 +19,15 @@ type StripeService struct {
 	cfg *config.StripeConfig
 }
 
+type StripeWebhookInfo struct {
+	OrderNo        string
+	TradeNo        string
+	EventType      string
+	Amount         int64
+	Currency       string
+	FailureMessage string
+}
+
 func NewStripeService(cfg *config.Config) *StripeService {
 	var stripeCfg *config.StripeConfig
 	if cfg != nil {
@@ -100,12 +109,12 @@ func (s *StripeService) CreatePayment(ctx context.Context, order *PaymentOrder, 
 }
 
 // VerifyWebhook 校验 Stripe Webhook
-func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signature string) (orderNo string, tradeNo string, eventType string, err error) {
+func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signature string) (*StripeWebhookInfo, error) {
 	if s.cfg == nil || !s.cfg.Enabled {
-		return "", "", "", errors.New("stripe is disabled")
+		return nil, errors.New("stripe is disabled")
 	}
 	if strings.TrimSpace(s.cfg.WebhookSecret) == "" {
-		return "", "", "", errors.New("stripe webhook_secret is required")
+		return nil, errors.New("stripe webhook_secret is required")
 	}
 	event, err := webhook.ConstructEventWithOptions(
 		payload,
@@ -114,21 +123,33 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 		webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true},
 	)
 	if err != nil {
-		return "", "", "", fmt.Errorf("verify webhook: %w", err)
+		return nil, fmt.Errorf("verify webhook: %w", err)
 	}
 
-	eventType = string(event.Type)
-	switch eventType {
+	info := &StripeWebhookInfo{EventType: string(event.Type)}
+
+	switch info.EventType {
 	case "payment_intent.succeeded":
+		fallthrough
+	case "payment_intent.payment_failed":
+		fallthrough
+	case "payment_intent.canceled":
 		var pi stripe.PaymentIntent
 		if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
-			return "", "", eventType, fmt.Errorf("parse payment_intent: %w", err)
+			return nil, fmt.Errorf("parse payment_intent: %w", err)
 		}
-		orderNo = pi.Metadata["order_no"]
-		tradeNo = pi.ID
-		return orderNo, tradeNo, eventType, nil
+		info.OrderNo = pi.Metadata["order_no"]
+		info.TradeNo = pi.ID
+		info.Amount = pi.Amount
+		info.Currency = strings.ToLower(string(pi.Currency))
+		if pi.LastPaymentError != nil && strings.TrimSpace(pi.LastPaymentError.Msg) != "" {
+			info.FailureMessage = strings.TrimSpace(pi.LastPaymentError.Msg)
+		} else if pi.CancellationReason != "" {
+			info.FailureMessage = string(pi.CancellationReason)
+		}
+		return info, nil
 	default:
-		return "", "", eventType, nil
+		return info, nil
 	}
 }
 
