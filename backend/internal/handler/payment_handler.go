@@ -66,14 +66,14 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 		creditsUSD := amountUSD
 		payUSD := creditsUSD * discount
 		plans = append(plans, dto.PaymentPlan{
-			ID:         planID,
-			Name:       pkg.Label,
-			AmountUSD:  amountUSD,
-			PayUSD:     payUSD,
-			CreditsUSD: creditsUSD,
+			ID:           planID,
+			Name:         pkg.Label,
+			AmountUSD:    amountUSD,
+			PayUSD:       payUSD,
+			CreditsUSD:   creditsUSD,
 			ExchangeRate: paymentCfg.ExchangeRate,
 			DiscountRate: discount,
-			Enabled:    paymentCfg.Enabled,
+			Enabled:      paymentCfg.Enabled,
 		})
 	}
 	response.Success(c, plans)
@@ -161,7 +161,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 
 	response.Created(c, gin.H{
-		"order": dto.PaymentOrderFromService(order),
+		"order":   dto.PaymentOrderFromService(order),
 		"pay_url": payURL,
 		"qr_url":  qrURL,
 	})
@@ -349,17 +349,24 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 	signature := c.GetHeader("Stripe-Signature")
 	info, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
 	if err != nil {
+		log.Printf("[Stripe Webhook] verify failed: error=%v", err)
 		c.Status(http.StatusBadRequest)
 		return
 	}
 
 	if info == nil || strings.TrimSpace(info.OrderNo) == "" {
+		if info != nil {
+			log.Printf("[Stripe Webhook] missing order_no: event_id=%s, type=%s, trade_no=%s",
+				info.EventID, info.EventType, info.TradeNo)
+		}
 		c.Status(http.StatusOK)
 		return
 	}
 
 	order, _ := h.paymentService.GetOrderByOrderNo(c.Request.Context(), info.OrderNo)
 	if order == nil || !strings.EqualFold(order.Provider, "stripe") {
+		log.Printf("[Stripe Webhook] order not found or provider mismatch: event_id=%s, type=%s, order_no=%s",
+			info.EventID, info.EventType, info.OrderNo)
 		c.Status(http.StatusOK)
 		return
 	}
