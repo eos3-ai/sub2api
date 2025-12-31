@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -304,32 +306,32 @@ type PaymentPackage struct {
 }
 
 type ZpayConfig struct {
-	Enabled         bool   `mapstructure:"enabled"`
-	PID             string `mapstructure:"pid"`
-	Key             string `mapstructure:"key"`
-	APIURL          string `mapstructure:"api_url"`
-	SubmitURL       string `mapstructure:"submit_url"`
-	QueryURL        string `mapstructure:"query_url"`
-	PaymentMethods  string `mapstructure:"payment_methods"`
-	OrderPrefix     string `mapstructure:"order_prefix"`
-	NotifyURL       string `mapstructure:"notify_url"`
-	ReturnURL       string `mapstructure:"return_url"`
-	NotifyUser      bool   `mapstructure:"notify_user"`
-	IPWhitelist     string `mapstructure:"ip_whitelist"`
-	RequireHTTPS    bool   `mapstructure:"require_https"`
+	Enabled        bool   `mapstructure:"enabled"`
+	PID            string `mapstructure:"pid"`
+	Key            string `mapstructure:"key"`
+	APIURL         string `mapstructure:"api_url"`
+	SubmitURL      string `mapstructure:"submit_url"`
+	QueryURL       string `mapstructure:"query_url"`
+	PaymentMethods string `mapstructure:"payment_methods"`
+	OrderPrefix    string `mapstructure:"order_prefix"`
+	NotifyURL      string `mapstructure:"notify_url"`
+	ReturnURL      string `mapstructure:"return_url"`
+	NotifyUser     bool   `mapstructure:"notify_user"`
+	IPWhitelist    string `mapstructure:"ip_whitelist"`
+	RequireHTTPS   bool   `mapstructure:"require_https"`
 }
 
 type StripeConfig struct {
-	Enabled       bool   `mapstructure:"enabled"`
-	APIKey        string `mapstructure:"api_key"`
-	WebhookSecret string `mapstructure:"webhook_secret"`
-	APIVersion    string `mapstructure:"api_version"`
+	Enabled        bool   `mapstructure:"enabled"`
+	APIKey         string `mapstructure:"api_key"`
+	WebhookSecret  string `mapstructure:"webhook_secret"`
+	APIVersion     string `mapstructure:"api_version"`
 	PaymentMethods string `mapstructure:"payment_methods"`
-	Currency      string `mapstructure:"currency"`
-	SuccessURL    string `mapstructure:"success_url"`
-	CancelURL     string `mapstructure:"cancel_url"`
-	WechatClient  string `mapstructure:"wechat_client"`
-	WechatAppID   string `mapstructure:"wechat_app_id"`
+	Currency       string `mapstructure:"currency"`
+	SuccessURL     string `mapstructure:"success_url"`
+	CancelURL      string `mapstructure:"cancel_url"`
+	WechatClient   string `mapstructure:"wechat_client"`
+	WechatAppID    string `mapstructure:"wechat_app_id"`
 }
 
 type RateLimitConfig struct {
@@ -364,6 +366,23 @@ func Load() (*Config, error) {
 	// 默认值
 	setDefaults()
 
+	// JSON env overrides for array-of-objects fields (docker-friendly).
+	// These are used by deploy/.env.example and allow configuring complex arrays without editing YAML.
+	if raw := strings.TrimSpace(os.Getenv("PAYMENT_PACKAGES")); raw != "" {
+		var parsed []map[string]any
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil, fmt.Errorf("invalid PAYMENT_PACKAGES JSON: %w", err)
+		}
+		viper.Set("payment.packages", parsed)
+	}
+	if raw := strings.TrimSpace(os.Getenv("PROMOTION_TIERS")); raw != "" {
+		var parsed []map[string]any
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil, fmt.Errorf("invalid PROMOTION_TIERS JSON: %w", err)
+		}
+		viper.Set("promotion.tiers", parsed)
+	}
+
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("read config error: %w", err)
@@ -388,9 +407,13 @@ func Load() (*Config, error) {
 // bindLegacyEnvAliases binds legacy (non-namespaced) env vars to the current config keys.
 //
 // This repo primarily uses Viper's `.` -> `_` mapping, so config keys like:
-//   payment.zpay.enabled -> PAYMENT_ZPAY_ENABLED
+//
+//	payment.zpay.enabled -> PAYMENT_ZPAY_ENABLED
+//
 // But some deployments already use:
-//   ZPAY_ENABLED / STRIPE_SECRET_KEY / ...
+//
+//	ZPAY_ENABLED / STRIPE_SECRET_KEY / ...
+//
 // This helper keeps backwards compatibility.
 func bindLegacyEnvAliases(v *viper.Viper) {
 	if v == nil {
