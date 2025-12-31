@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -379,21 +380,45 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 
 	switch info.EventType {
 	case "payment_intent.succeeded":
-		_, _ = h.paymentService.MarkOrderPaid(c.Request.Context(), info.OrderNo, info.TradeNo, gin.H{
+		_, err := h.paymentService.MarkOrderPaid(c.Request.Context(), info.OrderNo, info.TradeNo, gin.H{
 			"type": info.EventType,
 		})
+		if err != nil {
+			log.Printf("[Stripe Webhook] Failed to mark order as paid: order_no=%s, trade_no=%s, error=%v",
+				info.OrderNo, info.TradeNo, err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to process payment",
+			})
+			return
+		}
 	case "payment_intent.payment_failed":
 		reason := info.EventType
 		if strings.TrimSpace(info.FailureMessage) != "" {
 			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
 		}
-		_, _ = h.paymentService.MarkOrderFailed(c.Request.Context(), info.OrderNo, reason)
+		_, err := h.paymentService.MarkOrderFailed(c.Request.Context(), info.OrderNo, reason)
+		if err != nil {
+			log.Printf("[Stripe Webhook] Failed to mark order as failed: order_no=%s, reason=%s, error=%v",
+				info.OrderNo, reason, err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to process payment failure",
+			})
+			return
+		}
 	case "payment_intent.canceled":
 		reason := info.EventType
 		if strings.TrimSpace(info.FailureMessage) != "" {
 			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
 		}
-		_, _ = h.paymentService.MarkOrderCancelled(c.Request.Context(), info.OrderNo, reason)
+		_, err := h.paymentService.MarkOrderCancelled(c.Request.Context(), info.OrderNo, reason)
+		if err != nil {
+			log.Printf("[Stripe Webhook] Failed to mark order as cancelled: order_no=%s, reason=%s, error=%v",
+				info.OrderNo, reason, err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to process payment cancellation",
+			})
+			return
+		}
 	default:
 	}
 	c.Status(http.StatusOK)
