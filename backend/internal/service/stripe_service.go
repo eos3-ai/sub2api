@@ -20,6 +20,7 @@ type StripeService struct {
 }
 
 type StripeWebhookInfo struct {
+	EventID        string
 	OrderNo        string
 	TradeNo        string
 	EventType      string
@@ -72,6 +73,9 @@ func (s *StripeService) CreatePayment(ctx context.Context, order *PaymentOrder, 
 		Description:        stripe.String(fmt.Sprintf("Recharge %s", order.OrderNo)),
 		Metadata: map[string]string{
 			"order_no": order.OrderNo,
+			// Backward/compat keys: some deployments use camelCase keys.
+			"orderId":  order.OrderNo,
+			"orderNo":  order.OrderNo,
 			"provider": order.Provider,
 			"channel":  channel,
 		},
@@ -138,6 +142,7 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 	}
 
 	info := &StripeWebhookInfo{EventType: string(event.Type)}
+	info.EventID = event.ID
 
 	switch info.EventType {
 	case "payment_intent.succeeded":
@@ -149,7 +154,12 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 		if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 			return nil, fmt.Errorf("parse payment_intent: %w", err)
 		}
-		info.OrderNo = pi.Metadata["order_no"]
+		info.OrderNo = firstNonEmpty(
+			pi.Metadata["order_no"],
+			pi.Metadata["orderId"],
+			pi.Metadata["order_id"],
+			pi.Metadata["orderNo"],
+		)
 		info.TradeNo = pi.ID
 		info.Amount = pi.Amount
 		info.Currency = strings.ToLower(string(pi.Currency))
@@ -162,6 +172,15 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 	default:
 		return info, nil
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 func parseCommaList(value string) []string {
