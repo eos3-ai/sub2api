@@ -615,6 +615,9 @@ async function pollOrderStatus(orderNo: string) {
         stopPolling()
         appStore.showSuccess(t('payment.paymentSuccess'))
         await loadOrders()
+        setTimeout(() => {
+          payOpen.value = false
+        }, 1500)
         return
       }
       if (latest.status === 'failed') {

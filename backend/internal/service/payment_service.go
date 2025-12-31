@@ -298,9 +298,13 @@ func (s *PaymentService) CancelExpiredOrders(ctx context.Context) (int64, error)
 }
 
 func (s *PaymentService) generateOrderNo() string {
+	prefix := "PO" // 默认前缀
+	if s.cfg != nil && s.cfg.OrderPrefix != "" {
+		prefix = s.cfg.OrderPrefix
+	}
 	now := time.Now().UTC()
 	random := rand.Intn(1000000)
-	return "PO" + now.Format("20060102150405") + fmt.Sprintf("%06d", random)
+	return prefix + now.Format("20060102150405") + fmt.Sprintf("%06d", random)
 }
 
 func timePtr(t time.Time) *time.Time {
