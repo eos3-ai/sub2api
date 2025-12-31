@@ -439,17 +439,17 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("payment.zpay.require_https", "ZPAY_REQUIRE_HTTPS")
 
 	// Stripe
-	_ = v.BindEnv("payment.stripe.enabled", "STRIPE_ENABLED")
+	_ = v.BindEnv("payment.stripe.enabled", "STRIPE_ENABLED", "PAYMENT_STRIPE_ENABLED")
 	// Common naming: STRIPE_SECRET_KEY is the Stripe API key.
-	_ = v.BindEnv("payment.stripe.api_key", "STRIPE_API_KEY", "STRIPE_SECRET_KEY")
-	_ = v.BindEnv("payment.stripe.webhook_secret", "STRIPE_WEBHOOK_SECRET")
-	_ = v.BindEnv("payment.stripe.api_version", "STRIPE_API_VERSION")
-	_ = v.BindEnv("payment.stripe.payment_methods", "STRIPE_PAYMENT_METHODS")
-	_ = v.BindEnv("payment.stripe.currency", "STRIPE_CURRENCY")
-	_ = v.BindEnv("payment.stripe.success_url", "STRIPE_SUCCESS_URL")
-	_ = v.BindEnv("payment.stripe.cancel_url", "STRIPE_CANCEL_URL")
-	_ = v.BindEnv("payment.stripe.wechat_client", "STRIPE_WECHAT_CLIENT")
-	_ = v.BindEnv("payment.stripe.wechat_app_id", "STRIPE_WECHAT_APP_ID")
+	_ = v.BindEnv("payment.stripe.api_key", "STRIPE_API_KEY", "STRIPE_SECRET_KEY", "PAYMENT_STRIPE_API_KEY")
+	_ = v.BindEnv("payment.stripe.webhook_secret", "STRIPE_WEBHOOK_SECRET", "PAYMENT_STRIPE_WEBHOOK_SECRET")
+	_ = v.BindEnv("payment.stripe.api_version", "STRIPE_API_VERSION", "PAYMENT_STRIPE_API_VERSION")
+	_ = v.BindEnv("payment.stripe.payment_methods", "STRIPE_PAYMENT_METHODS", "PAYMENT_STRIPE_PAYMENT_METHODS")
+	_ = v.BindEnv("payment.stripe.currency", "STRIPE_CURRENCY", "PAYMENT_STRIPE_CURRENCY")
+	_ = v.BindEnv("payment.stripe.success_url", "STRIPE_SUCCESS_URL", "PAYMENT_STRIPE_SUCCESS_URL")
+	_ = v.BindEnv("payment.stripe.cancel_url", "STRIPE_CANCEL_URL", "PAYMENT_STRIPE_CANCEL_URL")
+	_ = v.BindEnv("payment.stripe.wechat_client", "STRIPE_WECHAT_CLIENT", "PAYMENT_STRIPE_WECHAT_CLIENT")
+	_ = v.BindEnv("payment.stripe.wechat_app_id", "STRIPE_WECHAT_APP_ID", "PAYMENT_STRIPE_WECHAT_APP_ID")
 
 	// Dingtalk
 	_ = v.BindEnv("dingtalk.enabled", "DINGTALK_ENABLED")
