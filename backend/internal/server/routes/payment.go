@@ -21,8 +21,8 @@ func RegisterPaymentCallbackRoutes(r *gin.Engine, h *handler.Handlers) {
 	r.POST("/api/payment/webhook/stripe", h.Payment.StripeWebhook)
 	r.POST("/payment/stripe/webhook", h.Payment.StripeWebhook)
 	// Lightweight return endpoints (optional, for external redirects).
-	r.GET("/payment/return/stripe", h.Payment.PaymentReturn)
+	// Accept any method because some providers/proxies may send POST for redirects/webhooks.
+	r.Any("/payment/return/stripe", h.Payment.PaymentReturn)
 	r.GET("/payment/success", h.Payment.PaymentReturn)
 	r.GET("/payment/cancel", h.Payment.PaymentReturn)
 }
-

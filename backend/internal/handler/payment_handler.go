@@ -426,6 +426,13 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 
 // PaymentReturn provides a lightweight return endpoint for payment providers.
 func (h *PaymentHandler) PaymentReturn(c *gin.Context) {
+	// Some deployments mistakenly configure Stripe webhook URL to point to the return endpoint.
+	// If this looks like a Stripe webhook call, handle it as webhook (no redirect).
+	if strings.TrimSpace(c.GetHeader("Stripe-Signature")) != "" {
+		h.StripeWebhook(c)
+		return
+	}
+
 	// Return endpoints are for external redirects; keep it lightweight and safe.
 	// If order_no is provided by the channel, redirect to the SPA result page to show status.
 	orderNo := strings.TrimSpace(c.Query("order"))
