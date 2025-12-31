@@ -335,6 +335,8 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 	orderType := "online_recharge"
 	if strings.EqualFold(o.Provider, "admin") {
 		orderType = "admin_recharge"
+	} else if strings.EqualFold(o.Provider, "activity") {
+		orderType = "activity_recharge"
 	}
 	return &PaymentOrder{
 		ID:        o.ID,
@@ -344,6 +346,7 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 		Username:  o.Username,
 		Provider:  o.Provider,
 		Status:    o.Status,
+		Remark:    o.Remark,
 		AmountCNY: o.AmountCNY,
 		AmountUSD: o.AmountUSD,
 		TotalUSD:  o.TotalUSD,

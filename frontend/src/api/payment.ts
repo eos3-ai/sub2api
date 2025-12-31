@@ -8,7 +8,7 @@
 import { apiClient } from './client'
 import type { PaginatedResponse } from '@/types'
 
-export type PaymentChannel = 'zpay' | 'stripe' | 'admin'
+export type PaymentChannel = 'zpay' | 'stripe' | 'admin' | 'activity'
 export type PaymentPayMethod = 'alipay' | 'wechat'
 export type PaymentCreateChannel = PaymentChannel | PaymentPayMethod
 
@@ -31,6 +31,7 @@ export interface PaymentOrder {
   order_no: string
   order_type: string
   provider: PaymentChannel
+  remark?: string
   amount_cny: number
   amount_usd: number
   total_usd: number

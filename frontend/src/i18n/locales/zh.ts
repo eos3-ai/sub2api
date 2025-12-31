@@ -149,6 +149,7 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     payment: '在线充值',
+    referral: '邀请返利',
     redeem: '兑换',
     profile: '个人资料',
     users: '用户管理',
@@ -167,6 +168,79 @@ export default {
     logout: '退出登录',
     github: 'GitHub',
     mySubscriptions: '我的订阅'
+  },
+
+  // Promotion
+  promotion: {
+    title: '新人活动',
+    subtitle: '现在充值可获得 {percent}% 赠送额度',
+    cta: '去充值',
+    remainingH: '剩余 {h}小时{m}分钟',
+    remainingM: '剩余 {m}分钟',
+    firstRecharge: {
+      title: '新用户首充限时优惠',
+      subtitle: '新注册用户 · 首充优惠',
+      onlyOnce: '仅一次',
+      cta: '立即充值',
+      badge: '新注册用户 · 首充优惠',
+      headline: '充得越多 · 送得越多 · 仅此一次',
+      rule1: '注册 {hours} 小时内完成首充立即锁定赠额',
+      rule2: '{n} 个档位递减，当前档位结束后自动降级',
+      rule3: '系统自动发放至账户余额，无需联系客服',
+      currentTitle: '当前优惠',
+      currentRange: '{range} · 额外赠送',
+      nextTierHint: '下一档将在 {time} 后开启，赠送比例将下降。',
+      countdown: '还剩',
+      tierLabel: '{hours}小时内',
+      tierBonus: '额外赠送 {percent}%',
+      currentTag: '当前',
+      hourSuffix: '小时'
+    }
+  },
+
+  // Referral
+  referral: {
+    title: '邀请返利',
+    description: '邀请好友注册并充值，系统将自动发放返利。',
+    disabledTitle: '邀请返利未启用',
+    disabledDesc: '如需开通请联系管理员。',
+    myCode: '我的邀请码',
+    inviteLink: '邀请链接',
+    shareHint: '分享链接给好友完成注册。',
+    ruleHint: '当被邀请人达标后，你将获得 {amount} 返利。',
+    page: {
+      tag: '邀请返利',
+      title: '分享获取额度',
+      description: '所有注册的用户都具备邀请资格，当推荐的客户通过您的链接完成账号的注册，并通过在线支付累计充值 {cny} 元以上时，我们赠送您 {reward} 的使用额度，该额度将直接入账您的账户中；该赠送额度没有使用期限；',
+      copyCode: '复制邀请码',
+      copyLink: '复制邀请链接',
+      inviteLinkLabel: '邀请链接',
+      inviteCodeLabel: '邀请码',
+      stats: {
+        total: '累计邀请',
+        qualified: '达标人数',
+        rewarded: '已获赠送额度'
+      },
+      recentTitle: '最近邀请',
+      recentTip: '已展示最近 {n} 个邀请',
+      registeredAt: '注册时间',
+      issued: '已发放',
+      notIssued: '未发放',
+      noInvites: '暂无邀请记录，快去分享你的邀请链接吧。'
+    },
+    stats: {
+      total: '邀请人数',
+      qualified: '达标人数',
+      rewarded: '已发放返利'
+    },
+    table: {
+      invitee: '被邀请人',
+      totalRecharge: '累计充值',
+      qualified: '是否达标',
+      rewardIssued: '是否发放',
+      rewardAmount: '返利金额',
+      createdAt: '创建时间'
+    }
   },
 
   // Payment
@@ -243,9 +317,12 @@ export default {
     noOrders: '暂无订单',
     orderNo: '订单号',
     orderType: '订单类型',
+    orderTypeActivity: '活动充值',
+    remark: '备注',
     orderTypeOnline: '在线充值',
     orderTypeAdmin: '后台充值',
     adminRecharge: '后台充值',
+    activityRecharge: '活动充值',
     channel: '渠道',
     amount: '金额',
     creditsAmount: '充值额度',
@@ -262,6 +339,8 @@ export default {
     paymentFailed: '支付失败，请重试',
     paymentExpired: '订单已过期，请重新下单',
     noQRCode: '暂无法生成支付二维码',
+    serviceUnavailableHint: '支付服务未开启或暂不可用，请联系管理员。',
+    internalErrorHint: '支付服务异常（服务器错误），请稍后重试或联系管理员。',
     statusPending: '待支付',
     statusPaid: '已支付',
     statusFailed: '支付失败',
@@ -289,6 +368,9 @@ export default {
     passwordLabel: '密码',
     passwordPlaceholder: '请输入密码',
     createPasswordPlaceholder: '创建一个安全的密码',
+    inviteCodeLabel: '邀请码（可选）',
+    inviteCodePlaceholder: '请输入邀请码',
+    inviteCodeHint: '如果你是通过邀请注册，可填写邀请码以绑定返利关系。',
     passwordHint: '至少 6 个字符',
     emailRequired: '请输入邮箱',
     invalidEmail: '请输入有效的邮箱地址',

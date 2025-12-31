@@ -246,3 +246,48 @@ payment:
     currency: "CNY"
     wechat_client: "web"
     wechat_app_id: ""
+
+# =============================================================================
+# Promotion (First Recharge Bonus)
+# =============================================================================
+# New user first recharge bonus (only once).
+# - Users get extra bonus credits on their first successful recharge within the promotion window.
+# - Tier selection is based on elapsed hours since registration.
+promotion:
+  enabled: false
+  # Promotion total duration after registration.
+  duration_hours: 72
+  # Minimum recharge amount (USD) to apply the promotion.
+  min_amount: 0.0
+  # Tiered bonus percentages by hours since registration.
+  # The first tier matched (elapsed_hours <= tier.hours) will be applied.
+  tiers:
+    - hours: 24
+      bonus_percent: 30
+    - hours: 36
+      bonus_percent: 20
+    - hours: 48
+      bonus_percent: 10
+    - hours: 72
+      bonus_percent: 5
+
+# =============================================================================
+# Referral Program (Invite & Reward)
+# =============================================================================
+# This feature powers the `/referral` page in the frontend.
+# Invite link format: `${payment.base_url}/register?inviter={CODE}` (when payment.base_url is set).
+referral:
+  enabled: false
+  # Optional: prefer this base URL for invite links (e.g. "https://your-domain.com").
+  # If empty, backend falls back to payment.base_url.
+  base_url: ""
+  # The frontend register route.
+  link_base_url: "/register"
+  # Reward credits (USD) for the inviter, issued when invitee reaches the qualified amount.
+  reward_usd: 10
+  # Invitee qualified threshold. If both are set, qualified_recharge_usd takes precedence.
+  qualified_recharge_cny: 20
+  qualified_recharge_usd: 0
+  code_length: 8
+  # 0 = unlimited
+  max_invitees_per_user: 0

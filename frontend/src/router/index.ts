@@ -161,6 +161,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/referral',
+    name: 'Referral',
+    component: () => import('@/views/user/ReferralView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Referral',
+      titleKey: 'referral.title',
+      descriptionKey: 'referral.description'
+    }
+  },
+  {
     path: '/payment/result',
     name: 'PaymentResult',
     component: () => import('@/views/user/PaymentResultView.vue'),

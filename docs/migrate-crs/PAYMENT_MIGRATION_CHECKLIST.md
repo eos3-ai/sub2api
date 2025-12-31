@@ -953,7 +953,9 @@ promotion:
 # 邀请返利配置
 referral:
   enabled: true
-  link_base_url: "https://your-domain.com/register"
+  # Use the SPA register route; backend will convert to absolute URL if referral.base_url (or payment.base_url) is set.
+  base_url: "https://your-domain.com"
+  link_base_url: "/register"
   reward_usd: 10
   qualified_recharge_cny: 20
   code_length: 8

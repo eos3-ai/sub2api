@@ -29,6 +29,7 @@ export interface RegisterRequest {
   email: string
   password: string
   verify_code?: string
+  invite_code?: string
   turnstile_token?: string
 }
 
@@ -64,6 +65,77 @@ export interface AuthResponse {
 
 export interface CurrentUserResponse extends User {
   run_mode?: 'standard' | 'simple'
+}
+
+// ==================== Promotion Types ====================
+
+export interface PromotionTier {
+  hours: number
+  bonus_percent: number
+}
+
+export interface PromotionCurrentTier {
+  tier: number
+  hours: number
+  bonus_percent: number
+}
+
+export interface UserPromotion {
+  user_id: number
+  status: string
+  activated_at: string
+  expire_at: string
+  used_tier?: number | null
+  used_at?: string | null
+  used_amount?: number | null
+  bonus_amount?: number | null
+}
+
+export interface PromotionStatusResponse {
+  enabled: boolean
+  status: 'none' | 'active' | 'used' | 'expired' | string
+  promotion?: UserPromotion
+  current_tier?: PromotionCurrentTier
+  current_tier_ends_at?: string
+  current_tier_remaining_seconds?: number
+  remaining_seconds?: number
+  tiers?: PromotionTier[]
+  duration_hours?: number
+  min_amount_usd?: number
+}
+
+// ==================== Referral Types ====================
+
+export interface ReferralStats {
+  total_invites: number
+  qualified_invites: number
+  rewarded_invites: number
+  rewarded_usd: number
+}
+
+export interface ReferralInfoResponse {
+  enabled: boolean
+  code?: string
+  invite_link?: string
+  reward_usd?: number
+  qualified_recharge_cny?: number
+  qualified_recharge_usd?: number
+  qualified_recharge_types?: string[]
+  max_invitees_per_user?: number
+  stats?: ReferralStats
+}
+
+export interface ReferralInvite {
+  id: number
+  invitee_id: number
+  invitee_username: string
+  total_recharge_usd: number
+  is_qualified: boolean
+  qualified_at?: string | null
+  reward_issued: boolean
+  reward_issued_at?: string | null
+  reward_amount_usd: number
+  created_at: string
 }
 
 // ==================== Subscription Types ====================

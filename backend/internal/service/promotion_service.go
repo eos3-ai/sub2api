@@ -35,6 +35,56 @@ func NewPromotionService(cfg *config.Config, repo PromotionRepository, cache Pro
 	}
 }
 
+// EnsureUserPromotion ensures a user has an active promotion record when:
+// - promotion is enabled
+// - user was created within the promotion window (based on registration time)
+// This is used to support "old users" created shortly before the feature was enabled.
+func (s *PromotionService) EnsureUserPromotion(ctx context.Context, userID int64) (*UserPromotion, error) {
+	if s == nil || s.cfg == nil || !s.cfg.Enabled || s.repo == nil {
+		return nil, nil
+	}
+	if userID <= 0 {
+		return nil, nil
+	}
+
+	existing, err := s.GetUserPromotion(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if existing != nil {
+		return existing, nil
+	}
+
+	meta, err := s.repo.GetUserMetaForPromotion(ctx, userID)
+	if err != nil || meta == nil || meta.CreatedAt.IsZero() {
+		return nil, err
+	}
+
+	expire := meta.CreatedAt.Add(time.Duration(s.cfg.DurationHours) * time.Hour)
+	now := time.Now()
+	if now.After(expire) {
+		return nil, nil
+	}
+
+	promotion := &UserPromotion{
+		UserID:      userID,
+		Username:    meta.Username,
+		ActivatedAt: meta.CreatedAt,
+		ExpireAt:    expire,
+		Status:      PromotionStatusActive,
+	}
+	if err := s.repo.Create(ctx, promotion); err != nil {
+		return nil, fmt.Errorf("create promotion: %w", err)
+	}
+	if s.cache != nil {
+		ttl := time.Until(expire)
+		if ttl > 0 {
+			_ = s.cache.SetUserPromotion(ctx, promotion, ttl)
+		}
+	}
+	return promotion, nil
+}
+
 // InitUserPromotion 初始化用户活动资格
 func (s *PromotionService) InitUserPromotion(ctx context.Context, userID int64, username string) error {
 	if s == nil || s.cfg == nil || !s.cfg.Enabled {
@@ -50,11 +100,18 @@ func (s *PromotionService) InitUserPromotion(ctx context.Context, userID int64, 
 	}
 
 	now := time.Now()
-	expire := now.Add(time.Duration(s.cfg.DurationHours) * time.Hour)
+	activatedAt := now
+	if meta, err := s.repo.GetUserMetaForPromotion(ctx, userID); err == nil && meta != nil && !meta.CreatedAt.IsZero() {
+		activatedAt = meta.CreatedAt
+		if username == "" {
+			username = meta.Username
+		}
+	}
+	expire := activatedAt.Add(time.Duration(s.cfg.DurationHours) * time.Hour)
 	promotion := &UserPromotion{
 		UserID:      userID,
 		Username:    username,
-		ActivatedAt: now,
+		ActivatedAt: activatedAt,
 		ExpireAt:    expire,
 		Status:      PromotionStatusActive,
 	}
@@ -106,7 +163,13 @@ func (s *PromotionService) ApplyPromotion(ctx context.Context, userID int64, amo
 		return nil, err
 	}
 	if promotion == nil {
-		return &PromotionApplyResult{Applied: false}, nil
+		promotion, err = s.EnsureUserPromotion(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		if promotion == nil {
+			return &PromotionApplyResult{Applied: false}, nil
+		}
 	}
 	if promotion.Status != PromotionStatusActive {
 		return &PromotionApplyResult{Applied: false}, nil

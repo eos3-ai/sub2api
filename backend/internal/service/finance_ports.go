@@ -27,6 +27,14 @@ type PromotionRepository interface {
 	GetByUserID(ctx context.Context, userID int64) (*UserPromotion, error)
 	Update(ctx context.Context, promotion *UserPromotion) error
 	CreateRecord(ctx context.Context, record *PromotionRecord) error
+	// GetUserMetaForPromotion fetches user registration time and display name for promotion initialization.
+	GetUserMetaForPromotion(ctx context.Context, userID int64) (*PromotionUserMeta, error)
+}
+
+type PromotionUserMeta struct {
+	UserID    int64
+	Username  string
+	CreatedAt time.Time
 }
 
 // PromotionCache 定义活动缓存接口
@@ -46,6 +54,16 @@ type ReferralRepository interface {
 	GetInviteByInviteeID(ctx context.Context, inviteeID int64) (*ReferralInvite, error)
 	ListInvitesByReferrer(ctx context.Context, referrerID int64, params pagination.PaginationParams) ([]ReferralInvite, *pagination.PaginationResult, error)
 	UpdateInvite(ctx context.Context, invite *ReferralInvite) error
+
+	CountInvitesByReferrer(ctx context.Context, referrerID int64) (int64, error)
+	GetReferrerStats(ctx context.Context, referrerID int64) (*ReferralStats, error)
+}
+
+type ReferralStats struct {
+	TotalInvites     int64   `json:"total_invites"`
+	QualifiedInvites int64   `json:"qualified_invites"`
+	RewardedInvites  int64   `json:"rewarded_invites"`
+	RewardedUSD      float64 `json:"rewarded_usd"`
 }
 
 // ReferralCache 定义邀请码缓存接口

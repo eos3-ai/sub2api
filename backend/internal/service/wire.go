@@ -93,6 +93,7 @@ var ProviderSet = wire.NewSet(
 	NewBalanceService,
 	NewPromotionService,
 	NewReferralService,
+	NewDingtalkService,
 	NewPaymentService,
 	NewZpayService,
 	NewStripeService,

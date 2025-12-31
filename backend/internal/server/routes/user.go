@@ -22,6 +22,19 @@ func RegisterUserRoutes(
 			user.GET("/profile", h.User.GetProfile)
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
+
+			// 活动优惠（用户端）
+			promotion := user.Group("/promotion")
+			{
+				promotion.GET("/status", h.Promotion.GetStatus)
+			}
+
+			// 邀请返利（用户端）
+			referral := user.Group("/referral")
+			{
+				referral.GET("/info", h.Referral.GetInfo)
+				referral.GET("/invitees", h.Referral.ListInvitees)
+			}
 		}
 
 		// 支付/充值

@@ -106,6 +106,11 @@ func (s *ReferralService) FindUserIDByCode(ctx context.Context, code string) (in
 		return 0, nil
 	}
 
+	code = strings.ToUpper(strings.TrimSpace(code))
+	if code == "" {
+		return 0, nil
+	}
+
 	if s.cache != nil {
 		if uid, err := s.cache.GetUserIDByCode(ctx, code); err == nil && uid > 0 {
 			return uid, nil
@@ -122,14 +127,38 @@ func (s *ReferralService) FindUserIDByCode(ctx context.Context, code string) (in
 	return record.UserID, nil
 }
 
+func (s *ReferralService) GetReferrerStats(ctx context.Context, referrerID int64) (*ReferralStats, error) {
+	if s == nil || s.repo == nil {
+		return nil, nil
+	}
+	return s.repo.GetReferrerStats(ctx, referrerID)
+}
+
 // RecordInvitation 保存邀请关系
 func (s *ReferralService) RecordInvitation(ctx context.Context, req RecordInvitationRequest) error {
 	if s == nil || s.repo == nil {
 		return nil
 	}
+	if s.cfg == nil || !s.cfg.Enabled {
+		return nil
+	}
 	if req.InviteeID == 0 || req.ReferrerID == 0 {
 		return fmt.Errorf("invalid invitation request")
 	}
+	if req.InviteeID == req.ReferrerID {
+		return fmt.Errorf("cannot invite yourself")
+	}
+
+	if s.cfg.MaxInviteesPerUser > 0 {
+		count, err := s.repo.CountInvitesByReferrer(ctx, req.ReferrerID)
+		if err != nil {
+			return err
+		}
+		if count >= int64(s.cfg.MaxInviteesPerUser) {
+			return fmt.Errorf("invitees limit reached")
+		}
+	}
+
 	existing, err := s.repo.GetInviteByInviteeID(ctx, req.InviteeID)
 	if err != nil {
 		return err
@@ -154,6 +183,20 @@ func (s *ReferralService) ProcessInviteeRecharge(ctx context.Context, req *Refer
 	}
 	if req == nil || req.InviteeID == 0 {
 		return nil, nil
+	}
+
+	if len(s.cfg.QualifiedRechargeTypes) > 0 {
+		rt := strings.ToLower(strings.TrimSpace(req.RechargeRecordType))
+		allowed := false
+		for _, t := range s.cfg.QualifiedRechargeTypes {
+			if strings.ToLower(strings.TrimSpace(t)) == rt {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return nil, nil
+		}
 	}
 
 	invite, err := s.repo.GetInviteByInviteeID(ctx, req.InviteeID)

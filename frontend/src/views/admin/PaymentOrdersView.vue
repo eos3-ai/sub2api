@@ -207,6 +207,7 @@ function providerLabel(provider: AdminPaymentProvider): string {
 function orderTypeLabel(orderType?: string): string {
   const value = String(orderType || '').toLowerCase()
   if (value === 'admin_recharge') return t('payment.orderTypeAdmin')
+  if (value === 'activity_recharge') return t('payment.orderTypeActivity')
   return t('payment.orderTypeOnline')
 }
 

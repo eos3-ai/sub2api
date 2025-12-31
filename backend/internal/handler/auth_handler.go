@@ -31,6 +31,7 @@ type RegisterRequest struct {
 	Email          string `json:"email" binding:"required,email"`
 	Password       string `json:"password" binding:"required,min=6"`
 	VerifyCode     string `json:"verify_code"`
+	InviteCode     string `json:"invite_code"`
 	TurnstileToken string `json:"turnstile_token"`
 }
 
@@ -77,7 +78,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		}
 	}
 
-	token, user, err := h.authService.RegisterWithVerification(c.Request.Context(), req.Email, req.Password, req.VerifyCode)
+	token, user, err := h.authService.RegisterWithVerification(c.Request.Context(), req.Email, req.Password, req.VerifyCode, req.InviteCode)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

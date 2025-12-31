@@ -4,12 +4,13 @@ import "time"
 
 // Recharge record types
 const (
-	RechargeTypeAdmin    = "admin"
-	RechargeTypePayment  = "payment"
-	RechargeTypeRedeem   = "redeem"
-	RechargeTypeReferral = "referral"
-	RechargeTypeDeduct   = "deduct"
-	RechargeTypeRefund   = "refund"
+	RechargeTypeAdmin     = "admin"
+	RechargeTypePayment   = "payment"
+	RechargeTypeRedeem    = "redeem"
+	RechargeTypeReferral  = "referral"
+	RechargeTypePromotion = "promotion"
+	RechargeTypeDeduct    = "deduct"
+	RechargeTypeRefund    = "refund"
 )
 
 // RechargeRecord 表示余额变动流水
