@@ -279,6 +279,7 @@ type PaymentConfig struct {
 	DiscountRate       float64          `mapstructure:"discount_rate"`
 	OrderExpireMinutes int              `mapstructure:"order_expire_minutes"`
 	MaxOrdersPerMinute int              `mapstructure:"max_orders_per_minute"`
+	OrderPrefix        string           `mapstructure:"order_prefix"`
 	Packages           []PaymentPackage `mapstructure:"packages"`
 	Zpay               ZpayConfig       `mapstructure:"zpay"`
 	Stripe             StripeConfig     `mapstructure:"stripe"`
@@ -381,6 +382,9 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	if v == nil {
 		return
 	}
+
+	// Payment
+	_ = v.BindEnv("payment.order_prefix", "PAYMENT_ORDER_PREFIX")
 
 	// ZPay
 	_ = v.BindEnv("payment.zpay.enabled", "ZPAY_ENABLED")
@@ -487,6 +491,7 @@ func setDefaults() {
 	viper.SetDefault("payment.discount_rate", 1.0)
 	viper.SetDefault("payment.order_expire_minutes", 30)
 	viper.SetDefault("payment.max_orders_per_minute", 3)
+	viper.SetDefault("payment.order_prefix", "PO")
 	viper.SetDefault("payment.packages", []map[string]any{
 		{"amount_usd": 100, "label": "$100", "popular": false},
 		{"amount_usd": 200, "label": "$200", "popular": false},

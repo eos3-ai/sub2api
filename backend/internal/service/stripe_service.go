@@ -75,17 +75,28 @@ func (s *StripeService) CreatePayment(ctx context.Context, order *PaymentOrder, 
 			"provider": order.Provider,
 			"channel":  channel,
 		},
+		// 关键参数：自动确认 PaymentIntent 以触发 QR 码生成
+		Confirm: stripe.Bool(true),
+		// 创建 WeChat Pay 支付方式
+		PaymentMethodData: &stripe.PaymentIntentPaymentMethodDataParams{
+			Type: stripe.String("wechat_pay"),
+		},
 	}
 
-	if wc := strings.TrimSpace(s.cfg.WechatClient); wc != "" {
-		params.PaymentMethodOptions = &stripe.PaymentIntentPaymentMethodOptionsParams{
-			WeChatPay: &stripe.PaymentIntentPaymentMethodOptionsWeChatPayParams{
-				Client: stripe.String(wc),
-			},
-		}
-		if appID := strings.TrimSpace(s.cfg.WechatAppID); appID != "" {
-			params.PaymentMethodOptions.WeChatPay.AppID = stripe.String(appID)
-		}
+	// 设置 WeChat Pay 选项
+	wechatClient := strings.TrimSpace(s.cfg.WechatClient)
+	if wechatClient == "" {
+		wechatClient = "web" // 默认使用 web 客户端
+	}
+
+	params.PaymentMethodOptions = &stripe.PaymentIntentPaymentMethodOptionsParams{
+		WeChatPay: &stripe.PaymentIntentPaymentMethodOptionsWeChatPayParams{
+			Client: stripe.String(wechatClient),
+		},
+	}
+
+	if appID := strings.TrimSpace(s.cfg.WechatAppID); appID != "" {
+		params.PaymentMethodOptions.WeChatPay.AppID = stripe.String(appID)
 	}
 
 	intent, err := paymentintent.New(params)

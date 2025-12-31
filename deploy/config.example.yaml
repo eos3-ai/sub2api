@@ -197,6 +197,8 @@ payment:
   discount_rate: 0.15
   order_expire_minutes: 30
   max_orders_per_minute: 3
+  # Order number prefix (applies to both ZPay and Stripe)
+  order_prefix: "ORD_"
 
   # Recharge packages shown in /payment
   packages:
@@ -222,12 +224,12 @@ payment:
     key: ""
     api_url: "https://zpayz.cn"
     # You can use either `/api/payment/webhook/zpay` or `/payment/zpay/notify` (both are routed to the same handler)
-    notify_url: "/payment/zpay/notify"
-    return_url: "/payment/zpay/return"
+    notify_url: "/api/payment/webhook/zpay"
+    return_url: "/payment/result"
     submit_url: "https://zpayz.cn/submit.php"
     query_url: "https://zpayz.cn/api.php"
     payment_methods: "alipay,wxpay"
-    order_prefix: "ORD_"
+    # order_prefix: "ORD_"
     notify_user: false
     ip_whitelist: ""
     require_https: true
