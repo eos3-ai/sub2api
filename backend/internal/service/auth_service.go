@@ -72,11 +72,11 @@ func NewAuthService(
 
 // Register 用户注册，返回token和用户
 func (s *AuthService) Register(ctx context.Context, email, password string) (string, *User, error) {
-	return s.RegisterWithVerification(ctx, email, password, "")
+	return s.RegisterWithVerification(ctx, email, password, "", "")
 }
 
 // RegisterWithVerification 用户注册（支持邮件验证），返回token和用户
-func (s *AuthService) RegisterWithVerification(ctx context.Context, email, password, verifyCode string) (string, *User, error) {
+func (s *AuthService) RegisterWithVerification(ctx context.Context, email, password, verifyCode, inviteCode string) (string, *User, error) {
 	// 检查是否开放注册
 	if s.settingService != nil && !s.settingService.IsRegistrationEnabled(ctx) {
 		return "", nil, ErrRegDisabled
@@ -136,6 +136,29 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 
 	if s.promotionService != nil && s.cfg.Promotion.Enabled {
 		_ = s.promotionService.InitUserPromotion(ctx, user.ID, user.Username)
+	}
+
+	if inviteCode != "" && s.referralService != nil && s.cfg != nil && s.cfg.Referral.Enabled {
+		referrerID, err := s.referralService.FindUserIDByCode(ctx, inviteCode)
+		if err == nil && referrerID > 0 {
+			referrerName := ""
+			if u, err := s.userRepo.GetByID(ctx, referrerID); err == nil && u != nil {
+				referrerName = u.Username
+				if referrerName == "" {
+					referrerName = u.Email
+				}
+			}
+			inviteeName := user.Username
+			if inviteeName == "" {
+				inviteeName = user.Email
+			}
+			_ = s.referralService.RecordInvitation(ctx, RecordInvitationRequest{
+				InviteeID:        user.ID,
+				InviteeUsername:  inviteeName,
+				ReferrerID:       referrerID,
+				ReferrerUsername: referrerName,
+			})
+		}
 	}
 
 	// 生成token

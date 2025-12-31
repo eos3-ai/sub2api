@@ -140,6 +140,7 @@ type paymentOrderModel struct {
 	TradeNo       *string `gorm:"size:100;uniqueIndex"`
 	UserID        int64   `gorm:"index;not null"`
 	Username      string  `gorm:"size:100"`
+	Remark        string  `gorm:"size:255;not null;default:''"`
 	AmountCNY     float64 `gorm:"type:decimal(20,2);not null"`
 	AmountUSD     float64 `gorm:"type:decimal(20,8);not null"`
 	BonusUSD      float64 `gorm:"type:decimal(20,8);not null;default:0"`
@@ -174,6 +175,7 @@ func paymentOrderModelToService(m *paymentOrderModel) *service.PaymentOrder {
 		TradeNo:       m.TradeNo,
 		UserID:        m.UserID,
 		Username:      m.Username,
+		Remark:        m.Remark,
 		AmountCNY:     m.AmountCNY,
 		AmountUSD:     m.AmountUSD,
 		BonusUSD:      m.BonusUSD,
@@ -207,6 +209,7 @@ func paymentOrderModelFromService(o *service.PaymentOrder) *paymentOrderModel {
 		TradeNo:       o.TradeNo,
 		UserID:        o.UserID,
 		Username:      o.Username,
+		Remark:        o.Remark,
 		AmountCNY:     o.AmountCNY,
 		AmountUSD:     o.AmountUSD,
 		BonusUSD:      o.BonusUSD,

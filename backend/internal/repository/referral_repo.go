@@ -106,6 +106,40 @@ func (r *referralRepository) UpdateInvite(ctx context.Context, invite *service.R
 	return nil
 }
 
+func (r *referralRepository) CountInvitesByReferrer(ctx context.Context, referrerID int64) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&referralInviteModel{}).Where("referrer_id = ?", referrerID).Count(&count).Error
+	return count, err
+}
+
+func (r *referralRepository) GetReferrerStats(ctx context.Context, referrerID int64) (*service.ReferralStats, error) {
+	type row struct {
+		TotalInvites     int64   `gorm:"column:total_invites"`
+		QualifiedInvites int64   `gorm:"column:qualified_invites"`
+		RewardedInvites  int64   `gorm:"column:rewarded_invites"`
+		RewardedUSD      float64 `gorm:"column:rewarded_usd"`
+	}
+	var out row
+	err := r.db.WithContext(ctx).Model(&referralInviteModel{}).
+		Select(`
+			COUNT(*) as total_invites,
+			COUNT(CASE WHEN is_qualified = true THEN 1 END) as qualified_invites,
+			COUNT(CASE WHEN reward_issued = true THEN 1 END) as rewarded_invites,
+			COALESCE(SUM(CASE WHEN reward_issued = true THEN reward_amount_usd ELSE 0 END), 0) as rewarded_usd
+		`).
+		Where("referrer_id = ?", referrerID).
+		Scan(&out).Error
+	if err != nil {
+		return nil, err
+	}
+	return &service.ReferralStats{
+		TotalInvites:     out.TotalInvites,
+		QualifiedInvites: out.QualifiedInvites,
+		RewardedInvites:  out.RewardedInvites,
+		RewardedUSD:      out.RewardedUSD,
+	}, nil
+}
+
 type referralCodeModel struct {
 	ID        int64     `gorm:"primaryKey"`
 	UserID    int64     `gorm:"uniqueIndex;not null"`

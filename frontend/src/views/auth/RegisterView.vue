@@ -159,6 +159,25 @@
           </p>
         </div>
 
+        <!-- Invite Code (Optional) -->
+        <div>
+          <label for="invite-code" class="input-label">
+            {{ t('auth.inviteCodeLabel') }}
+          </label>
+          <input
+            id="invite-code"
+            v-model="formData.invite_code"
+            type="text"
+            autocomplete="off"
+            :disabled="isLoading"
+            class="input"
+            :placeholder="t('auth.inviteCodePlaceholder')"
+          />
+          <p class="input-hint">
+            {{ t('auth.inviteCodeHint') }}
+          </p>
+        </div>
+
         <!-- Turnstile Widget -->
         <div v-if="turnstileEnabled && turnstileSiteKey">
           <TurnstileWidget
@@ -270,7 +289,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
@@ -281,6 +300,7 @@ const { t } = useI18n()
 
 // ==================== Router & Stores ====================
 
+const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
@@ -305,7 +325,8 @@ const turnstileToken = ref<string>('')
 
 const formData = reactive({
   email: '',
-  password: ''
+  password: '',
+  invite_code: ''
 })
 
 const errors = reactive({
@@ -324,6 +345,11 @@ onMounted(async () => {
     turnstileEnabled.value = settings.turnstile_enabled
     turnstileSiteKey.value = settings.turnstile_site_key || ''
     siteName.value = settings.site_name || 'Sub2API'
+
+    const inviter = String(route.query.inviter || '').trim()
+    if (inviter) {
+      formData.invite_code = inviter
+    }
   } catch (error) {
     console.error('Failed to load public settings:', error)
   } finally {
@@ -412,6 +438,7 @@ async function handleRegister(): Promise<void> {
         JSON.stringify({
           email: formData.email,
           password: formData.password,
+          invite_code: formData.invite_code,
           turnstile_token: turnstileToken.value
         })
       )
@@ -425,6 +452,7 @@ async function handleRegister(): Promise<void> {
     await authStore.register({
       email: formData.email,
       password: formData.password,
+      invite_code: formData.invite_code || undefined,
       turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined
     })
 

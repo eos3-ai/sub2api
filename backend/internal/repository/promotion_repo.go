@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -59,6 +60,42 @@ func (r *promotionRepository) CreateRecord(ctx context.Context, record *service.
 	record.ID = m.ID
 	record.CreatedAt = m.CreatedAt
 	return nil
+}
+
+func (r *promotionRepository) GetUserMetaForPromotion(ctx context.Context, userID int64) (*service.PromotionUserMeta, error) {
+	if r == nil || r.db == nil || userID <= 0 {
+		return nil, nil
+	}
+
+	type row struct {
+		ID        int64     `gorm:"column:id"`
+		Email     string    `gorm:"column:email"`
+		Username  string    `gorm:"column:username"`
+		CreatedAt time.Time `gorm:"column:created_at"`
+	}
+	var out row
+	err := r.db.WithContext(ctx).
+		Model(&userModel{}).
+		Select("id", "email", "username", "created_at").
+		Where("id = ?", userID).
+		Take(&out).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	name := strings.TrimSpace(out.Username)
+	if name == "" {
+		name = strings.TrimSpace(out.Email)
+	}
+
+	return &service.PromotionUserMeta{
+		UserID:    out.ID,
+		Username:  name,
+		CreatedAt: out.CreatedAt,
+	}, nil
 }
 
 type userPromotionModel struct {

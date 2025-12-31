@@ -152,6 +152,7 @@ export default {
     apiKeys: 'API Keys',
     usage: 'Usage',
     payment: 'Online Recharge',
+    referral: 'Referral',
     redeem: 'Redeem',
     profile: 'Profile',
     users: 'Users',
@@ -170,6 +171,80 @@ export default {
     logout: 'Logout',
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions'
+  },
+
+  // Promotion
+  promotion: {
+    title: 'New User Bonus',
+    subtitle: 'Recharge now and get {percent}% bonus credits',
+    cta: 'Recharge Now',
+    remainingH: '{h}h {m}m left',
+    remainingM: '{m}m left',
+    firstRecharge: {
+      title: 'New User First Recharge Bonus',
+      subtitle: 'New users · First recharge only',
+      onlyOnce: 'One-time',
+      cta: 'Recharge Now',
+      badge: 'New users · First recharge',
+      headline: 'Recharge more · Get more · One time only',
+      rule1: 'Complete your first recharge within {hours} hours to lock in the bonus',
+      rule2: '{n} tiers in total; bonus decreases after each tier ends',
+      rule3: 'Bonus is credited automatically — no support needed',
+      currentTitle: 'Current Bonus',
+      currentRange: '{range} · Extra bonus',
+      nextTierHint: 'Next tier starts in {time}; the bonus rate will drop.',
+      countdown: 'Time left',
+      tierLabel: 'Within {hours}h',
+      tierBonus: 'Extra +{percent}%',
+      currentTag: 'Current',
+      hourSuffix: 'h'
+    }
+  },
+
+  // Referral
+  referral: {
+    title: 'Referral',
+    description: 'Invite friends and earn rewards automatically.',
+    disabledTitle: 'Referral program is disabled',
+    disabledDesc: 'Please contact support if you think this is a mistake.',
+    myCode: 'My invite code',
+    inviteLink: 'Invite link',
+    shareHint: 'Share this link with your friends to register.',
+    ruleHint: 'When your invitee reaches the qualifying recharge, you earn {amount}.',
+    page: {
+      tag: 'Referral',
+      title: 'Share to Earn Credits',
+      description:
+        'All registered users can invite others. When your invitee registers via your link and accumulates online payment of at least ¥{cny}, we will grant you {reward} credits. Credits are added directly to your account and never expire.',
+      copyCode: 'Copy invite code',
+      copyLink: 'Copy invite link',
+      inviteLinkLabel: 'Invite link',
+      inviteCodeLabel: 'Invite code',
+      stats: {
+        total: 'Total invites',
+        qualified: 'Qualified invites',
+        rewarded: 'Credits earned'
+      },
+      recentTitle: 'Recent invites',
+      recentTip: 'Showing latest {n} invites',
+      registeredAt: 'Registered at',
+      issued: 'Issued',
+      notIssued: 'Not issued',
+      noInvites: 'No invites yet. Share your invite link to get started.'
+    },
+    stats: {
+      total: 'Total invites',
+      qualified: 'Qualified',
+      rewarded: 'Rewards paid'
+    },
+    table: {
+      invitee: 'Invitee',
+      totalRecharge: 'Invitee recharge',
+      qualified: 'Qualified',
+      rewardIssued: 'Reward issued',
+      rewardAmount: 'Reward',
+      createdAt: 'Created at'
+    }
   },
 
   // Payment
@@ -247,9 +322,12 @@ export default {
     noOrders: 'No orders yet',
     orderNo: 'Order No.',
     orderType: 'Type',
+    orderTypeActivity: 'Activity Recharge',
+    remark: 'Remark',
     orderTypeOnline: 'Online Recharge',
     orderTypeAdmin: 'Admin Recharge',
     adminRecharge: 'Admin Recharge',
+    activityRecharge: 'Activity Recharge',
     channel: 'Channel',
     amount: 'Amount',
     creditsAmount: 'Credits',
@@ -266,6 +344,8 @@ export default {
     paymentFailed: 'Payment failed. Please try again.',
     paymentExpired: 'Order expired. Please create a new order.',
     noQRCode: 'Payment QR code is unavailable.',
+    serviceUnavailableHint: 'Payment is not enabled or temporarily unavailable. Please contact the administrator.',
+    internalErrorHint: 'Payment server error. Please try again later or contact the administrator.',
     statusPending: 'Pending',
     statusPaid: 'Paid',
     statusFailed: 'Failed',
@@ -293,6 +373,9 @@ export default {
     passwordLabel: 'Password',
     passwordPlaceholder: 'Enter your password',
     createPasswordPlaceholder: 'Create a strong password',
+    inviteCodeLabel: 'Invite code (optional)',
+    inviteCodePlaceholder: 'Enter invite code',
+    inviteCodeHint: 'If you were invited, fill in the code to link the referral.',
     passwordHint: 'At least 6 characters',
     emailRequired: 'Email is required',
     invalidEmail: 'Please enter a valid email address',

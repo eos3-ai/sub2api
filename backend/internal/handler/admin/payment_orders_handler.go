@@ -97,6 +97,8 @@ func (h *PaymentOrdersHandler) Export(c *gin.Context) {
 		orderType := "online_recharge"
 		if strings.EqualFold(o.Provider, "admin") {
 			orderType = "admin_recharge"
+		} else if strings.EqualFold(o.Provider, "activity") {
+			orderType = "activity_recharge"
 		}
 		_ = w.Write([]string{
 			o.OrderNo,

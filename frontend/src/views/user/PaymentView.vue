@@ -1,8 +1,10 @@
 <template>
   <AppLayout>
     <div class="space-y-6">
+      <FirstRechargePromotion cta-to="#recharge-plans" />
+
       <!-- Plans -->
-      <div class="card p-6">
+      <div id="recharge-plans" class="card p-6">
         <div class="mb-6 rounded-2xl bg-primary-600 px-6 py-4 text-white">
           <div class="flex items-center gap-3">
             <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
@@ -223,6 +225,9 @@
                       {{ t('payment.orderType') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
+                      {{ t('payment.remark') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
                       {{ t('payment.channel') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
@@ -246,6 +251,9 @@
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ orderTypeLabel(o.order_type) }}
+                    </td>
+                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
+                      {{ o.remark || '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ providerLabel(o.provider) }}
@@ -417,6 +425,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Modal from '@/components/common/Modal.vue'
 import { useAppStore } from '@/stores'
@@ -510,6 +519,15 @@ function isNotFoundError(error: unknown): boolean {
   return status === 404
 }
 
+function paymentErrorMessage(error: unknown): string {
+  const err = error as { status?: number; message?: string }
+  const message = String(err?.message || '')
+  if (err?.status === 503) return t('payment.serviceUnavailableHint')
+  if (err?.status === 500 || message.toLowerCase() === 'internal error') return t('payment.internalErrorHint')
+  if (message) return message
+  return t('common.error')
+}
+
 function formatUSDCompact(amount: number): string {
   if (!Number.isFinite(amount) || amount <= 0) return '$0'
   if (Math.abs(amount - Math.round(amount)) < 1e-9) return `$${Math.round(amount)}`
@@ -541,7 +559,7 @@ async function loadPlans() {
       plans.value = []
       return
     }
-    appStore.showError((error as { message?: string }).message || t('common.error'))
+    appStore.showError(paymentErrorMessage(error))
   } finally {
     loadingPlans.value = false
   }
@@ -655,7 +673,7 @@ async function loadOrders() {
       orders.value = []
       return
     }
-    appStore.showError((error as { message?: string }).message || t('common.error'))
+    appStore.showError(paymentErrorMessage(error))
   } finally {
     loadingOrders.value = false
   }
@@ -712,7 +730,7 @@ async function payNow() {
       appStore.showWarning(t('payment.apiNotEnabledToast'))
       return
     }
-    appStore.showError((error as { message?: string }).message || t('common.error'))
+    appStore.showError(paymentErrorMessage(error))
   } finally {
     creatingOrder.value = false
   }
@@ -740,12 +758,14 @@ function providerLabel(provider: PaymentChannel): string {
   if (provider === 'zpay') return t('payment.alipay')
   if (provider === 'stripe') return t('payment.wechat')
   if (provider === 'admin') return t('payment.adminRecharge')
+  if (provider === 'activity') return t('payment.activityRecharge')
   return provider
 }
 
 function orderTypeLabel(orderType?: string): string {
   const value = String(orderType || '').toLowerCase()
   if (value === 'admin_recharge') return t('payment.orderTypeAdmin')
+  if (value === 'activity_recharge') return t('payment.orderTypeActivity')
   return t('payment.orderTypeOnline')
 }
 

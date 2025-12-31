@@ -259,6 +259,7 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 // Registration data from sessionStorage
 const email = ref<string>('')
 const password = ref<string>('')
+const inviteCode = ref<string>('')
 const initialTurnstileToken = ref<string>('')
 const hasRegisterData = ref<boolean>(false)
 
@@ -287,6 +288,7 @@ onMounted(async () => {
       const registerData = JSON.parse(registerDataStr)
       email.value = registerData.email || ''
       password.value = registerData.password || ''
+      inviteCode.value = registerData.invite_code || ''
       initialTurnstileToken.value = registerData.turnstile_token || ''
       hasRegisterData.value = !!(email.value && password.value)
     } catch {
@@ -441,6 +443,7 @@ async function handleVerify(): Promise<void> {
       email: email.value,
       password: password.value,
       verify_code: verifyCode.value.trim(),
+      invite_code: inviteCode.value || undefined,
       turnstile_token: initialTurnstileToken.value || undefined
     })
 

@@ -26,6 +26,7 @@ type Config struct {
 	Promotion    PromotionConfig    `mapstructure:"promotion"`
 	Referral     ReferralConfig     `mapstructure:"referral"`
 	Payment      PaymentConfig      `mapstructure:"payment"`
+	Dingtalk     DingtalkConfig     `mapstructure:"dingtalk"`
 	Timezone     string             `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
 	Gemini       GeminiConfig       `mapstructure:"gemini"`
 }
@@ -153,13 +154,23 @@ type PromotionTier struct {
 }
 
 type ReferralConfig struct {
-	Enabled              bool    `mapstructure:"enabled"`
-	LinkBaseURL          string  `mapstructure:"link_base_url"`
-	RewardUSD            float64 `mapstructure:"reward_usd"`
-	QualifiedRechargeCNY float64 `mapstructure:"qualified_recharge_cny"`
-	QualifiedRechargeUSD float64 `mapstructure:"qualified_recharge_usd"`
-	CodeLength           int     `mapstructure:"code_length"`
-	MaxInviteesPerUser   int     `mapstructure:"max_invitees_per_user"`
+	Enabled                bool     `mapstructure:"enabled"`
+	BaseURL                string   `mapstructure:"base_url"`
+	LinkBaseURL            string   `mapstructure:"link_base_url"`
+	RewardUSD              float64  `mapstructure:"reward_usd"`
+	QualifiedRechargeCNY   float64  `mapstructure:"qualified_recharge_cny"`
+	QualifiedRechargeUSD   float64  `mapstructure:"qualified_recharge_usd"`
+	QualifiedRechargeTypes []string `mapstructure:"qualified_recharge_types"`
+	CodeLength             int      `mapstructure:"code_length"`
+	MaxInviteesPerUser     int      `mapstructure:"max_invitees_per_user"`
+}
+
+type DingtalkConfig struct {
+	Enabled    bool   `mapstructure:"enabled"`
+	WebhookURL string `mapstructure:"webhook_url"`
+	Secret     string `mapstructure:"secret"`
+	AtMobiles  string `mapstructure:"at_mobiles"` // comma separated
+	AtAll      bool   `mapstructure:"at_all"`
 }
 
 type PaymentConfig struct {
@@ -232,6 +243,9 @@ func Load() (*Config, error) {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("./config")
+	// Workspace convenience: allow running the server from repo root.
+	viper.AddConfigPath("./backend")
+	viper.AddConfigPath("./backend/config")
 	viper.AddConfigPath("/etc/sub2api")
 
 	// 环境变量支持
@@ -305,6 +319,23 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("payment.stripe.cancel_url", "STRIPE_CANCEL_URL")
 	_ = v.BindEnv("payment.stripe.wechat_client", "STRIPE_WECHAT_CLIENT")
 	_ = v.BindEnv("payment.stripe.wechat_app_id", "STRIPE_WECHAT_APP_ID")
+
+	// Dingtalk
+	_ = v.BindEnv("dingtalk.enabled", "DINGTALK_ENABLED")
+	_ = v.BindEnv("dingtalk.webhook_url", "DINGTALK_WEBHOOK_URL")
+	_ = v.BindEnv("dingtalk.secret", "DINGTALK_SECRET")
+	_ = v.BindEnv("dingtalk.at_mobiles", "DINGTALK_AT_MOBILES")
+	_ = v.BindEnv("dingtalk.at_all", "DINGTALK_AT_ALL")
+
+	// Referral (legacy and docker env friendly)
+	_ = v.BindEnv("referral.enabled", "REFERRAL_ENABLED")
+	_ = v.BindEnv("referral.base_url", "REFERRAL_BASE_URL")
+	_ = v.BindEnv("referral.link_base_url", "REFERRAL_LINK_BASE_URL")
+	_ = v.BindEnv("referral.reward_usd", "REFERRAL_REWARD_USD")
+	_ = v.BindEnv("referral.qualified_recharge_cny", "REFERRAL_QUALIFIED_RECHARGE_CNY")
+	_ = v.BindEnv("referral.qualified_recharge_usd", "REFERRAL_QUALIFIED_RECHARGE_USD")
+	_ = v.BindEnv("referral.code_length", "REFERRAL_CODE_LENGTH")
+	_ = v.BindEnv("referral.max_invitees_per_user", "REFERRAL_MAX_INVITEES_PER_USER")
 }
 
 func setDefaults() {
@@ -356,12 +387,23 @@ func setDefaults() {
 
 	// Referral
 	viper.SetDefault("referral.enabled", false)
-	viper.SetDefault("referral.link_base_url", "")
+	// Default to the SPA register route; ReferralHandler will convert to absolute if payment.base_url is set.
+	viper.SetDefault("referral.link_base_url", "/register")
+	viper.SetDefault("referral.base_url", "")
 	viper.SetDefault("referral.reward_usd", 0.0)
 	viper.SetDefault("referral.qualified_recharge_cny", 0.0)
 	viper.SetDefault("referral.qualified_recharge_usd", 0.0)
+	// Optional: if empty, all recharge types count toward qualification.
+	viper.SetDefault("referral.qualified_recharge_types", []string{})
 	viper.SetDefault("referral.code_length", 8)
 	viper.SetDefault("referral.max_invitees_per_user", 0)
+
+	// Dingtalk
+	viper.SetDefault("dingtalk.enabled", false)
+	viper.SetDefault("dingtalk.webhook_url", "")
+	viper.SetDefault("dingtalk.secret", "")
+	viper.SetDefault("dingtalk.at_mobiles", "")
+	viper.SetDefault("dingtalk.at_all", false)
 
 	// Payment
 	viper.SetDefault("payment.enabled", false)
@@ -458,6 +500,8 @@ func GetServerAddress() string {
 	v.SetConfigType("yaml")
 	v.AddConfigPath(".")
 	v.AddConfigPath("./config")
+	v.AddConfigPath("./backend")
+	v.AddConfigPath("./backend/config")
 	v.AddConfigPath("/etc/sub2api")
 
 	// Support SERVER_HOST and SERVER_PORT environment variables

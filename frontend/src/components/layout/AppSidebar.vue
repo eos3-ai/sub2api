@@ -392,6 +392,7 @@ const userNavItems = computed(() => {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
+    { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon }
   ]

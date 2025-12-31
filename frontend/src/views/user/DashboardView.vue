@@ -7,6 +7,8 @@
       </div>
 
       <template v-else-if="stats">
+        <FirstRechargePromotion class="-mt-2" />
+
         <!-- Row 1: Core Stats -->
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Balance -->
@@ -725,6 +727,7 @@ import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
+import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 
 import {
   Chart as ChartJS,

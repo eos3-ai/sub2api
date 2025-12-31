@@ -32,6 +32,8 @@ type Handlers struct {
 	Redeem        *RedeemHandler
 	Subscription  *SubscriptionHandler
 	Payment       *PaymentHandler
+	Promotion     *PromotionHandler
+	Referral      *ReferralHandler
 	Admin         *AdminHandlers
 	Gateway       *GatewayHandler
 	OpenAIGateway *OpenAIGatewayHandler

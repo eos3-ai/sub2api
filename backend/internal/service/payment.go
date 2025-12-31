@@ -3,12 +3,12 @@ package service
 import "time"
 
 const (
-	PaymentStatusPending  = "pending"
-	PaymentStatusPaid     = "paid"
-	PaymentStatusFailed   = "failed"
-	PaymentStatusExpired  = "expired"
+	PaymentStatusPending   = "pending"
+	PaymentStatusPaid      = "paid"
+	PaymentStatusFailed    = "failed"
+	PaymentStatusExpired   = "expired"
 	PaymentStatusCancelled = "cancelled"
-	PaymentStatusRefunded = "refunded"
+	PaymentStatusRefunded  = "refunded"
 )
 
 // PaymentOrder 表示支付订单
@@ -18,6 +18,7 @@ type PaymentOrder struct {
 	TradeNo      *string
 	UserID       int64
 	Username     string
+	Remark       string
 	AmountCNY    float64
 	AmountUSD    float64
 	BonusUSD     float64
