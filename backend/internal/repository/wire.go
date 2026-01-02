@@ -28,7 +28,7 @@ func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.Conc
 // ProviderSet is the Wire provider set for all repositories
 var ProviderSet = wire.NewSet(
 	NewUserRepository,
-	NewApiKeyRepository,
+	NewAPIKeyRepository,
 	NewGroupRepository,
 	NewAccountRepository,
 	NewProxyRepository,
@@ -38,6 +38,7 @@ var ProviderSet = wire.NewSet(
 	NewReferralRepository,
 	NewPaymentOrderRepository,
 	NewUsageLogRepository,
+	NewOpsRepository,
 	NewSettingRepository,
 	NewUserSubscriptionRepository,
 	NewUserAttributeDefinitionRepository,
@@ -46,7 +47,7 @@ var ProviderSet = wire.NewSet(
 	// Cache implementations
 	NewGatewayCache,
 	NewBillingCache,
-	NewApiKeyCache,
+	NewAPIKeyCache,
 	ProvideConcurrencyCache,
 	NewEmailCache,
 	NewIdentityCache,
