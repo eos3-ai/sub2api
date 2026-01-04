@@ -341,12 +341,17 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 		return
 	}
 
+	log.Printf("[Stripe Webhook] Request received: remote_addr=%s, content_length=%d",
+		c.Request.RemoteAddr, c.Request.ContentLength)
+
 	payload, err := io.ReadAll(c.Request.Body)
 	if err != nil {
 		c.Status(http.StatusBadRequest)
 		return
 	}
 	signature := c.GetHeader("Stripe-Signature")
+	log.Printf("[Stripe Webhook] Raw payload: %s", string(payload))
+	log.Printf("[Stripe Webhook] Stripe-Signature present: %v, length: %d", signature != "", len(signature))
 	info, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
 	if err != nil {
 		log.Printf("[Stripe Webhook] verify failed: error=%v", err)
@@ -370,6 +375,9 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 		c.Status(http.StatusOK)
 		return
 	}
+	log.Printf("[Stripe Webhook] Order found: order_no=%s, user_id=%d, status=%s, amount_usd=%.2f, provider=%s",
+		order.OrderNo, order.UserID, order.Status, order.TotalUSD, order.Provider)
+
 	if info.Amount > 0 {
 		money := float64(info.Amount) / 100
 		if !approxEqual(order.AmountCNY, money, 0.02) {
@@ -385,9 +393,11 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 		}
 	}
 
+	log.Printf("[Stripe Webhook] Processing event type: %s for order_no=%s", info.EventType, info.OrderNo)
+
 	switch info.EventType {
 	case "payment_intent.succeeded":
-		_, err := h.paymentService.MarkOrderPaid(c.Request.Context(), info.OrderNo, info.TradeNo, gin.H{
+		updatedOrder, err := h.paymentService.MarkOrderPaid(c.Request.Context(), info.OrderNo, info.TradeNo, gin.H{
 			"type": info.EventType,
 		})
 		if err != nil {
@@ -398,12 +408,16 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 			})
 			return
 		}
+		if updatedOrder != nil {
+			log.Printf("[Stripe Webhook] Order marked as PAID successfully: order_no=%s, trade_no=%s, user_id=%d, amount_usd=%.2f, paid_at=%v",
+				updatedOrder.OrderNo, *updatedOrder.TradeNo, updatedOrder.UserID, updatedOrder.TotalUSD, updatedOrder.PaidAt)
+		}
 	case "payment_intent.payment_failed":
 		reason := info.EventType
 		if strings.TrimSpace(info.FailureMessage) != "" {
 			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
 		}
-		_, err := h.paymentService.MarkOrderFailed(c.Request.Context(), info.OrderNo, reason)
+		updatedOrder, err := h.paymentService.MarkOrderFailed(c.Request.Context(), info.OrderNo, reason)
 		if err != nil {
 			log.Printf("[Stripe Webhook] Failed to mark order as failed: order_no=%s, reason=%s, error=%v",
 				info.OrderNo, reason, err)
@@ -412,12 +426,16 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 			})
 			return
 		}
+		if updatedOrder != nil {
+			log.Printf("[Stripe Webhook] Order marked as FAILED successfully: order_no=%s, user_id=%d, reason=%s, callback_at=%v",
+				updatedOrder.OrderNo, updatedOrder.UserID, reason, updatedOrder.CallbackAt)
+		}
 	case "payment_intent.canceled":
 		reason := info.EventType
 		if strings.TrimSpace(info.FailureMessage) != "" {
 			reason = reason + ": " + strings.TrimSpace(info.FailureMessage)
 		}
-		_, err := h.paymentService.MarkOrderCancelled(c.Request.Context(), info.OrderNo, reason)
+		updatedOrder, err := h.paymentService.MarkOrderCancelled(c.Request.Context(), info.OrderNo, reason)
 		if err != nil {
 			log.Printf("[Stripe Webhook] Failed to mark order as cancelled: order_no=%s, reason=%s, error=%v",
 				info.OrderNo, reason, err)
@@ -426,8 +444,14 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 			})
 			return
 		}
+		if updatedOrder != nil {
+			log.Printf("[Stripe Webhook] Order marked as CANCELLED successfully: order_no=%s, user_id=%d, reason=%s, callback_at=%v",
+				updatedOrder.OrderNo, updatedOrder.UserID, reason, updatedOrder.CallbackAt)
+		}
 	default:
 	}
+	log.Printf("[Stripe Webhook] Request processing completed successfully: event_id=%s, type=%s, order_no=%s",
+		info.EventID, info.EventType, info.OrderNo)
 	c.Status(http.StatusOK)
 }
 
