@@ -147,7 +147,10 @@ export default {
     selectOption: '请选择',
     searchPlaceholder: '搜索...',
     noOptionsFound: '无匹配选项',
+    noGroupsAvailable: '无可用分组',
+    unknownError: '发生未知错误',
     saving: '保存中...',
+    selectedCount: '（已选 {count} 个）',
     refresh: '刷新',
     createdAt: '创建时间',
     updatedAt: '更新时间',
@@ -997,10 +1000,6 @@ export default {
       roles: {
         admin: '管理员',
         user: '用户'
-      },
-      statuses: {
-        active: '正常',
-        banned: '禁用'
       },
       form: {
         emailLabel: '邮箱',
