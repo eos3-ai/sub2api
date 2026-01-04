@@ -79,6 +79,22 @@ func ProvidePaymentMaintenanceService(cfg *config.Config, paymentService *Paymen
 	return svc
 }
 
+// ProvideBonusService creates BonusService with all dependencies
+// Note: PaymentService is not injected here to avoid circular dependency.
+// The issuer will function without it (activity orders won't be created, but balance will still be applied).
+func ProvideBonusService(
+	promotionService *PromotionService,
+	balanceService *BalanceService,
+) *BonusService {
+	// 创建策略实现
+	calculator := NewPromotionCalculator(promotionService)
+	issuer := NewBalanceBonusIssuer(balanceService, nil) // nil to avoid circular dependency
+	recorder := NewPromotionBonusRecorder(promotionService)
+
+	// 创建BonusService
+	return NewBonusService(calculator, issuer, recorder)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -94,6 +110,7 @@ var ProviderSet = wire.NewSet(
 	NewPromotionService,
 	NewReferralService,
 	NewDingtalkService,
+	ProvideBonusService,
 	NewPaymentService,
 	NewZpayService,
 	NewStripeService,
