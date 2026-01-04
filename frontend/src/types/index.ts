@@ -568,6 +568,7 @@ export interface UpdateAccountRequest {
   proxy_id?: number | null
   concurrency?: number
   priority?: number
+  schedulable?: boolean
   status?: 'active' | 'inactive'
   group_ids?: number[]
   confirm_mixed_channel_risk?: boolean
@@ -918,6 +919,7 @@ export type UserAttributeType = 'text' | 'textarea' | 'number' | 'email' | 'url'
 export interface UserAttributeOption {
   value: string
   label: string
+  [key: string]: unknown
 }
 
 export interface UserAttributeValidation {
