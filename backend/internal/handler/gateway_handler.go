@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -38,14 +39,19 @@ func NewGatewayHandler(
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
+	cfg *config.Config,
 ) *GatewayHandler {
+	pingInterval := time.Duration(0)
+	if cfg != nil {
+		pingInterval = time.Duration(cfg.Concurrency.PingInterval) * time.Second
+	}
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
 		geminiCompatService:       geminiCompatService,
 		antigravityGatewayService: antigravityGatewayService,
 		userService:               userService,
 		billingCacheService:       billingCacheService,
-		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude),
+		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
 	}
 }
 
@@ -121,6 +127,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
+	// 在请求结束或 Context 取消时确保释放槽位，避免客户端断开造成泄漏
+	userReleaseFunc = wrapReleaseOnDone(c.Request.Context(), userReleaseFunc)
 	if userReleaseFunc != nil {
 		defer userReleaseFunc()
 	}
@@ -220,6 +228,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					log.Printf("Bind sticky session failed: %v", err)
 				}
 			}
+			// 账号槽位/等待计数需要在超时或断开时安全回收
+			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
 
 			// 转发请求 - 根据账号平台分流
 			var result *service.ForwardResult
@@ -344,6 +355,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				log.Printf("Bind sticky session failed: %v", err)
 			}
 		}
+		// 账号槽位/等待计数需要在超时或断开时安全回收
+		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
 
 		// 转发请求 - 根据账号平台分流
 		var result *service.ForwardResult
