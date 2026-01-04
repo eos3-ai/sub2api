@@ -31,6 +31,7 @@ type PaymentService struct {
 	orderRepo        PaymentOrderRepository
 	paymentCache     PaymentCache
 	balanceService   *BalanceService
+	bonusService     *BonusService
 	promotionService *PromotionService
 	referralService  *ReferralService
 	dingtalkService  *DingtalkService
@@ -41,6 +42,7 @@ func NewPaymentService(
 	orderRepo PaymentOrderRepository,
 	paymentCache PaymentCache,
 	balanceService *BalanceService,
+	bonusService *BonusService,
 	promotionService *PromotionService,
 	referralService *ReferralService,
 	dingtalkService *DingtalkService,
@@ -54,6 +56,7 @@ func NewPaymentService(
 		orderRepo:        orderRepo,
 		paymentCache:     paymentCache,
 		balanceService:   balanceService,
+		bonusService:     bonusService,
 		promotionService: promotionService,
 		referralService:  referralService,
 		dingtalkService:  dingtalkService,
@@ -252,20 +255,43 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 	order.CallbackData = callbackData
 	order.CallbackAt = now
 
-	var promotionTier *int
-	var bonusAmount float64
-	if s.promotionService != nil {
-		result, err := s.promotionService.ApplyPromotion(ctx, order.UserID, order.AmountUSD)
-		if err == nil && result != nil && result.Applied {
-			bonusAmount = result.Bonus
-			promotionTier = &result.Tier
+	// 使用BonusService处理赠送逻辑
+	if s.bonusService != nil {
+		bonusReq := &BonusRequest{
+			OrderID:   order.ID,
+			OrderNo:   order.OrderNo,
+			UserID:    order.UserID,
+			Username:  order.Username,
+			AmountUSD: order.AmountUSD,
+			AmountCNY: order.AmountCNY,
+			Provider:  order.Provider,
+		}
+
+		bonusResult, err := s.bonusService.ProcessOrderBonus(ctx, bonusReq)
+		if err != nil {
+			log.Printf("[Payment Service] ERROR: Bonus processing failed: order_no=%s, user_id=%d, error=%v",
+				order.OrderNo, order.UserID, err)
+			// 发送DingTalk告警
+			s.notifyAsync("Bonus Processing Failed", fmt.Sprintf(
+				"**警告: 首充赠送发放失败**\n\n"+
+					"**Order**: %s\n\n"+
+					"**User ID**: %d\n\n"+
+					"**Username**: %s\n\n"+
+					"**Amount(USD)**: %.2f\n\n"+
+					"**Error**: %v\n\n"+
+					"**Action**: 需要管理员手动补发",
+				order.OrderNo, order.UserID, order.Username, order.AmountUSD, err,
+			))
+		} else if bonusResult != nil && bonusResult.Applied {
+			// 更新订单bonus信息
+			order.BonusUSD = bonusResult.BonusAmount
+			order.PromotionTier = &bonusResult.Tier
+			order.PromotionUsed = true
+
+			log.Printf("[Payment Service] Bonus applied successfully: order_no=%s, user_id=%d, amount=%.2f, tier=%d",
+				order.OrderNo, order.UserID, bonusResult.BonusAmount, bonusResult.Tier)
 		}
 	}
-	if promotionTier != nil {
-		order.PromotionTier = promotionTier
-		order.PromotionUsed = true
-	}
-	order.BonusUSD = bonusAmount
 
 	if err := s.orderRepo.Update(ctx, order); err != nil {
 		return nil, fmt.Errorf("update order: %w", err)
@@ -286,27 +312,7 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 		}
 	}
 
-	// Promotion bonus should be a separate user-visible "activity recharge" record.
-	if promotionTier != nil && bonusAmount > 0 && s.balanceService != nil {
-		activityOrder, err := s.createActivityRechargeOrder(ctx, order.UserID, bonusAmount, "邀请首充奖励")
-		relatedID := &order.OrderNo
-		if err == nil && activityOrder != nil {
-			relatedID = &activityOrder.OrderNo
-		}
-		_, _ = s.balanceService.ApplyChange(ctx, BalanceChangeRequest{
-			UserID:    order.UserID,
-			Amount:    bonusAmount,
-			Type:      RechargeTypePromotion,
-			Operator:  "system",
-			Remark:    "邀请首充奖励",
-			RelatedID: relatedID,
-		})
-	}
-
-	if promotionTier != nil && s.promotionService != nil {
-		_ = s.promotionService.MarkPromotionUsed(ctx, order.UserID, *promotionTier, order.AmountUSD, bonusAmount)
-	}
-
+	// 处理邀请返利
 	if s.referralService != nil {
 		reward, err := s.referralService.ProcessInviteeRecharge(ctx, &ReferralRechargeRequest{
 			InviteeID:          order.UserID,
