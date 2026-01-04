@@ -1755,6 +1755,7 @@ export default {
         },
         rateLimit: {
           ok: '未限流',
+          unlimited: '无限流',
           limited: '限流 {time}',
           now: '现在'
         }
