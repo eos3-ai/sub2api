@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/rand"
 	"strings"
 	"time"
@@ -137,6 +138,7 @@ func (s *PaymentService) MarkOrderFailed(ctx context.Context, orderNo string, re
 	if s == nil {
 		return nil, nil
 	}
+	log.Printf("[Payment Service] MarkOrderFailed called: order_no=%s, reason=%s", orderNo, reason)
 	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
 	if err != nil {
 		return nil, fmt.Errorf("get order: %w", err)
@@ -144,6 +146,8 @@ func (s *PaymentService) MarkOrderFailed(ctx context.Context, orderNo string, re
 	if order == nil {
 		return nil, fmt.Errorf("order not found")
 	}
+	log.Printf("[Payment Service] Order retrieved: order_no=%s, current_status=%s, user_id=%d, amount_usd=%.2f",
+		order.OrderNo, order.Status, order.UserID, order.TotalUSD)
 	if order.Status != PaymentStatusPending {
 		return order, nil
 	}
@@ -158,6 +162,8 @@ func (s *PaymentService) MarkOrderFailed(ctx context.Context, orderNo string, re
 		return nil, fmt.Errorf("update order: %w", err)
 	}
 
+	log.Printf("[Payment Service] Order marked as failed: order_no=%s, user_id=%d, status=%s, callback_at=%v",
+		order.OrderNo, order.UserID, order.Status, order.CallbackAt)
 	s.notifyAsync("Payment Failed", fmt.Sprintf("**Order**: %s\n\n**Provider**: %s\n\n**Amount(CNY)**: %.2f\n\n**Reason**: %s", order.OrderNo, order.Provider, order.AmountCNY, reason))
 	return order, nil
 }
@@ -167,6 +173,7 @@ func (s *PaymentService) MarkOrderCancelled(ctx context.Context, orderNo string,
 	if s == nil {
 		return nil, nil
 	}
+	log.Printf("[Payment Service] MarkOrderCancelled called: order_no=%s, reason=%s", orderNo, reason)
 	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
 	if err != nil {
 		return nil, fmt.Errorf("get order: %w", err)
@@ -174,6 +181,8 @@ func (s *PaymentService) MarkOrderCancelled(ctx context.Context, orderNo string,
 	if order == nil {
 		return nil, fmt.Errorf("order not found")
 	}
+	log.Printf("[Payment Service] Order retrieved: order_no=%s, current_status=%s, user_id=%d, amount_usd=%.2f",
+		order.OrderNo, order.Status, order.UserID, order.TotalUSD)
 	if order.Status != PaymentStatusPending {
 		return order, nil
 	}
@@ -188,6 +197,8 @@ func (s *PaymentService) MarkOrderCancelled(ctx context.Context, orderNo string,
 		return nil, fmt.Errorf("update order: %w", err)
 	}
 
+	log.Printf("[Payment Service] Order marked as cancelled: order_no=%s, user_id=%d, status=%s, callback_at=%v",
+		order.OrderNo, order.UserID, order.Status, order.CallbackAt)
 	s.notifyAsync("Payment Cancelled", fmt.Sprintf("**Order**: %s\n\n**Provider**: %s\n\n**Amount(CNY)**: %.2f\n\n**Reason**: %s", order.OrderNo, order.Provider, order.AmountCNY, reason))
 	return order, nil
 }
@@ -213,6 +224,7 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 	if s == nil {
 		return nil, nil
 	}
+	log.Printf("[Payment Service] MarkOrderPaid called: order_no=%s, trade_no=%s", orderNo, tradeNo)
 	order, err := s.orderRepo.GetByOrderNo(ctx, orderNo)
 	if err != nil {
 		return nil, fmt.Errorf("get order: %w", err)
@@ -220,6 +232,8 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 	if order == nil {
 		return nil, fmt.Errorf("order not found")
 	}
+	log.Printf("[Payment Service] Order retrieved: order_no=%s, current_status=%s, user_id=%d, amount_usd=%.2f",
+		order.OrderNo, order.Status, order.UserID, order.TotalUSD)
 	if order.Status != PaymentStatusPending {
 		return order, nil
 	}
@@ -319,6 +333,8 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 		}
 	}
 
+	log.Printf("[Payment Service] Order payment completed: order_no=%s, user_id=%d, username=%s, amount_usd=%.2f, bonus_usd=%.2f, paid_at=%v, promotion_used=%v",
+		order.OrderNo, order.UserID, order.Username, order.AmountUSD, order.BonusUSD, order.PaidAt, order.PromotionUsed)
 	s.notifyAsync("Payment Paid", fmt.Sprintf("**Order**: %s\n\n**Provider**: %s\n\n**Amount(CNY)**: %.2f\n\n**Credits(USD)**: %.2f\n\n**Bonus(USD)**: %.2f\n\n**Total(USD)**: %.2f", order.OrderNo, order.Provider, order.AmountCNY, order.AmountUSD, order.BonusUSD, order.TotalUSD))
 	return order, nil
 }

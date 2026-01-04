@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strings"
 
@@ -131,6 +132,8 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 	if strings.TrimSpace(s.cfg.WebhookSecret) == "" {
 		return nil, errors.New("stripe webhook_secret is required")
 	}
+	log.Printf("[Stripe Webhook] Starting verification: payload_length=%d, has_signature=%v",
+		len(payload), signature != "")
 	event, err := webhook.ConstructEventWithOptions(
 		payload,
 		signature,
@@ -143,6 +146,8 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 
 	info := &StripeWebhookInfo{EventType: string(event.Type)}
 	info.EventID = event.ID
+	log.Printf("[Stripe Webhook] Event parsed successfully: event_id=%s, type=%s, api_version=%s",
+		event.ID, event.Type, event.APIVersion)
 
 	switch info.EventType {
 	case "payment_intent.succeeded":
@@ -154,6 +159,8 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 		if err := json.Unmarshal(event.Data.Raw, &pi); err != nil {
 			return nil, fmt.Errorf("parse payment_intent: %w", err)
 		}
+		log.Printf("[Stripe Webhook] PaymentIntent details: id=%s, amount=%d, currency=%s, status=%s",
+			pi.ID, pi.Amount, pi.Currency, pi.Status)
 		info.OrderNo = firstNonEmpty(
 			pi.Metadata["order_no"],
 			pi.Metadata["orderId"],
@@ -168,6 +175,8 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 		} else if pi.CancellationReason != "" {
 			info.FailureMessage = string(pi.CancellationReason)
 		}
+		log.Printf("[Stripe Webhook] Extracted metadata: order_no=%s, failure_message=%s",
+			info.OrderNo, info.FailureMessage)
 		return info, nil
 	default:
 		return info, nil
