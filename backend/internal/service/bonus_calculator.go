@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
 )
 
 // PromotionCalculator Promotion策略的计算器实现
@@ -19,6 +20,9 @@ func NewPromotionCalculator(promotionService *PromotionService) BonusCalculator 
 
 // Calculate 计算promotion赠送金额
 func (c *PromotionCalculator) Calculate(ctx context.Context, userID int64, amountUSD float64) (*CalculationResult, error) {
+	log.Printf("[BonusCalculator] Calculate ENTRY: user_id=%d, amount_usd=%.2f, promotionService_is_nil=%v",
+		userID, amountUSD, c.promotionService == nil)
+
 	if c.promotionService == nil {
 		return &CalculationResult{
 			ShouldGrant: false,
@@ -28,6 +32,7 @@ func (c *PromotionCalculator) Calculate(ctx context.Context, userID int64, amoun
 
 	// 调用现有的 PromotionService.ApplyPromotion()
 	result, err := c.promotionService.ApplyPromotion(ctx, userID, amountUSD)
+	log.Printf("[BonusCalculator] PromotionService.ApplyPromotion returned: result=%+v, err=%v", result, err)
 	if err != nil {
 		return nil, fmt.Errorf("apply promotion: %w", err)
 	}
