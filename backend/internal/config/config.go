@@ -1,9 +1,11 @@
 package config
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -349,6 +351,15 @@ func NormalizeRunMode(value string) string {
 }
 
 func Load() (*Config, error) {
+	// Optional: load env file defaults (does not override existing env vars).
+	// This supports running the binary directly with deploy/.env(.example) without docker-compose env injection.
+	loadEnvDefaultsFromFiles([]string{
+		".env",
+		filepath.Join("deploy", ".env"),
+		".env.example",
+		filepath.Join("deploy", ".env.example"),
+	})
+
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -356,6 +367,8 @@ func Load() (*Config, error) {
 	// Workspace convenience: allow running the server from repo root.
 	viper.AddConfigPath("./backend")
 	viper.AddConfigPath("./backend/config")
+	// Deployment convenience: allow using deploy/config.example.yaml as a base config.
+	viper.AddConfigPath("./deploy")
 	viper.AddConfigPath("/etc/sub2api")
 
 	// 环境变量支持
@@ -388,6 +401,13 @@ func Load() (*Config, error) {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("read config error: %w", err)
 		}
+		// Fallback: allow using deploy/config.example.yaml when no config.yaml exists.
+		if _, statErr := os.Stat(filepath.Join("deploy", "config.example.yaml")); statErr == nil {
+			viper.SetConfigFile(filepath.Join("deploy", "config.example.yaml"))
+			if err := viper.ReadInConfig(); err != nil {
+				return nil, fmt.Errorf("read config error: %w", err)
+			}
+		}
 		// 配置文件不存在时使用默认值
 	}
 
@@ -403,6 +423,51 @@ func Load() (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+func loadEnvDefaultsFromFiles(paths []string) {
+	for _, path := range paths {
+		loadEnvDefaultsFromFile(path)
+	}
+}
+
+// loadEnvDefaultsFromFile loads KEY=VALUE pairs from file into the process environment
+// only when the key is not already set.
+func loadEnvDefaultsFromFile(path string) {
+	f, err := os.Open(path)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if strings.HasPrefix(line, "export ") {
+			line = strings.TrimSpace(strings.TrimPrefix(line, "export "))
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 {
+			if (value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'') {
+				value = value[1 : len(value)-1]
+			}
+		}
+		_ = os.Setenv(key, value)
+	}
 }
 
 // bindCoreEnvAliases binds docker-compose / setup env vars to the config keys.
@@ -447,6 +512,51 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	// JWT
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
 	_ = v.BindEnv("jwt.expire_hour", "JWT_EXPIRE_HOUR")
+
+	// Gemini OAuth / Quota
+	_ = v.BindEnv("gemini.oauth.client_id", "GEMINI_OAUTH_CLIENT_ID")
+	_ = v.BindEnv("gemini.oauth.client_secret", "GEMINI_OAUTH_CLIENT_SECRET")
+	_ = v.BindEnv("gemini.oauth.scopes", "GEMINI_OAUTH_SCOPES")
+	_ = v.BindEnv("gemini.quota.policy", "GEMINI_QUOTA_POLICY")
+
+	// Payment
+	_ = v.BindEnv("payment.enabled", "PAYMENT_ENABLED")
+	_ = v.BindEnv("payment.base_url", "PAYMENT_BASE_URL")
+	_ = v.BindEnv("payment.min_amount", "PAYMENT_MIN_AMOUNT")
+	_ = v.BindEnv("payment.max_amount", "PAYMENT_MAX_AMOUNT")
+	_ = v.BindEnv("payment.exchange_rate", "PAYMENT_EXCHANGE_RATE")
+	_ = v.BindEnv("payment.discount_rate", "PAYMENT_DISCOUNT_RATE")
+	_ = v.BindEnv("payment.order_expire_minutes", "PAYMENT_ORDER_EXPIRE_MINUTES")
+	_ = v.BindEnv("payment.max_orders_per_minute", "PAYMENT_MAX_ORDERS_PER_MINUTE")
+	_ = v.BindEnv("payment.order_prefix", "PAYMENT_ORDER_PREFIX")
+	// Complex arrays are also supported via JSON env overrides in Load(): PAYMENT_PACKAGES.
+
+	// Payment.ZPay
+	_ = v.BindEnv("payment.zpay.enabled", "PAYMENT_ZPAY_ENABLED", "ZPAY_ENABLED")
+	_ = v.BindEnv("payment.zpay.pid", "PAYMENT_ZPAY_PID", "ZPAY_PID")
+	_ = v.BindEnv("payment.zpay.key", "PAYMENT_ZPAY_KEY", "ZPAY_KEY")
+	_ = v.BindEnv("payment.zpay.api_url", "PAYMENT_ZPAY_API_URL", "ZPAY_API_URL")
+	_ = v.BindEnv("payment.zpay.submit_url", "PAYMENT_ZPAY_SUBMIT_URL", "ZPAY_SUBMIT_URL")
+	_ = v.BindEnv("payment.zpay.query_url", "PAYMENT_ZPAY_QUERY_URL", "ZPAY_QUERY_URL")
+	_ = v.BindEnv("payment.zpay.payment_methods", "PAYMENT_ZPAY_PAYMENT_METHODS", "ZPAY_PAYMENT_METHODS")
+	_ = v.BindEnv("payment.zpay.order_prefix", "PAYMENT_ZPAY_ORDER_PREFIX", "ZPAY_ORDER_PREFIX")
+	_ = v.BindEnv("payment.zpay.notify_url", "PAYMENT_ZPAY_NOTIFY_URL", "ZPAY_NOTIFY_URL")
+	_ = v.BindEnv("payment.zpay.return_url", "PAYMENT_ZPAY_RETURN_URL", "ZPAY_RETURN_URL")
+	_ = v.BindEnv("payment.zpay.notify_user", "PAYMENT_ZPAY_NOTIFY_USER", "ZPAY_NOTIFY_USER")
+	_ = v.BindEnv("payment.zpay.ip_whitelist", "PAYMENT_ZPAY_IP_WHITELIST", "ZPAY_IP_WHITELIST")
+	_ = v.BindEnv("payment.zpay.require_https", "PAYMENT_ZPAY_REQUIRE_HTTPS", "ZPAY_REQUIRE_HTTPS")
+
+	// Payment.Stripe (keep deploy/.env.example naming working)
+	_ = v.BindEnv("payment.stripe.enabled", "PAYMENT_STRIPE_ENABLED", "STRIPE_ENABLED")
+	_ = v.BindEnv("payment.stripe.api_key", "PAYMENT_STRIPE_API_KEY", "STRIPE_API_KEY", "STRIPE_SECRET_KEY")
+	_ = v.BindEnv("payment.stripe.webhook_secret", "PAYMENT_STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET")
+	_ = v.BindEnv("payment.stripe.api_version", "PAYMENT_STRIPE_API_VERSION", "STRIPE_API_VERSION")
+	_ = v.BindEnv("payment.stripe.payment_methods", "PAYMENT_STRIPE_PAYMENT_METHODS", "STRIPE_PAYMENT_METHODS")
+	_ = v.BindEnv("payment.stripe.currency", "PAYMENT_STRIPE_CURRENCY", "STRIPE_CURRENCY")
+	_ = v.BindEnv("payment.stripe.success_url", "PAYMENT_STRIPE_SUCCESS_URL", "STRIPE_SUCCESS_URL")
+	_ = v.BindEnv("payment.stripe.cancel_url", "PAYMENT_STRIPE_CANCEL_URL", "STRIPE_CANCEL_URL")
+	_ = v.BindEnv("payment.stripe.wechat_client", "PAYMENT_STRIPE_WECHAT_CLIENT", "STRIPE_WECHAT_CLIENT")
+	_ = v.BindEnv("payment.stripe.wechat_app_id", "PAYMENT_STRIPE_WECHAT_APP_ID", "STRIPE_WECHAT_APP_ID")
 }
 
 // bindLegacyEnvAliases binds legacy (non-namespaced) env vars to the current config keys.
