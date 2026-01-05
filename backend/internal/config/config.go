@@ -361,6 +361,7 @@ func Load() (*Config, error) {
 	// 环境变量支持
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	bindCoreEnvAliases(viper.GetViper())
 	bindLegacyEnvAliases(viper.GetViper())
 
 	// 默认值
@@ -404,6 +405,50 @@ func Load() (*Config, error) {
 	return &cfg, nil
 }
 
+// bindCoreEnvAliases binds docker-compose / setup env vars to the config keys.
+//
+// Viper's AutomaticEnv is not always sufficient for nested structs when using Unmarshal,
+// so we bind the common env vars explicitly to guarantee env overrides are applied.
+func bindCoreEnvAliases(v *viper.Viper) {
+	if v == nil {
+		return
+	}
+
+	// Server
+	_ = v.BindEnv("server.host", "SERVER_HOST")
+	_ = v.BindEnv("server.port", "SERVER_PORT")
+	_ = v.BindEnv("server.mode", "SERVER_MODE", "GIN_MODE")
+	_ = v.BindEnv("run_mode", "RUN_MODE")
+	_ = v.BindEnv("timezone", "TIMEZONE", "TZ")
+
+	// Database
+	_ = v.BindEnv("database.host", "DATABASE_HOST")
+	_ = v.BindEnv("database.port", "DATABASE_PORT")
+	_ = v.BindEnv("database.user", "DATABASE_USER")
+	_ = v.BindEnv("database.password", "DATABASE_PASSWORD")
+	_ = v.BindEnv("database.dbname", "DATABASE_DBNAME")
+	_ = v.BindEnv("database.sslmode", "DATABASE_SSLMODE")
+	_ = v.BindEnv("database.max_open_conns", "DATABASE_MAX_OPEN_CONNS")
+	_ = v.BindEnv("database.max_idle_conns", "DATABASE_MAX_IDLE_CONNS")
+	_ = v.BindEnv("database.conn_max_lifetime_minutes", "DATABASE_CONN_MAX_LIFETIME_MINUTES")
+	_ = v.BindEnv("database.conn_max_idle_time_minutes", "DATABASE_CONN_MAX_IDLE_TIME_MINUTES")
+
+	// Redis
+	_ = v.BindEnv("redis.host", "REDIS_HOST")
+	_ = v.BindEnv("redis.port", "REDIS_PORT")
+	_ = v.BindEnv("redis.password", "REDIS_PASSWORD")
+	_ = v.BindEnv("redis.db", "REDIS_DB")
+	_ = v.BindEnv("redis.dial_timeout_seconds", "REDIS_DIAL_TIMEOUT_SECONDS")
+	_ = v.BindEnv("redis.read_timeout_seconds", "REDIS_READ_TIMEOUT_SECONDS")
+	_ = v.BindEnv("redis.write_timeout_seconds", "REDIS_WRITE_TIMEOUT_SECONDS")
+	_ = v.BindEnv("redis.pool_size", "REDIS_POOL_SIZE")
+	_ = v.BindEnv("redis.min_idle_conns", "REDIS_MIN_IDLE_CONNS")
+
+	// JWT
+	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
+	_ = v.BindEnv("jwt.expire_hour", "JWT_EXPIRE_HOUR")
+}
+
 // bindLegacyEnvAliases binds legacy (non-namespaced) env vars to the current config keys.
 //
 // This repo primarily uses Viper's `.` -> `_` mapping, so config keys like:
@@ -419,6 +464,10 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	if v == nil {
 		return
 	}
+
+	// Server
+	// Many deployments use Gin's standard env var; keep it working.
+	_ = v.BindEnv("server.mode", "SERVER_MODE", "GIN_MODE")
 
 	// Payment
 	_ = v.BindEnv("payment.order_prefix", "PAYMENT_ORDER_PREFIX")
