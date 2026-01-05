@@ -70,15 +70,31 @@ type JWTConfig struct {
 // NeedsSetup checks if the system needs initial setup
 // Uses multiple checks to prevent attackers from forcing re-setup by deleting config
 func NeedsSetup() bool {
-	// Check 1: Config file must not exist
-	if _, err := os.Stat(ConfigFile); !os.IsNotExist(err) {
-		return false // Config exists, no setup needed
+	// Check 1: If any valid config file exists in known locations, no setup needed.
+	// Keep this list aligned with config.Load() search paths.
+	configSearchPaths := []string{
+		".",
+		"./config",
+		"./backend",
+		"./backend/config",
+		"/etc/sub2api",
+	}
+	for _, dir := range configSearchPaths {
+		if _, err := os.Stat(dir + "/" + ConfigFile); err == nil {
+			return false
+		}
 	}
 
 	// Check 2: Installation lock file (harder to bypass)
 	lockFile := ".installed"
 	if _, err := os.Stat(lockFile); !os.IsNotExist(err) {
 		return false // Lock file exists, already installed
+	}
+
+	// Check 3: If core env vars are already provided, assume it's configured (env-only deployments).
+	// This preserves pre-setup-wizard behavior where config could be entirely env-driven.
+	if os.Getenv("JWT_SECRET") != "" {
+		return false
 	}
 
 	return true
