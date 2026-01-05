@@ -624,6 +624,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		return nil, s.writeGoogleError(c, http.StatusBadRequest, "Request body is empty")
 	}
 
+	// 解析请求以获取 image_size（用于图片计费）
+	imageSize := s.extractImageSize(body)
+
 	switch action {
 	case "generateContent", "streamGenerateContent":
 		// ok
@@ -782,6 +785,13 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		usage = &ClaudeUsage{}
 	}
 
+	// 判断是否为图片生成模型
+	imageCount := 0
+	if isImageGenerationModel(mappedModel) {
+		// 图片模型按次计费，默认 1 张图片
+		imageCount = 1
+	}
+
 	return &ForwardResult{
 		RequestID:    requestID,
 		Usage:        *usage,
@@ -789,6 +799,8 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		Stream:       stream,
 		Duration:     time.Since(startTime),
 		FirstTokenMs: firstTokenMs,
+		ImageCount:   imageCount,
+		ImageSize:    imageSize,
 	}, nil
 }
 
@@ -1294,4 +1306,28 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 		}
 	}
 
+}
+
+// extractImageSize 从 Gemini 请求中提取 image_size 参数
+func (s *AntigravityGatewayService) extractImageSize(body []byte) string {
+	var req antigravity.GeminiRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return "2K" // 默认 2K
+	}
+
+	if req.GenerationConfig != nil && req.GenerationConfig.ImageConfig != nil {
+		size := strings.ToUpper(strings.TrimSpace(req.GenerationConfig.ImageConfig.ImageSize))
+		if size == "1K" || size == "2K" || size == "4K" {
+			return size
+		}
+	}
+
+	return "2K" // 默认 2K
+}
+
+// isImageGenerationModel 判断模型是否为图片生成模型
+func isImageGenerationModel(model string) bool {
+	modelLower := strings.ToLower(model)
+	return strings.Contains(modelLower, "gemini-3-pro-image") ||
+		strings.Contains(modelLower, "gemini-2.5-flash-image")
 }

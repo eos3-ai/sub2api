@@ -609,7 +609,8 @@ export default {
     exportExcelFailed: 'Failed to export usage data',
     billingType: 'Billing',
     balance: 'Balance',
-    subscription: 'Subscription'
+    subscription: 'Subscription',
+    imageUnit: ' images'
   },
 
   // Redeem
@@ -1160,6 +1161,10 @@ export default {
         defaultValidityDays: 'Default Validity (Days)',
         validityHint: 'Number of days the subscription is valid when assigned to a user',
         noLimit: 'No limit'
+      },
+      imagePricing: {
+        title: 'Image Generation Pricing',
+        description: 'Configure pricing for gemini-3-pro-image model. Leave empty to use default prices.'
       }
     },
 
