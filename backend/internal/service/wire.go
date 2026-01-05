@@ -83,15 +83,13 @@ func ProvidePaymentMaintenanceService(cfg *config.Config, paymentService *Paymen
 }
 
 // ProvideBonusService creates BonusService with all dependencies
-// Note: PaymentService is not injected here to avoid circular dependency.
-// The issuer will function without it (activity orders won't be created, but balance will still be applied).
 func ProvideBonusService(
 	promotionService *PromotionService,
 	balanceService *BalanceService,
 ) *BonusService {
 	// 创建策略实现
 	calculator := NewPromotionCalculator(promotionService)
-	issuer := NewBalanceBonusIssuer(balanceService, nil) // nil to avoid circular dependency
+	issuer := NewBalanceBonusIssuer(balanceService)
 	recorder := NewPromotionBonusRecorder(promotionService)
 
 	// 创建BonusService

@@ -9,42 +9,28 @@ import (
 // BalanceBonusIssuer 余额发放实现
 type BalanceBonusIssuer struct {
 	balanceService *BalanceService
-	paymentService *PaymentService // 用于创建activity order
 }
 
 // NewBalanceBonusIssuer 创建余额发放器
-func NewBalanceBonusIssuer(balanceService *BalanceService, paymentService *PaymentService) BonusIssuer {
+func NewBalanceBonusIssuer(balanceService *BalanceService) BonusIssuer {
 	return &BalanceBonusIssuer{
 		balanceService: balanceService,
-		paymentService: paymentService,
 	}
 }
 
 // Issue 发放赠送到用户余额
 func (i *BalanceBonusIssuer) Issue(ctx context.Context, req *IssueRequest) error {
-	log.Printf("[BonusIssuer] Issue ENTRY: user_id=%d, amount=%.2f, type=%s, remark=%s, balanceService_is_nil=%v, paymentService_is_nil=%v",
-		req.UserID, req.Amount, req.Type, req.Remark, i.balanceService == nil, i.paymentService == nil)
+	log.Printf("[BonusIssuer] Issue ENTRY: user_id=%d, amount=%.2f, type=%s, remark=%s, balanceService_is_nil=%v",
+		req.UserID, req.Amount, req.Type, req.Remark, i.balanceService == nil)
 
 	if i.balanceService == nil {
 		return fmt.Errorf("balance service not available")
 	}
 
+	// 直接使用传入的RelatedID（订单号）
 	relatedID := req.RelatedID
 
-	// 1. 创建活动订单（用于记录）
-	if i.paymentService != nil && req.ActivityOrderNo == nil {
-		activityOrder, err := i.paymentService.createActivityRechargeOrder(ctx, req.UserID, req.Amount, req.Remark)
-		if err != nil {
-			log.Printf("[BonusIssuer] WARNING: Failed to create activity order: user_id=%d, amount=%.2f, error=%v",
-				req.UserID, req.Amount, err)
-			// 继续执行，activity order失败不阻断余额发放
-		} else if activityOrder != nil {
-			orderNo := activityOrder.OrderNo
-			relatedID = &orderNo
-		}
-	}
-
-	// 2. 发放余额
+	// 发放余额
 	log.Printf("[BonusIssuer] Issuing bonus: user_id=%d, amount=%.2f, type=%s, remark=%s",
 		req.UserID, req.Amount, req.Type, req.Remark)
 
