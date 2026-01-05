@@ -266,7 +266,7 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 			OrderNo:   order.OrderNo,
 			UserID:    order.UserID,
 			Username:  order.Username,
-			AmountUSD: order.AmountUSD,
+			AmountUSD: order.TotalUSD, // 使用实际到账金额计算赠送
 			AmountCNY: order.AmountCNY,
 			Provider:  order.Provider,
 		}
@@ -296,6 +296,16 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 
 			log.Printf("[Payment Service] Bonus applied successfully: order_no=%s, user_id=%d, amount=%.2f, tier=%d",
 				order.OrderNo, order.UserID, bonusResult.BonusAmount, bonusResult.Tier)
+
+			// 创建活动充值订单
+			activityOrder, err := s.createActivityRechargeOrder(ctx, order.UserID, bonusResult.BonusAmount, "新用户首充奖励")
+			if err != nil {
+				log.Printf("[Payment Service] WARNING: Failed to create activity order for bonus: order_no=%s, user_id=%d, bonus=%.2f, error=%v",
+					order.OrderNo, order.UserID, bonusResult.BonusAmount, err)
+			} else if activityOrder != nil {
+				log.Printf("[Payment Service] Activity order created for bonus: order_no=%s, activity_order_no=%s, amount=%.2f",
+					order.OrderNo, activityOrder.OrderNo, activityOrder.TotalUSD)
+			}
 		}
 	} else {
 		log.Printf("[Payment Service] WARNING: BonusService is nil, skipping bonus processing for order_no=%s", order.OrderNo)
