@@ -158,6 +158,9 @@
                 />
               </svg>
             </button>
+            <button class="btn btn-secondary" :disabled="loading || exporting" @click="exportFiltered">
+              {{ exporting ? t('common.loading') : t('admin.users.exportRecords') }}
+            </button>
             <!-- Filter Settings Dropdown -->
             <div class="relative" ref="filterDropdownRef">
               <button
@@ -284,10 +287,6 @@
             </button>
           </div>
         </div>
-        <button class="btn btn-secondary" :disabled="loading || exporting" @click="exportFiltered">
-          {{ exporting ? t('common.loading') : t('admin.users.exportRecords') }}
-        </button>
-      </div>
       </template>
 
       <!-- Users Table -->
