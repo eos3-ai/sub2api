@@ -2,207 +2,237 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"strings"
-	"time"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
+	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-
-	"gorm.io/gorm"
 )
 
 type promotionRepository struct {
-	db *gorm.DB
+	client *dbent.Client
+	db     *sql.DB
 }
 
-func NewPromotionRepository(db *gorm.DB) service.PromotionRepository {
-	return &promotionRepository{db: db}
+func NewPromotionRepository(client *dbent.Client, sqlDB *sql.DB) service.PromotionRepository {
+	return &promotionRepository{client: client, db: sqlDB}
 }
 
 func (r *promotionRepository) Create(ctx context.Context, promotion *service.UserPromotion) error {
-	m := userPromotionModelFromService(promotion)
-	err := r.db.WithContext(ctx).Create(m).Error
-	if err != nil {
-		return err
+	if promotion == nil {
+		return nil
 	}
-	applyUserPromotionModelToService(promotion, m)
-	return nil
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	var usedTier sql.NullInt64
+	if promotion.UsedTier != nil {
+		usedTier = sql.NullInt64{Int64: int64(*promotion.UsedTier), Valid: true}
+	}
+	var usedAt sql.NullTime
+	if promotion.UsedAt != nil {
+		usedAt = sql.NullTime{Time: *promotion.UsedAt, Valid: true}
+	}
+	var usedAmount sql.NullFloat64
+	if promotion.UsedAmount != nil {
+		usedAmount = sql.NullFloat64{Float64: *promotion.UsedAmount, Valid: true}
+	}
+	var bonusAmount sql.NullFloat64
+	if promotion.BonusAmount != nil {
+		bonusAmount = sql.NullFloat64{Float64: *promotion.BonusAmount, Valid: true}
+	}
+
+	err := scanSingleRow(
+		ctx,
+		exec,
+		`
+INSERT INTO user_promotions (
+  user_id, username, activated_at, expire_at, status,
+  used_tier, used_at, used_amount, bonus_amount
+)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+RETURNING id, created_at, updated_at
+`,
+		[]any{
+			promotion.UserID,
+			nullIfEmpty(promotion.Username),
+			promotion.ActivatedAt,
+			promotion.ExpireAt,
+			promotion.Status,
+			usedTier,
+			usedAt,
+			usedAmount,
+			bonusAmount,
+		},
+		&promotion.ID,
+		&promotion.CreatedAt,
+		&promotion.UpdatedAt,
+	)
+	return err
 }
 
 func (r *promotionRepository) GetByUserID(ctx context.Context, userID int64) (*service.UserPromotion, error) {
-	var m userPromotionModel
-	err := r.db.WithContext(ctx).Where("user_id = ?", userID).First(&m).Error
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	var out service.UserPromotion
+	var username sql.NullString
+	var usedTier sql.NullInt64
+	var usedAt sql.NullTime
+	var usedAmount sql.NullFloat64
+	var bonusAmount sql.NullFloat64
+	err := scanSingleRow(
+		ctx,
+		exec,
+		`
+SELECT id, user_id, username, activated_at, expire_at, status, used_tier, used_at, used_amount, bonus_amount, created_at, updated_at
+FROM user_promotions
+WHERE user_id = $1
+`,
+		[]any{userID},
+		&out.ID,
+		&out.UserID,
+		&username,
+		&out.ActivatedAt,
+		&out.ExpireAt,
+		&out.Status,
+		&usedTier,
+		&usedAt,
+		&usedAmount,
+		&bonusAmount,
+		&out.CreatedAt,
+		&out.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
 		return nil, err
 	}
-	return userPromotionModelToService(&m), nil
+	out.Username = username.String
+	if usedTier.Valid {
+		v := int(usedTier.Int64)
+		out.UsedTier = &v
+	}
+	if usedAt.Valid {
+		t := usedAt.Time
+		out.UsedAt = &t
+	}
+	if usedAmount.Valid {
+		v := usedAmount.Float64
+		out.UsedAmount = &v
+	}
+	if bonusAmount.Valid {
+		v := bonusAmount.Float64
+		out.BonusAmount = &v
+	}
+	return &out, nil
 }
 
 func (r *promotionRepository) Update(ctx context.Context, promotion *service.UserPromotion) error {
-	m := userPromotionModelFromService(promotion)
-	err := r.db.WithContext(ctx).Save(m).Error
-	if err != nil {
-		return err
+	if promotion == nil {
+		return nil
 	}
-	applyUserPromotionModelToService(promotion, m)
-	return nil
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	var usedTier sql.NullInt64
+	if promotion.UsedTier != nil {
+		usedTier = sql.NullInt64{Int64: int64(*promotion.UsedTier), Valid: true}
+	}
+	var usedAt sql.NullTime
+	if promotion.UsedAt != nil {
+		usedAt = sql.NullTime{Time: *promotion.UsedAt, Valid: true}
+	}
+	var usedAmount sql.NullFloat64
+	if promotion.UsedAmount != nil {
+		usedAmount = sql.NullFloat64{Float64: *promotion.UsedAmount, Valid: true}
+	}
+	var bonusAmount sql.NullFloat64
+	if promotion.BonusAmount != nil {
+		bonusAmount = sql.NullFloat64{Float64: *promotion.BonusAmount, Valid: true}
+	}
+
+	err := scanSingleRow(
+		ctx,
+		exec,
+		`
+UPDATE user_promotions
+SET username=$2, activated_at=$3, expire_at=$4, status=$5,
+    used_tier=$6, used_at=$7, used_amount=$8, bonus_amount=$9,
+    updated_at=NOW()
+WHERE user_id=$1
+RETURNING updated_at
+`,
+		[]any{
+			promotion.UserID,
+			nullIfEmpty(promotion.Username),
+			promotion.ActivatedAt,
+			promotion.ExpireAt,
+			promotion.Status,
+			usedTier,
+			usedAt,
+			usedAmount,
+			bonusAmount,
+		},
+		&promotion.UpdatedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	return err
 }
 
 func (r *promotionRepository) CreateRecord(ctx context.Context, record *service.PromotionRecord) error {
-	m := promotionRecordModelFromService(record)
-	err := r.db.WithContext(ctx).Create(m).Error
-	if err != nil {
-		return err
+	if record == nil {
+		return nil
 	}
-	record.ID = m.ID
-	record.CreatedAt = m.CreatedAt
-	return nil
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	err := scanSingleRow(
+		ctx,
+		exec,
+		`
+INSERT INTO promotion_records (user_id, username, tier, amount, bonus)
+VALUES ($1,$2,$3,$4,$5)
+RETURNING id, created_at
+`,
+		[]any{
+			record.UserID,
+			nullIfEmpty(record.Username),
+			record.Tier,
+			record.Amount,
+			record.Bonus,
+		},
+		&record.ID,
+		&record.CreatedAt,
+	)
+	return err
 }
 
 func (r *promotionRepository) GetUserMetaForPromotion(ctx context.Context, userID int64) (*service.PromotionUserMeta, error) {
-	if r == nil || r.db == nil || userID <= 0 {
+	if userID <= 0 {
 		return nil, nil
 	}
-
-	type row struct {
-		ID        int64     `gorm:"column:id"`
-		Email     string    `gorm:"column:email"`
-		Username  string    `gorm:"column:username"`
-		CreatedAt time.Time `gorm:"column:created_at"`
-	}
-	var out row
-	err := r.db.WithContext(ctx).
-		Model(&userModel{}).
-		Select("id", "email", "username", "created_at").
-		Where("id = ?", userID).
-		Take(&out).Error
+	client := clientFromContext(ctx, r.client)
+	u, err := client.User.Query().
+		Select(dbuser.FieldID, dbuser.FieldEmail, dbuser.FieldUsername, dbuser.FieldCreatedAt).
+		Where(dbuser.IDEQ(userID)).
+		Only(ctx)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if dbent.IsNotFound(err) {
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	name := strings.TrimSpace(out.Username)
+	name := strings.TrimSpace(u.Username)
 	if name == "" {
-		name = strings.TrimSpace(out.Email)
+		name = strings.TrimSpace(u.Email)
 	}
 
 	return &service.PromotionUserMeta{
-		UserID:    out.ID,
+		UserID:    u.ID,
 		Username:  name,
-		CreatedAt: out.CreatedAt,
+		CreatedAt: u.CreatedAt,
 	}, nil
-}
-
-type userPromotionModel struct {
-	ID          int64     `gorm:"primaryKey"`
-	UserID      int64     `gorm:"uniqueIndex;not null"`
-	Username    string    `gorm:"size:100"`
-	ActivatedAt time.Time `gorm:"not null"`
-	ExpireAt    time.Time `gorm:"not null"`
-	Status      string    `gorm:"size:20;not null"`
-	UsedTier    *int      `gorm:"type:int"`
-	UsedAt      *time.Time
-	UsedAmount  *float64   `gorm:"type:decimal(20,8)"`
-	BonusAmount *float64   `gorm:"type:decimal(20,8)"`
-	CreatedAt   time.Time  `gorm:"not null"`
-	UpdatedAt   time.Time  `gorm:"not null"`
-	User        *userModel `gorm:"foreignKey:UserID"`
-}
-
-func (userPromotionModel) TableName() string { return "user_promotions" }
-
-type promotionRecordModel struct {
-	ID        int64      `gorm:"primaryKey"`
-	UserID    int64      `gorm:"index;not null"`
-	Username  string     `gorm:"size:100"`
-	Tier      int        `gorm:"not null"`
-	Amount    float64    `gorm:"type:decimal(20,8);not null"`
-	Bonus     float64    `gorm:"type:decimal(20,8);not null"`
-	CreatedAt time.Time  `gorm:"not null"`
-	User      *userModel `gorm:"foreignKey:UserID"`
-}
-
-func (promotionRecordModel) TableName() string { return "promotion_records" }
-
-func userPromotionModelToService(m *userPromotionModel) *service.UserPromotion {
-	if m == nil {
-		return nil
-	}
-	return &service.UserPromotion{
-		ID:          m.ID,
-		UserID:      m.UserID,
-		Username:    m.Username,
-		ActivatedAt: m.ActivatedAt,
-		ExpireAt:    m.ExpireAt,
-		Status:      m.Status,
-		UsedTier:    m.UsedTier,
-		UsedAt:      m.UsedAt,
-		UsedAmount:  m.UsedAmount,
-		BonusAmount: m.BonusAmount,
-		CreatedAt:   m.CreatedAt,
-		UpdatedAt:   m.UpdatedAt,
-	}
-}
-
-func userPromotionModelFromService(p *service.UserPromotion) *userPromotionModel {
-	if p == nil {
-		return nil
-	}
-	return &userPromotionModel{
-		ID:          p.ID,
-		UserID:      p.UserID,
-		Username:    p.Username,
-		ActivatedAt: p.ActivatedAt,
-		ExpireAt:    p.ExpireAt,
-		Status:      p.Status,
-		UsedTier:    p.UsedTier,
-		UsedAt:      p.UsedAt,
-		UsedAmount:  p.UsedAmount,
-		BonusAmount: p.BonusAmount,
-		CreatedAt:   p.CreatedAt,
-		UpdatedAt:   p.UpdatedAt,
-	}
-}
-
-func applyUserPromotionModelToService(dst *service.UserPromotion, src *userPromotionModel) {
-	if dst == nil || src == nil {
-		return
-	}
-	dst.ID = src.ID
-	dst.CreatedAt = src.CreatedAt
-	dst.UpdatedAt = src.UpdatedAt
-}
-
-func promotionRecordModelFromService(r *service.PromotionRecord) *promotionRecordModel {
-	if r == nil {
-		return nil
-	}
-	return &promotionRecordModel{
-		ID:       r.ID,
-		UserID:   r.UserID,
-		Username: r.Username,
-		Tier:     r.Tier,
-		Amount:   r.Amount,
-		Bonus:    r.Bonus,
-	}
-}
-
-func promotionRecordModelToService(m *promotionRecordModel) *service.PromotionRecord {
-	if m == nil {
-		return nil
-	}
-	return &service.PromotionRecord{
-		ID:        m.ID,
-		UserID:    m.UserID,
-		Username:  m.Username,
-		Tier:      m.Tier,
-		Amount:    m.Amount,
-		Bonus:     m.Bonus,
-		CreatedAt: m.CreatedAt,
-	}
 }
