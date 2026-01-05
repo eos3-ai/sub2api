@@ -34,6 +34,7 @@ frontend/dist/
 *.local
 *.tsbuildinfo
 vite.config.d.ts
+vite.config.js.timestamp-*
 
 # 日志
 npm-debug.log*
