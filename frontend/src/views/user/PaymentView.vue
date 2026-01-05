@@ -256,7 +256,7 @@
                       {{ o.remark || '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      {{ providerLabel(o.provider) }}
+                      {{ shouldShowChannel(o.order_type) ? providerLabel(o.provider) : '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       ${{ o.total_usd.toFixed(2) }}
@@ -760,6 +760,11 @@ function providerLabel(provider: PaymentChannel): string {
   if (provider === 'admin') return t('payment.adminRecharge')
   if (provider === 'activity') return t('payment.activityRecharge')
   return provider
+}
+
+function shouldShowChannel(orderType?: string): boolean {
+  const value = String(orderType || '').toLowerCase()
+  return value === '' || value === 'online_recharge'
 }
 
 function orderTypeLabel(orderType?: string): string {

@@ -102,7 +102,9 @@
             </template>
 
             <template #cell-provider="{ row }">
-              <span class="text-sm text-gray-900 dark:text-white">{{ providerLabel(row.provider) }}</span>
+              <span class="text-sm text-gray-900 dark:text-white">
+                {{ shouldShowChannel(row.order_type) ? providerLabel(row.provider) : '-' }}
+              </span>
             </template>
 
             <template #cell-total_usd="{ row }">
@@ -202,6 +204,11 @@ function providerLabel(provider: AdminPaymentProvider): string {
   if (provider === 'stripe') return t('payment.wechat')
   if (provider === 'admin') return t('payment.adminRecharge')
   return provider
+}
+
+function shouldShowChannel(orderType?: string): boolean {
+  const value = String(orderType || '').toLowerCase()
+  return value === '' || value === 'online_recharge'
 }
 
 function orderTypeLabel(orderType?: string): string {
