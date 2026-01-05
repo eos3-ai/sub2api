@@ -20,6 +20,9 @@ func NewPromotionBonusRecorder(promotionService *PromotionService) BonusRecorder
 
 // Record 记录赠送使用情况
 func (r *PromotionBonusRecorder) Record(ctx context.Context, req *RecordRequest) error {
+	log.Printf("[BonusRecorder] Record ENTRY: user_id=%d, tier=%d, amount_usd=%.2f, bonus_usd=%.2f, promotionService_is_nil=%v",
+		req.UserID, req.Tier, req.AmountUSD, req.BonusUSD, r.promotionService == nil)
+
 	if r.promotionService == nil {
 		return fmt.Errorf("promotion service not available")
 	}

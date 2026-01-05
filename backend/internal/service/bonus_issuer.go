@@ -22,6 +22,9 @@ func NewBalanceBonusIssuer(balanceService *BalanceService, paymentService *Payme
 
 // Issue 发放赠送到用户余额
 func (i *BalanceBonusIssuer) Issue(ctx context.Context, req *IssueRequest) error {
+	log.Printf("[BonusIssuer] Issue ENTRY: user_id=%d, amount=%.2f, type=%s, remark=%s, balanceService_is_nil=%v, paymentService_is_nil=%v",
+		req.UserID, req.Amount, req.Type, req.Remark, i.balanceService == nil, i.paymentService == nil)
+
 	if i.balanceService == nil {
 		return fmt.Errorf("balance service not available")
 	}

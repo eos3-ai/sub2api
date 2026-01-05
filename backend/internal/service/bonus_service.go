@@ -25,11 +25,12 @@ func NewBonusService(calculator BonusCalculator, issuer BonusIssuer, recorder Bo
 // ProcessOrderBonus 处理订单的赠送逻辑（计算+发放+记录）
 func (s *BonusService) ProcessOrderBonus(ctx context.Context, req *BonusRequest) (*BonusResult, error) {
 	if s == nil {
+		log.Printf("[BonusService] ERROR: BonusService instance is nil")
 		return nil, fmt.Errorf("bonus service is nil")
 	}
 
-	log.Printf("[BonusService] Processing order bonus: order_no=%s, user_id=%d, amount_usd=%.2f, provider=%s",
-		req.OrderNo, req.UserID, req.AmountUSD, req.Provider)
+	log.Printf("[BonusService] ProcessOrderBonus ENTRY: order_no=%s, user_id=%d, amount_usd=%.2f, provider=%s, calculator_is_nil=%v, issuer_is_nil=%v, recorder_is_nil=%v",
+		req.OrderNo, req.UserID, req.AmountUSD, req.Provider, s.calculator == nil, s.issuer == nil, s.recorder == nil)
 
 	result := &BonusResult{
 		Applied: false,
@@ -41,7 +42,9 @@ func (s *BonusService) ProcessOrderBonus(ctx context.Context, req *BonusRequest)
 		return result, nil
 	}
 
+	log.Printf("[BonusService] Calling Calculator.Calculate for user_id=%d, amount_usd=%.2f", req.UserID, req.AmountUSD)
 	calculation, err := s.calculator.Calculate(ctx, req.UserID, req.AmountUSD)
+	log.Printf("[BonusService] Calculator.Calculate returned: calculation=%+v, err=%v", calculation, err)
 	if err != nil {
 		log.Printf("[BonusService] ERROR: Calculation failed: order_no=%s, user_id=%d, error=%v",
 			req.OrderNo, req.UserID, err)

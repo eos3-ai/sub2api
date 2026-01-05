@@ -256,7 +256,11 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 	order.CallbackAt = now
 
 	// 使用BonusService处理赠送逻辑
+	log.Printf("[Payment Service] Checking bonusService availability: bonusService_is_nil=%v", s.bonusService == nil)
 	if s.bonusService != nil {
+		log.Printf("[Payment Service] BonusService available, preparing bonus request for order_no=%s, user_id=%d, amount_usd=%.2f",
+			order.OrderNo, order.UserID, order.AmountUSD)
+
 		bonusReq := &BonusRequest{
 			OrderID:   order.ID,
 			OrderNo:   order.OrderNo,
@@ -267,7 +271,9 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 			Provider:  order.Provider,
 		}
 
+		log.Printf("[Payment Service] Calling BonusService.ProcessOrderBonus with req=%+v", bonusReq)
 		bonusResult, err := s.bonusService.ProcessOrderBonus(ctx, bonusReq)
+		log.Printf("[Payment Service] BonusService.ProcessOrderBonus returned: result=%+v, err=%v", bonusResult, err)
 		if err != nil {
 			log.Printf("[Payment Service] ERROR: Bonus processing failed: order_no=%s, user_id=%d, error=%v",
 				order.OrderNo, order.UserID, err)
@@ -291,6 +297,8 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 			log.Printf("[Payment Service] Bonus applied successfully: order_no=%s, user_id=%d, amount=%.2f, tier=%d",
 				order.OrderNo, order.UserID, bonusResult.BonusAmount, bonusResult.Tier)
 		}
+	} else {
+		log.Printf("[Payment Service] WARNING: BonusService is nil, skipping bonus processing for order_no=%s", order.OrderNo)
 	}
 
 	if err := s.orderRepo.Update(ctx, order); err != nil {
