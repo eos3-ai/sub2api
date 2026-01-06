@@ -4,7 +4,7 @@
       <FirstRechargePromotion cta-to="#recharge-plans" />
 
       <!-- Plans -->
-      <div id="recharge-plans" class="card p-6">
+      <div id="recharge-plans" class="card animate-fade-in-up p-6 stagger-1">
         <div class="mb-6 rounded-2xl bg-primary-600 px-6 py-4 text-white">
           <div class="flex items-center gap-3">
             <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
@@ -186,7 +186,7 @@
       </div>
 
       <!-- Orders -->
-      <div class="card p-6">
+      <div class="card animate-fade-in-up p-6 stagger-2">
         <div class="mb-4 flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('payment.myOrders') }}</h2>
           <button class="btn btn-secondary" :disabled="loadingOrders" @click="loadOrders">

@@ -14,7 +14,7 @@
 
     <div class="relative z-10 w-full max-w-md text-center">
       <!-- 404 Display -->
-      <div class="mb-8">
+      <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.1s; animation-fill-mode: both">
         <div class="relative inline-block">
           <span class="text-[12rem] font-bold leading-none text-gray-100 dark:text-dark-800"
             >404</span
@@ -42,7 +42,7 @@
       </div>
 
       <!-- Text Content -->
-      <div class="mb-8">
+      <div class="mb-8 animate-fade-in-up" style="animation-delay: 0.2s; animation-fill-mode: both">
         <h1 class="mb-3 text-2xl font-bold text-gray-900 dark:text-white">
           {{ t('errors.pageNotFound') }}
         </h1>
@@ -52,7 +52,7 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex flex-col justify-center gap-3 sm:flex-row">
+      <div class="animate-fade-in-up flex flex-col justify-center gap-3 sm:flex-row" style="animation-delay: 0.3s; animation-fill-mode: both">
         <button @click="goBack" class="btn btn-secondary">
           <svg
             class="mr-2 h-5 w-5"
@@ -88,7 +88,7 @@
       </div>
 
       <!-- Help Link -->
-      <p class="mt-8 text-sm text-gray-400 dark:text-dark-500">
+      <p class="mt-8 animate-fade-in-up text-sm text-gray-400 dark:text-dark-500" style="animation-delay: 0.4s; animation-fill-mode: both">
         Need help?
         <a
           href="#"

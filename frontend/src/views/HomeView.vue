@@ -22,7 +22,7 @@
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
+            class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-600"
           >
             {{ t('home.docs') }}
           </a>
@@ -58,14 +58,14 @@
           <router-link
             v-if="isAuthenticated"
             to="/dashboard"
-            class="rounded-full bg-[#C44A2C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#A33D24]"
+            class="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
           >
             {{ t('home.dashboard') }}
           </router-link>
           <router-link
             v-else
             to="/login"
-            class="rounded-full bg-[#C44A2C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#A33D24]"
+            class="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
           >
             {{ t('home.login') }}
           </router-link>
@@ -78,20 +78,20 @@
       <div class="mx-auto max-w-4xl text-center">
         <h1
           class="hero-title mb-6 animate-fade-in-up text-5xl font-bold leading-tight text-[#1a1a1a] dark:text-white md:text-6xl lg:text-7xl"
-          style="animation-delay: 0.2s; animation-fill-mode: both"
+          style="animation-delay: 0.15s; animation-fill-mode: both"
         >
           {{ siteName }}
         </h1>
         <p
           class="hero-subtitle mb-10 animate-fade-in-up text-xl leading-relaxed text-[#4a4a4a] dark:text-dark-300 md:text-2xl"
-          style="animation-delay: 0.4s; animation-fill-mode: both"
+          style="animation-delay: 0.3s; animation-fill-mode: both"
         >
           {{ siteSubtitle }}
         </p>
-        <div class="hero-cta animate-fade-in-up flex flex-col items-center justify-center gap-4 sm:flex-row" style="animation-delay: 0.6s; animation-fill-mode: both">
+        <div class="hero-cta animate-fade-in-up flex flex-col items-center justify-center gap-4 sm:flex-row" style="animation-delay: 0.45s; animation-fill-mode: both">
           <router-link
             :to="isAuthenticated ? '/dashboard' : '/login'"
-            class="group inline-flex items-center gap-2 rounded-full bg-[#C44A2C] px-8 py-4 text-base font-medium text-white transition-all hover:bg-[#A33D24] hover:shadow-lg"
+            class="group inline-flex items-center gap-2 rounded-full bg-primary-600 px-8 py-4 text-base font-medium text-white transition-all hover:bg-primary-700 hover:shadow-lg"
           >
             {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
             <svg
@@ -113,7 +113,7 @@
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 rounded-full border border-[#1a1a1a]/20 px-8 py-4 text-base font-medium text-[#1a1a1a] transition-all hover:border-[#C44A2C] hover:text-[#C44A2C] dark:border-dark-600 dark:text-white dark:hover:border-[#C44A2C] dark:hover:text-[#C44A2C]"
+            class="inline-flex items-center gap-2 rounded-full border border-[#1a1a1a]/20 px-8 py-4 text-base font-medium text-[#1a1a1a] transition-all hover:border-primary-600 hover:text-primary-600 dark:border-dark-600 dark:text-white dark:hover:border-primary-600 dark:hover:text-primary-600"
           >
             {{ t('home.viewDocs') }}
           </a>
@@ -127,7 +127,7 @@
         <div class="flex flex-wrap items-center justify-center gap-6 md:gap-8">
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-[#C44A2C]"
+              class="h-5 w-5 text-primary-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -145,7 +145,7 @@
           </div>
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-[#C44A2C]"
+              class="h-5 w-5 text-primary-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -163,7 +163,7 @@
           </div>
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-[#C44A2C]"
+              class="h-5 w-5 text-primary-600"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -199,7 +199,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-600/20 dark:text-primary-400"
             >
               <svg
                 class="h-7 w-7"
@@ -228,7 +228,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-600/20 dark:text-primary-400"
             >
               <svg
                 class="h-7 w-7"
@@ -257,7 +257,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-600/20 dark:text-primary-400"
             >
               <svg
                 class="h-7 w-7"
@@ -305,7 +305,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.claude') }}
             </span>
-            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
+            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-600/20 dark:text-primary-400">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -316,7 +316,7 @@
               <span class="text-sm font-bold text-white">G</span>
             </div>
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">GPT</span>
-            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
+            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-600/20 dark:text-primary-400">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -329,7 +329,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.gemini') }}
             </span>
-            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
+            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-600/20 dark:text-primary-400">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -342,7 +342,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.antigravity') }}
             </span>
-            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
+            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-600/20 dark:text-primary-400">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -422,7 +422,7 @@
               :href="docUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
+              class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-600"
             >
               {{ t('home.docs') }}
             </a>
@@ -430,7 +430,7 @@
               :href="githubUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
+              class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-600"
             >
               GitHub
             </a>

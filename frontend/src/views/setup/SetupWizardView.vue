@@ -4,7 +4,7 @@
   >
     <div class="w-full max-w-2xl">
       <!-- Logo & Title -->
-      <div class="mb-8 text-center">
+      <div class="mb-8 animate-fade-in-up text-center stagger-1">
         <div
           class="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 shadow-lg"
         >
@@ -32,7 +32,7 @@
       </div>
 
       <!-- Progress Steps -->
-      <div class="mb-8">
+      <div class="mb-8 animate-fade-in-up stagger-2">
         <div class="flex items-center justify-center">
           <template v-for="(step, index) in steps" :key="step.id">
             <div class="flex items-center">
@@ -79,7 +79,7 @@
       </div>
 
       <!-- Step Content -->
-      <div class="rounded-2xl bg-white p-8 shadow-xl dark:bg-dark-800">
+      <div class="animate-fade-in-up rounded-2xl bg-white p-8 shadow-xl stagger-3 dark:bg-dark-800">
         <!-- Step 1: Database -->
         <div v-if="currentStep === 0" class="space-y-6">
           <div class="mb-6 text-center">
