@@ -86,6 +86,9 @@ type PaymentOrderFilter struct {
 type PaymentOrderRepository interface {
 	Create(ctx context.Context, order *PaymentOrder) error
 	GetByOrderNo(ctx context.Context, orderNo string) (*PaymentOrder, error)
+	// GetByOrderNoForUpdate locks the order row within an existing transaction.
+	// Callers should wrap in an ent transaction context (ent.NewTxContext).
+	GetByOrderNoForUpdate(ctx context.Context, orderNo string) (*PaymentOrder, error)
 	GetByTradeNo(ctx context.Context, tradeNo string) (*PaymentOrder, error)
 	Update(ctx context.Context, order *PaymentOrder) error
 

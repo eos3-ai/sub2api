@@ -96,6 +96,11 @@ func (r *paymentOrderRepository) GetByOrderNo(ctx context.Context, orderNo strin
 	return r.getOne(ctx, exec, `WHERE order_no = $1`, []any{orderNo})
 }
 
+func (r *paymentOrderRepository) GetByOrderNoForUpdate(ctx context.Context, orderNo string) (*service.PaymentOrder, error) {
+	exec := sqlExecutorFromContext(ctx, r.db)
+	return r.getOne(ctx, exec, `WHERE order_no = $1 FOR UPDATE`, []any{orderNo})
+}
+
 func (r *paymentOrderRepository) GetByTradeNo(ctx context.Context, tradeNo string) (*service.PaymentOrder, error) {
 	exec := sqlExecutorFromContext(ctx, r.db)
 	return r.getOne(ctx, exec, `WHERE trade_no = $1`, []any{tradeNo})
@@ -403,4 +408,3 @@ func inferredDiscountRate(amountUSD, totalUSD float64) float64 {
 func isFinite(v float64) bool {
 	return !math.IsNaN(v) && !math.IsInf(v, 0)
 }
-

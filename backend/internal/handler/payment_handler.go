@@ -350,8 +350,7 @@ func (h *PaymentHandler) StripeWebhook(c *gin.Context) {
 		return
 	}
 	signature := c.GetHeader("Stripe-Signature")
-	log.Printf("[Stripe Webhook] Raw payload: %s", string(payload))
-	log.Printf("[Stripe Webhook] Stripe-Signature present: %v, length: %d", signature != "", len(signature))
+	log.Printf("[Stripe Webhook] Stripe-Signature present: %v", signature != "")
 	info, err := h.stripeService.VerifyWebhook(c.Request.Context(), payload, signature)
 	if err != nil {
 		log.Printf("[Stripe Webhook] verify failed: error=%v", err)

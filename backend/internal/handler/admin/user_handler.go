@@ -159,8 +159,8 @@ func (h *UserHandler) Export(c *gin.Context) {
 		u := all[i]
 		_ = w.Write([]string{
 			strconv.FormatInt(u.ID, 10),
-			u.Email,
-			u.Username,
+			sanitizeCSVCell(u.Email),
+			sanitizeCSVCell(u.Username),
 			u.Role,
 			u.Status,
 			fmt.Sprintf("%.8f", u.Balance),
