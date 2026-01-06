@@ -22,7 +22,7 @@
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-400"
+            class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
           >
             {{ t('home.docs') }}
           </a>
@@ -58,14 +58,14 @@
           <router-link
             v-if="isAuthenticated"
             to="/dashboard"
-            class="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            class="rounded-full bg-[#C44A2C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#A33D24]"
           >
             {{ t('home.dashboard') }}
           </router-link>
           <router-link
             v-else
             to="/login"
-            class="rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            class="rounded-full bg-[#C44A2C] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#A33D24]"
           >
             {{ t('home.login') }}
           </router-link>
@@ -89,7 +89,7 @@
         <div class="hero-cta flex flex-col items-center justify-center gap-4 sm:flex-row">
           <router-link
             :to="isAuthenticated ? '/dashboard' : '/login'"
-            class="group inline-flex items-center gap-2 rounded-full bg-primary-600 px-8 py-4 text-base font-medium text-white transition-all hover:bg-primary-700 hover:shadow-lg hover:shadow-primary-600/30"
+            class="group inline-flex items-center gap-2 rounded-full bg-[#C44A2C] px-8 py-4 text-base font-medium text-white transition-all hover:bg-[#A33D24] hover:shadow-lg"
           >
             {{ isAuthenticated ? t('home.goToDashboard') : t('home.getStarted') }}
             <svg
@@ -111,7 +111,7 @@
             :href="docUrl"
             target="_blank"
             rel="noopener noreferrer"
-            class="inline-flex items-center gap-2 rounded-full border border-[#1a1a1a]/20 px-8 py-4 text-base font-medium text-[#1a1a1a] transition-all hover:border-primary-600 hover:text-primary-600 dark:border-dark-600 dark:text-white dark:hover:border-primary-400 dark:hover:text-primary-400"
+            class="inline-flex items-center gap-2 rounded-full border border-[#1a1a1a]/20 px-8 py-4 text-base font-medium text-[#1a1a1a] transition-all hover:border-[#C44A2C] hover:text-[#C44A2C] dark:border-dark-600 dark:text-white dark:hover:border-[#C44A2C] dark:hover:text-[#C44A2C]"
           >
             {{ t('home.viewDocs') }}
           </a>
@@ -125,7 +125,7 @@
         <div class="flex flex-wrap items-center justify-center gap-6 md:gap-8">
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-primary-600"
+              class="h-5 w-5 text-[#C44A2C]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -143,7 +143,7 @@
           </div>
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-primary-600"
+              class="h-5 w-5 text-[#C44A2C]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -161,7 +161,7 @@
           </div>
           <div class="feature-tag flex items-center gap-2.5">
             <svg
-              class="h-5 w-5 text-primary-600"
+              class="h-5 w-5 text-[#C44A2C]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -197,7 +197,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-900/30 dark:text-primary-400"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
             >
               <svg
                 class="h-7 w-7"
@@ -226,7 +226,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-900/30 dark:text-primary-400"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
             >
               <svg
                 class="h-7 w-7"
@@ -255,7 +255,7 @@
         <div class="feature-card group">
           <div class="mb-6">
             <div
-              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100 text-primary-600 transition-transform group-hover:scale-110 dark:bg-primary-900/30 dark:text-primary-400"
+              class="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-[#fde9e3] text-[#C44A2C] transition-transform group-hover:scale-110 dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]"
             >
               <svg
                 class="h-7 w-7"
@@ -303,7 +303,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.claude') }}
             </span>
-            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -314,7 +314,7 @@
               <span class="text-sm font-bold text-white">G</span>
             </div>
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">GPT</span>
-            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -327,7 +327,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.gemini') }}
             </span>
-            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -340,7 +340,7 @@
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">
               {{ t('home.providers.antigravity') }}
             </span>
-            <span class="rounded bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+            <span class="rounded bg-[#fde9e3] px-2 py-0.5 text-xs font-medium text-[#a33d24] dark:bg-[#C44A2C]/20 dark:text-[#f08f6f]">
               {{ t('home.providers.supported') }}
             </span>
           </div>
@@ -420,7 +420,7 @@
               :href="docUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-400"
+              class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
             >
               {{ t('home.docs') }}
             </a>
@@ -428,7 +428,7 @@
               :href="githubUrl"
               target="_blank"
               rel="noopener noreferrer"
-              class="text-sm text-[#4a4a4a] transition-colors hover:text-primary-600 dark:text-dark-400 dark:hover:text-primary-400"
+              class="text-sm text-[#4a4a4a] transition-colors hover:text-[#C44A2C] dark:text-dark-400 dark:hover:text-[#C44A2C]"
             >
               GitHub
             </a>
@@ -507,20 +507,20 @@ onMounted(async () => {
 /* Hero Animations */
 .hero-title {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.1s;
+  animation: fadeInUp 0.3s ease-out forwards;
+  animation-delay: 0.15s;
 }
 
 .hero-subtitle {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.25s;
+  animation: fadeInUp 0.3s ease-out forwards;
+  animation-delay: 0.3s;
 }
 
 .hero-cta {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.4s;
+  animation: fadeInUp 0.3s ease-out forwards;
+  animation-delay: 0.45s;
 }
 
 @keyframes fadeInUp {
@@ -537,28 +537,28 @@ onMounted(async () => {
 /* Section Animations */
 .section-title {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.3s ease-out forwards;
 }
 
 .feature-tag {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.3s ease-out forwards;
 }
 
 .feature-tag:nth-child(1) {
-  animation-delay: 0.1s;
+  animation-delay: 0.15s;
 }
 .feature-tag:nth-child(2) {
-  animation-delay: 0.25s;
+  animation-delay: 0.3s;
 }
 .feature-tag:nth-child(3) {
-  animation-delay: 0.4s;
+  animation-delay: 0.45s;
 }
 
 /* Feature Cards */
 .feature-card {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.3s ease-out forwards;
   padding: 2rem;
   border-radius: 1rem;
   background: white;
@@ -577,13 +577,13 @@ onMounted(async () => {
 }
 
 .feature-card:nth-child(1) {
-  animation-delay: 0.2s;
+  animation-delay: 0.15s;
 }
 .feature-card:nth-child(2) {
-  animation-delay: 0.35s;
+  animation-delay: 0.3s;
 }
 .feature-card:nth-child(3) {
-  animation-delay: 0.5s;
+  animation-delay: 0.45s;
 }
 
 /* Provider Cards */
@@ -596,7 +596,7 @@ onMounted(async () => {
   background: white;
   border: 1px solid rgba(26, 26, 26, 0.08);
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
+  animation: fadeInUp 0.3s ease-out forwards;
   transition: all 0.3s ease;
 }
 
@@ -611,26 +611,26 @@ onMounted(async () => {
 }
 
 .provider-card:nth-child(1) {
-  animation-delay: 0.1s;
+  animation-delay: 0.15s;
 }
 .provider-card:nth-child(2) {
-  animation-delay: 0.2s;
-}
-.provider-card:nth-child(3) {
   animation-delay: 0.3s;
 }
+.provider-card:nth-child(3) {
+  animation-delay: 0.45s;
+}
 .provider-card:nth-child(4) {
-  animation-delay: 0.4s;
+  animation-delay: 0.6s;
 }
 .provider-card:nth-child(5) {
-  animation-delay: 0.5s;
+  animation-delay: 0.75s;
 }
 
 /* Terminal Demo */
 .terminal-demo {
   opacity: 0;
-  animation: fadeInUp 0.6s ease-out forwards;
-  animation-delay: 0.3s;
+  animation: fadeInUp 0.3s ease-out forwards;
+  animation-delay: 0.15s;
 }
 
 .terminal-window {

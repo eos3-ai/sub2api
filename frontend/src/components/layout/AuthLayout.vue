@@ -30,11 +30,12 @@
       <div class="mb-8 text-center">
         <!-- Custom Logo or Default Logo -->
         <div
-          class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg shadow-primary-500/30"
+          class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg"
+          style="box-shadow: 0 10px 25px rgba(196, 74, 44, 0.3)"
         >
           <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
         </div>
-        <h1 class="text-gradient mb-2 text-3xl font-bold">
+        <h1 class="mb-2 text-3xl font-bold" style="color: #c44a2c">
           {{ siteName }}
         </h1>
         <p class="text-sm text-gray-500 dark:text-dark-400">
@@ -82,8 +83,3 @@ onMounted(async () => {
 })
 </script>
 
-<style scoped>
-.text-gradient {
-  @apply bg-gradient-to-r from-primary-600 to-primary-500 bg-clip-text text-transparent;
-}
-</style>
