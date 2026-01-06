@@ -5,7 +5,7 @@ import axios from 'axios'
 
 // Create a separate client for setup endpoints (not under /api/v1)
 const setupClient = axios.create({
-  baseURL: '',
+  baseURL: import.meta.env.VITE_SETUP_BASE_URL || '',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

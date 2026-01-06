@@ -5,19 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 主色调 - Teal/Cyan 青色系
+        // 主色调 - Burnt Orange/Rust 暖橙红系
         primary: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-          950: '#042f2e'
+          50: '#fef6f4',
+          100: '#fde9e3',
+          200: '#fbd6ca',
+          300: '#f7b8a4',
+          400: '#f08f6f',
+          500: '#e46a45',
+          600: '#c44a2c',
+          700: '#a33d24',
+          800: '#873421',
+          900: '#702f21',
+          950: '#3d160d'
         },
         // 辅助色 - 深蓝灰
         accent: {
@@ -50,14 +50,11 @@ export default {
       },
       fontFamily: {
         sans: [
-          'Inter',
-          '-apple-system',
-          'BlinkMacSystemFont',
-          'Segoe UI',
-          'Roboto',
-          'Helvetica Neue',
-          'Arial',
-          'sans-serif'
+          'Merriweather',
+          'Noto Serif SC',
+          'Source Han Serif SC',
+          'Georgia',
+          'serif'
         ],
         mono: ['JetBrains Mono', 'Fira Code', 'Monaco', 'Consolas', 'monospace']
       },
@@ -80,12 +77,14 @@ export default {
           'radial-gradient(at 40% 20%, rgba(20, 184, 166, 0.12) 0px, transparent 50%), radial-gradient(at 80% 0%, rgba(6, 182, 212, 0.08) 0px, transparent 50%), radial-gradient(at 0% 50%, rgba(20, 184, 166, 0.08) 0px, transparent 50%)'
       },
       animation: {
-        'fade-in': 'fadeIn 0.3s ease-out',
+        'fade-in': 'fadeIn 0.6s ease-out',
+        'fade-in-up': 'fadeInUp 0.6s ease-out',
         'slide-up': 'slideUp 0.3s ease-out',
         'slide-down': 'slideDown 0.3s ease-out',
         'slide-in-right': 'slideInRight 0.3s ease-out',
         'scale-in': 'scaleIn 0.2s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'pulse-soft': 'pulseSoft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         shimmer: 'shimmer 2s linear infinite',
         glow: 'glow 2s ease-in-out infinite alternate'
       },
@@ -93,6 +92,10 @@ export default {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' }
+        },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(30px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
         },
         slideUp: {
           '0%': { opacity: '0', transform: 'translateY(10px)' },
@@ -115,8 +118,12 @@ export default {
           '100%': { backgroundPosition: '200% 0' }
         },
         glow: {
-          '0%': { boxShadow: '0 0 20px rgba(20, 184, 166, 0.25)' },
-          '100%': { boxShadow: '0 0 30px rgba(20, 184, 166, 0.4)' }
+          '0%': { boxShadow: '0 0 20px rgba(196, 74, 44, 0.25)' },
+          '100%': { boxShadow: '0 0 30px rgba(196, 74, 44, 0.4)' }
+        },
+        pulseSoft: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.8' }
         }
       },
       backdropBlur: {
