@@ -46,6 +46,13 @@ export default {
           800: '#1e293b',
           900: '#0f172a',
           950: '#020617'
+        },
+        // 暖色背景系统 (参考 TokenCloud)
+        warm: {
+          bg: '#f4f1ea',
+          text: '#1a1a1a',
+          scroll: '#4a4a4a',
+          'scroll-hover': '#5a5a5a'
         }
       },
       fontFamily: {
@@ -85,6 +92,8 @@ export default {
         'scale-in': 'scaleIn 0.2s ease-out',
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'pulse-soft': 'pulseSoft 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+        'bounce-subtle': 'bounceSubtle 1s ease-in-out infinite',
+        'ping-soft': 'pingSoft 2s cubic-bezier(0, 0, 0.2, 1) infinite',
         shimmer: 'shimmer 2s linear infinite',
         glow: 'glow 2s ease-in-out infinite alternate'
       },
@@ -124,6 +133,14 @@ export default {
         pulseSoft: {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.8' }
+        },
+        bounceSubtle: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-3px)' }
+        },
+        pingSoft: {
+          '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+          '50%': { transform: 'scale(1.5)', opacity: '0' }
         }
       },
       backdropBlur: {

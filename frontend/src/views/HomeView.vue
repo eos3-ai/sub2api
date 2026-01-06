@@ -77,16 +77,18 @@
     <section class="mx-auto max-w-7xl px-6 py-20 lg:px-8 lg:py-32">
       <div class="mx-auto max-w-4xl text-center">
         <h1
-          class="hero-title mb-6 text-5xl font-bold leading-tight text-[#1a1a1a] dark:text-white md:text-6xl lg:text-7xl"
+          class="hero-title mb-6 animate-fade-in-up text-5xl font-bold leading-tight text-[#1a1a1a] dark:text-white md:text-6xl lg:text-7xl"
+          style="animation-delay: 0.2s; animation-fill-mode: both"
         >
           {{ siteName }}
         </h1>
         <p
-          class="hero-subtitle mb-10 text-xl leading-relaxed text-[#4a4a4a] dark:text-dark-300 md:text-2xl"
+          class="hero-subtitle mb-10 animate-fade-in-up text-xl leading-relaxed text-[#4a4a4a] dark:text-dark-300 md:text-2xl"
+          style="animation-delay: 0.4s; animation-fill-mode: both"
         >
           {{ siteSubtitle }}
         </p>
-        <div class="hero-cta flex flex-col items-center justify-center gap-4 sm:flex-row">
+        <div class="hero-cta animate-fade-in-up flex flex-col items-center justify-center gap-4 sm:flex-row" style="animation-delay: 0.6s; animation-fill-mode: both">
           <router-link
             :to="isAuthenticated ? '/dashboard' : '/login'"
             class="group inline-flex items-center gap-2 rounded-full bg-[#C44A2C] px-8 py-4 text-base font-medium text-white transition-all hover:bg-[#A33D24] hover:shadow-lg"
