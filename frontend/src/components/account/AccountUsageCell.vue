@@ -43,7 +43,7 @@
           :utilization="usageInfo.five_hour.utilization"
           :resets-at="usageInfo.five_hour.resets_at"
           :window-stats="usageInfo.five_hour.window_stats"
-          color="indigo"
+          color="primary"
         />
 
         <!-- 7d Window (OAuth only) -->
@@ -61,7 +61,7 @@
           label="7d S"
           :utilization="usageInfo.seven_day_sonnet.utilization"
           :resets-at="usageInfo.seven_day_sonnet.resets_at"
-          color="purple"
+          color="primary"
         />
       </div>
 
@@ -78,7 +78,7 @@
           label="5h"
           :utilization="codex5hUsedPercent"
           :resets-at="codex5hResetAt"
-          color="indigo"
+          color="primary"
         />
 
         <!-- 7d Window -->
@@ -151,7 +151,7 @@
           :label="t('admin.accounts.usageWindow.gemini3Pro')"
           :utilization="antigravity3ProUsageFromAPI.utilization"
           :resets-at="antigravity3ProUsageFromAPI.resetTime"
-          color="indigo"
+          color="primary"
         />
 
         <!-- Gemini 3 Flash -->
@@ -169,7 +169,7 @@
           :label="t('admin.accounts.usageWindow.gemini3Image')"
           :utilization="antigravity3ImageUsageFromAPI.utilization"
           :resets-at="antigravity3ImageUsageFromAPI.resetTime"
-          color="purple"
+          color="primary"
         />
 
         <!-- Claude 4.5 -->
@@ -248,7 +248,7 @@
             :resets-at="usageInfo.gemini_pro_daily.resets_at"
             :window-stats="usageInfo.gemini_pro_daily.window_stats"
             :stats-title="t('admin.accounts.usageWindow.statsTitleDaily')"
-            color="indigo"
+            color="primary"
           />
           <UsageProgressBar
             v-if="usageInfo?.gemini_flash_daily"
@@ -611,7 +611,7 @@ const geminiTierClass = computed(() => {
   if (isGoogleOne) {
     // Google One tier 颜色
     const colorMap: Record<string, string> = {
-      AI_PREMIUM: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
+      AI_PREMIUM: 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300',
       GOOGLE_ONE_STANDARD: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
       GOOGLE_ONE_BASIC: 'bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-300',
       FREE: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
@@ -628,7 +628,7 @@ const geminiTierClass = computed(() => {
     case 'PRO':
       return 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
     case 'ULTRA':
-      return 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+      return 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300'
     default:
       return ''
   }
@@ -682,7 +682,7 @@ const antigravityTierClass = computed(() => {
     case 'g1-pro-tier':
       return 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300'
     case 'g1-ultra-tier':
-      return 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300'
+      return 'bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300'
     default:
       return ''
   }

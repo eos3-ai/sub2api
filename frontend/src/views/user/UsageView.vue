@@ -105,9 +105,9 @@
         <!-- Average Duration -->
         <div class="card p-4">
           <div class="flex items-center gap-3">
-            <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+            <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
               <svg
-                class="h-5 w-5 text-purple-600 dark:text-purple-400"
+                class="h-5 w-5 text-primary-600 dark:text-primary-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -245,7 +245,7 @@
                   <!-- Output -->
                   <div class="inline-flex items-center gap-1">
                     <svg
-                      class="h-3.5 w-3.5 text-violet-500"
+                      class="h-3.5 w-3.5 text-primary-500"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -367,7 +367,7 @@
               class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium"
               :class="
                 row.billing_type === 1
-                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                  ? 'bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200'
                   : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
               "
             >

@@ -312,7 +312,7 @@ const platformNote = computed(() => {
 })
 
 // Syntax highlighting helpers
-const keyword = (text: string) => `<span class="text-purple-400">${text}</span>`
+const keyword = (text: string) => `<span class="text-primary-400">${text}</span>`
 const variable = (text: string) => `<span class="text-cyan-400">${text}</span>`
 const string = (text: string) => `<span class="text-green-400">${text}</span>`
 const operator = (text: string) => `<span class="text-yellow-400">${text}</span>`

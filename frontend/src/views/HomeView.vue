@@ -334,7 +334,7 @@
 
           <!-- Antigravity -->
           <div class="provider-card">
-            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-pink-600">
+            <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-primary-500 to-primary-600">
               <span class="text-sm font-bold text-white">A</span>
             </div>
             <span class="text-sm font-medium text-[#1a1a1a] dark:text-dark-200">

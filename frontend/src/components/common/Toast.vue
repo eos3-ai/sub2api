@@ -160,7 +160,7 @@ const getIconColor = (type: string): string => {
     success: 'text-green-500',
     error: 'text-red-500',
     warning: 'text-yellow-500',
-    info: 'text-blue-500'
+    info: 'text-primary-600'
   }
   return colors[type] || colors.info
 }
@@ -170,7 +170,7 @@ const getBorderColor = (type: string): string => {
     success: 'border-green-500',
     error: 'border-red-500',
     warning: 'border-yellow-500',
-    info: 'border-blue-500'
+    info: 'border-primary-600'
   }
   return colors[type] || colors.info
 }
@@ -180,7 +180,7 @@ const getProgressBarColor = (type: string): string => {
     success: 'bg-green-500',
     error: 'bg-red-500',
     warning: 'bg-yellow-500',
-    info: 'bg-blue-500'
+    info: 'bg-primary-600'
   }
   return colors[type] || colors.info
 }

@@ -19,7 +19,7 @@
                 : isGemini
                   ? 'from-blue-500 to-blue-600'
                   : isAntigravity
-                    ? 'from-purple-500 to-purple-600'
+                    ? 'from-primary-500 to-primary-600'
                     : 'from-orange-500 to-orange-600'
             ]"
           >
@@ -139,15 +139,15 @@
               'flex items-center gap-3 rounded-lg border-2 p-3 text-left transition-all',
               !geminiAIStudioOAuthEnabled ? 'cursor-not-allowed opacity-60' : '',
               geminiOAuthType === 'ai_studio'
-                ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-                : 'border-gray-200 hover:border-purple-300 dark:border-dark-600 dark:hover:border-purple-700'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
+                : 'border-gray-200 hover:border-primary-300 dark:border-dark-600 dark:hover:border-primary-700'
             ]"
           >
             <div
               :class="[
                 'flex h-8 w-8 items-center justify-center rounded-lg',
                 geminiOAuthType === 'ai_studio'
-                  ? 'bg-purple-500 text-white'
+                  ? 'bg-primary-500 text-white'
                   : 'bg-gray-100 text-gray-500 dark:bg-dark-600 dark:text-gray-400'
               ]"
             >
