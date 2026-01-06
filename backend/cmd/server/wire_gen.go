@@ -84,7 +84,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	paymentCache := repository.NewPaymentCache(redisClient)
 	bonusService := service.ProvideBonusService(promotionService, balanceService)
 	dingtalkService := service.NewDingtalkService(configConfig)
-	paymentService := service.NewPaymentService(configConfig, paymentOrderRepository, paymentCache, balanceService, bonusService, promotionService, referralService, dingtalkService)
+	paymentService := service.NewPaymentService(configConfig, paymentOrderRepository, paymentCache, balanceService, bonusService, promotionService, referralService, dingtalkService, client)
 	zpayService := service.NewZpayService(configConfig)
 	stripeService := service.NewStripeService(configConfig)
 	paymentHandler := handler.NewPaymentHandler(configConfig, paymentService, zpayService, stripeService)

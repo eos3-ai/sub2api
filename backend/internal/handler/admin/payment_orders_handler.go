@@ -103,7 +103,7 @@ func (h *PaymentOrdersHandler) Export(c *gin.Context) {
 		_ = w.Write([]string{
 			o.OrderNo,
 			orderType,
-			emailByUserID[o.UserID],
+			sanitizeCSVCell(emailByUserID[o.UserID]),
 			o.Provider,
 			fmt.Sprintf("%.2f", o.AmountCNY),
 			fmt.Sprintf("%.8f", o.AmountUSD),
