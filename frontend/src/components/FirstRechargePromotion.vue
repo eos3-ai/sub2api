@@ -1,13 +1,13 @@
 <template>
   <div
     v-if="visible"
-    class="relative overflow-hidden rounded-3xl border border-primary-200/70 bg-gradient-to-r from-primary-100 via-white to-primary-200 p-6 shadow-card dark:border-primary-500/30 dark:from-primary-900/40 dark:via-dark-900 dark:to-primary-900/10"
+    class="relative overflow-hidden rounded-3xl border border-primary-200/70 bg-gradient-to-r from-primary-100 via-primary-50 to-primary-100 p-6 shadow-card dark:border-primary-500/30 dark:from-primary-900/40 dark:via-dark-900 dark:to-primary-900/40"
   >
     <div
       class="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full bg-primary-400/20 blur-3xl dark:bg-primary-400/10"
     />
     <div
-      class="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl dark:bg-cyan-400/10"
+      class="pointer-events-none absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-primary-400/20 blur-3xl dark:bg-primary-400/10"
     />
 
     <div class="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

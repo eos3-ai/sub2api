@@ -44,9 +44,9 @@
           <!-- Service Accounts -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-purple-600 dark:text-purple-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -190,9 +190,9 @@
           <!-- Total Tokens -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-indigo-600 dark:text-indigo-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -214,7 +214,7 @@
                 </p>
                 <p class="text-xs">
                   <span
-                    class="text-indigo-600 dark:text-indigo-400"
+                    class="text-primary-600 dark:text-primary-400"
                     :title="t('admin.dashboard.actual')"
                     >${{ formatCost(stats.total_actual_cost) }}</span
                   >
@@ -232,9 +232,9 @@
           <!-- Performance (RPM/TPM) -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-violet-600 dark:text-violet-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -258,7 +258,7 @@
                   <span class="text-xs text-gray-500 dark:text-gray-400">RPM</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                  <p class="text-sm font-semibold text-violet-600 dark:text-violet-400">
+                  <p class="text-sm font-semibold text-primary-600 dark:text-primary-400">
                     {{ formatTokens(stats.tpm) }}
                   </p>
                   <span class="text-xs text-gray-500 dark:text-gray-400">TPM</span>

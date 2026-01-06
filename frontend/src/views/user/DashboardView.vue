@@ -108,9 +108,9 @@
           <!-- Today Cost -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-purple-600 dark:text-purple-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -128,7 +128,7 @@
                   {{ t('dashboard.todayCost') }}
                 </p>
                 <p class="text-xl font-bold text-gray-900 dark:text-white">
-                  <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')"
+                  <span class="text-primary-600 dark:text-primary-400" :title="t('dashboard.actual')"
                     >${{ formatCost(stats.today_actual_cost) }}</span
                   >
                   <span
@@ -140,7 +140,7 @@
                 </p>
                 <p class="text-xs">
                   <span class="text-gray-500 dark:text-gray-400">{{ t('common.total') }}: </span>
-                  <span class="text-purple-600 dark:text-purple-400" :title="t('dashboard.actual')"
+                  <span class="text-primary-600 dark:text-primary-400" :title="t('dashboard.actual')"
                     >${{ formatCost(stats.total_actual_cost) }}</span
                   >
                   <span class="text-gray-400 dark:text-gray-500" :title="t('dashboard.standard')">
@@ -190,9 +190,9 @@
           <!-- Total Tokens -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-indigo-100 p-2 dark:bg-indigo-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-indigo-600 dark:text-indigo-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -223,9 +223,9 @@
           <!-- Performance (RPM/TPM) -->
           <div class="card p-4">
             <div class="flex items-center gap-3">
-              <div class="rounded-lg bg-violet-100 p-2 dark:bg-violet-900/30">
+              <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
-                  class="h-5 w-5 text-violet-600 dark:text-violet-400"
+                  class="h-5 w-5 text-primary-600 dark:text-primary-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -249,7 +249,7 @@
                   <span class="text-xs text-gray-500 dark:text-gray-400">RPM</span>
                 </div>
                 <div class="flex items-baseline gap-2">
-                  <p class="text-sm font-semibold text-violet-600 dark:text-violet-400">
+                  <p class="text-sm font-semibold text-primary-600 dark:text-primary-400">
                     {{ formatTokens(stats.tpm) }}
                   </p>
                   <span class="text-xs text-gray-500 dark:text-gray-400">TPM</span>
@@ -664,10 +664,10 @@
                   class="group flex w-full items-center gap-4 rounded-xl bg-gray-50 p-4 text-left transition-all duration-200 hover:bg-gray-100 dark:bg-dark-800/50 dark:hover:bg-dark-800"
                 >
                   <div
-                    class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-violet-100 transition-transform group-hover:scale-105 dark:bg-violet-900/30"
+                    class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary-100 transition-transform group-hover:scale-105 dark:bg-primary-900/30"
                   >
                     <svg
-                      class="h-6 w-6 text-violet-600 dark:text-violet-400"
+                      class="h-6 w-6 text-primary-600 dark:text-primary-400"
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -689,7 +689,7 @@
                     </p>
                   </div>
                   <svg
-                    class="h-5 w-5 text-gray-400 transition-colors group-hover:text-violet-500 dark:text-dark-500"
+                    class="h-5 w-5 text-gray-400 transition-colors group-hover:text-primary-500 dark:text-dark-500"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"

@@ -111,7 +111,7 @@
               :class="[
                 'flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-all',
                 modelRestrictionMode === 'mapping'
-                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-dark-600 dark:text-gray-400 dark:hover:bg-dark-500'
               ]"
               @click="modelRestrictionMode = 'mapping'"
@@ -186,8 +186,8 @@
 
           <!-- Mapping Mode -->
           <div v-else>
-            <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
-              <p class="text-xs text-purple-700 dark:text-purple-400">
+            <div class="mb-3 rounded-lg bg-primary-50 p-3 dark:bg-primary-900/20">
+              <p class="text-xs text-primary-700 dark:text-primary-400">
                 <svg
                   class="mr-1 inline h-4 w-4"
                   fill="none"
@@ -723,14 +723,14 @@ const presetMappings = [
     from: 'claude-sonnet-4-5-20250929',
     to: 'claude-sonnet-4-5-20250929',
     color:
-      'bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400'
+      'bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400'
   },
   {
     label: 'Opus 4.5',
     from: 'claude-opus-4-5-20251101',
     to: 'claude-opus-4-5-20251101',
     color:
-      'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400'
+      'bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400'
   },
   {
     label: 'Opus->Sonnet',

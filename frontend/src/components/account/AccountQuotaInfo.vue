@@ -116,14 +116,14 @@ const tierBadgeClass = computed(() => {
   if (isGoogleOne.value) {
     // Google One tier 样式
     const tierColorMap: Record<string, string> = {
-      AI_PREMIUM: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+      AI_PREMIUM: 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400',
       GOOGLE_ONE_STANDARD: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
       GOOGLE_ONE_BASIC: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
       FREE: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
       GOOGLE_ONE_UNKNOWN: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
       GOOGLE_ONE_UNLIMITED: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
     }
-    return tierColorMap[creds?.tier_id || ''] || 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+    return tierColorMap[creds?.tier_id || ''] || 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
   }
 
   // AI Studio 默认样式：蓝色

@@ -97,7 +97,7 @@ const labelClass = computed(() => {
   if (props.platform === 'gemini') {
     return `${base} bg-blue-200/60 text-blue-800 dark:bg-blue-800/40 dark:text-blue-300`
   }
-  return `${base} bg-violet-200/60 text-violet-800 dark:bg-violet-800/40 dark:text-violet-300`
+  return `${base} bg-primary-200/60 text-primary-800 dark:bg-primary-800/40 dark:text-primary-300`
 })
 
 // Badge color based on platform and subscription type
@@ -120,7 +120,7 @@ const badgeClass = computed(() => {
   }
   // Fallback: original colors
   return isSubscription.value
-    ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
+    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
     : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
 })
 </script>

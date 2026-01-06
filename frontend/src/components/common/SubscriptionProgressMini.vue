@@ -3,11 +3,11 @@
     <!-- Mini Progress Display -->
     <button
       @click="toggleTooltip"
-      class="flex cursor-pointer items-center gap-2 rounded-xl bg-purple-50 px-3 py-1.5 transition-colors hover:bg-purple-100 dark:bg-purple-900/20 dark:hover:bg-purple-900/30"
+      class="flex cursor-pointer items-center gap-2 rounded-xl bg-primary-50 px-3 py-1.5 transition-colors hover:bg-primary-100 dark:bg-primary-900/20 dark:hover:bg-primary-900/30"
       :title="t('subscriptionProgress.viewDetails')"
     >
       <svg
-        class="h-4 w-4 text-purple-600 dark:text-purple-400"
+        class="h-4 w-4 text-primary-600 dark:text-primary-400"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -29,7 +29,7 @@
             :class="getProgressDotClass(sub)"
           ></div>
         </div>
-        <span class="text-xs font-medium text-purple-700 dark:text-purple-300">
+        <span class="text-xs font-medium text-primary-700 dark:text-primary-300">
           {{ activeSubscriptions.length }}
         </span>
       </div>
@@ -74,7 +74,7 @@
               <!-- Unlimited subscription badge -->
               <div
                 v-if="isUnlimited(subscription)"
-                class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-teal-50 px-2.5 py-1.5 dark:from-emerald-900/20 dark:to-teal-900/20"
+                class="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-50 to-primary-50 px-2.5 py-1.5 dark:from-emerald-900/20 dark:to-primary-900/20"
               >
                 <span class="text-lg text-emerald-600 dark:text-emerald-400">∞</span>
                 <span class="text-xs font-medium text-emerald-700 dark:text-emerald-300">
