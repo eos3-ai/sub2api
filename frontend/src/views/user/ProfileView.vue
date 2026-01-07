@@ -20,7 +20,7 @@
         <StatCard
           class="animate-fade-in-up stagger-3"
           :title="t('profile.memberSince')"
-          :value="formatDate(user?.created_at || '', 'YYYY-MM')"
+          :value="formatDate(user?.created_at || '', { year: 'numeric', month: '2-digit' })"
           :icon="CalendarIcon"
           icon-variant="primary"
         />
