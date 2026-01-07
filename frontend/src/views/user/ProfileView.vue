@@ -4,27 +4,30 @@
       <!-- Account Stats Summary -->
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <StatCard
+          class="animate-fade-in-up stagger-1"
           :title="t('profile.accountBalance')"
           :value="formatCurrency(user?.balance || 0)"
           :icon="WalletIcon"
           icon-variant="success"
         />
         <StatCard
+          class="animate-fade-in-up stagger-2"
           :title="t('profile.concurrencyLimit')"
           :value="user?.concurrency || 0"
           :icon="BoltIcon"
           icon-variant="warning"
         />
         <StatCard
+          class="animate-fade-in-up stagger-3"
           :title="t('profile.memberSince')"
-          :value="formatDate(user?.created_at || '', 'YYYY-MM')"
+          :value="formatDate(user?.created_at || '', { year: 'numeric', month: '2-digit' })"
           :icon="CalendarIcon"
           icon-variant="primary"
         />
       </div>
 
       <!-- User Information -->
-      <div class="card overflow-hidden">
+      <div class="card animate-fade-in-up overflow-hidden stagger-4">
         <div
           class="border-b border-gray-100 bg-gradient-to-r from-primary-500/10 to-primary-600/5 px-6 py-5 dark:border-dark-700 dark:from-primary-500/20 dark:to-primary-600/10"
         >
@@ -96,7 +99,7 @@
       <!-- Contact Support Section -->
       <div
         v-if="contactInfo"
-        class="card border-primary-200 bg-gradient-to-r from-primary-50 to-primary-100/50 dark:border-primary-800/40 dark:from-primary-900/20 dark:to-primary-800/10"
+        class="card animate-fade-in-up border-primary-200 bg-gradient-to-r from-primary-50 to-primary-100/50 stagger-5 dark:border-primary-800/40 dark:from-primary-900/20 dark:to-primary-800/10"
       >
         <div class="px-6 py-5">
           <div class="flex items-center gap-4">
@@ -130,7 +133,7 @@
       </div>
 
       <!-- Edit Profile Section -->
-      <div class="card">
+      <div class="card animate-fade-in-up stagger-6">
         <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
           <h2 class="text-lg font-medium text-gray-900 dark:text-white">
             {{ t('profile.editProfile') }}
@@ -161,7 +164,7 @@
       </div>
 
       <!-- Change Password Section -->
-      <div class="card">
+      <div class="card animate-fade-in-up stagger-1">
         <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
           <h2 class="text-lg font-medium text-gray-900 dark:text-white">
             {{ t('profile.changePassword') }}

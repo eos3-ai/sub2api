@@ -1,3 +1,4 @@
+// Package dto provides data transfer objects for HTTP handlers.
 package dto
 
 import (
@@ -30,11 +31,11 @@ func UserFromService(u *service.User) *User {
 		return nil
 	}
 	out := UserFromServiceShallow(u)
-	if len(u.ApiKeys) > 0 {
-		out.ApiKeys = make([]ApiKey, 0, len(u.ApiKeys))
-		for i := range u.ApiKeys {
-			k := u.ApiKeys[i]
-			out.ApiKeys = append(out.ApiKeys, *ApiKeyFromService(&k))
+	if len(u.APIKeys) > 0 {
+		out.APIKeys = make([]APIKey, 0, len(u.APIKeys))
+		for i := range u.APIKeys {
+			k := u.APIKeys[i]
+			out.APIKeys = append(out.APIKeys, *APIKeyFromService(&k))
 		}
 	}
 	if len(u.Subscriptions) > 0 {
@@ -47,11 +48,11 @@ func UserFromService(u *service.User) *User {
 	return out
 }
 
-func ApiKeyFromService(k *service.ApiKey) *ApiKey {
+func APIKeyFromService(k *service.APIKey) *APIKey {
 	if k == nil {
 		return nil
 	}
-	return &ApiKey{
+	return &APIKey{
 		ID:        k.ID,
 		UserID:    k.UserID,
 		Key:       k.Key,
@@ -81,6 +82,9 @@ func GroupFromServiceShallow(g *service.Group) *Group {
 		DailyLimitUSD:    g.DailyLimitUSD,
 		WeeklyLimitUSD:   g.WeeklyLimitUSD,
 		MonthlyLimitUSD:  g.MonthlyLimitUSD,
+		ImagePrice1K:     g.ImagePrice1K,
+		ImagePrice2K:     g.ImagePrice2K,
+		ImagePrice4K:     g.ImagePrice4K,
 		CreatedAt:        g.CreatedAt,
 		UpdatedAt:        g.UpdatedAt,
 		AccountCount:     g.AccountCount,
@@ -107,28 +111,31 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		return nil
 	}
 	return &Account{
-		ID:                  a.ID,
-		Name:                a.Name,
-		Platform:            a.Platform,
-		Type:                a.Type,
-		Credentials:         a.Credentials,
-		Extra:               a.Extra,
-		ProxyID:             a.ProxyID,
-		Concurrency:         a.Concurrency,
-		Priority:            a.Priority,
-		Status:              a.Status,
-		ErrorMessage:        a.ErrorMessage,
-		LastUsedAt:          a.LastUsedAt,
-		CreatedAt:           a.CreatedAt,
-		UpdatedAt:           a.UpdatedAt,
-		Schedulable:         a.Schedulable,
-		RateLimitedAt:       a.RateLimitedAt,
-		RateLimitResetAt:    a.RateLimitResetAt,
-		OverloadUntil:       a.OverloadUntil,
-		SessionWindowStart:  a.SessionWindowStart,
-		SessionWindowEnd:    a.SessionWindowEnd,
-		SessionWindowStatus: a.SessionWindowStatus,
-		GroupIDs:            a.GroupIDs,
+		ID:                      a.ID,
+		Name:                    a.Name,
+		Notes:                   a.Notes,
+		Platform:                a.Platform,
+		Type:                    a.Type,
+		Credentials:             a.Credentials,
+		Extra:                   a.Extra,
+		ProxyID:                 a.ProxyID,
+		Concurrency:             a.Concurrency,
+		Priority:                a.Priority,
+		Status:                  a.Status,
+		ErrorMessage:            a.ErrorMessage,
+		LastUsedAt:              a.LastUsedAt,
+		CreatedAt:               a.CreatedAt,
+		UpdatedAt:               a.UpdatedAt,
+		Schedulable:             a.Schedulable,
+		RateLimitedAt:           a.RateLimitedAt,
+		RateLimitResetAt:        a.RateLimitResetAt,
+		OverloadUntil:           a.OverloadUntil,
+		TempUnschedulableUntil:  a.TempUnschedulableUntil,
+		TempUnschedulableReason: a.TempUnschedulableReason,
+		SessionWindowStart:      a.SessionWindowStart,
+		SessionWindowEnd:        a.SessionWindowEnd,
+		SessionWindowStatus:     a.SessionWindowStatus,
+		GroupIDs:                a.GroupIDs,
 	}
 }
 
@@ -224,7 +231,7 @@ func UsageLogFromService(l *service.UsageLog) *UsageLog {
 	return &UsageLog{
 		ID:                    l.ID,
 		UserID:                l.UserID,
-		ApiKeyID:              l.ApiKeyID,
+		APIKeyID:              l.APIKeyID,
 		AccountID:             l.AccountID,
 		RequestID:             l.RequestID,
 		Model:                 l.Model,
@@ -247,9 +254,11 @@ func UsageLogFromService(l *service.UsageLog) *UsageLog {
 		Stream:                l.Stream,
 		DurationMs:            l.DurationMs,
 		FirstTokenMs:          l.FirstTokenMs,
+		ImageCount:            l.ImageCount,
+		ImageSize:             l.ImageSize,
 		CreatedAt:             l.CreatedAt,
 		User:                  UserFromServiceShallow(l.User),
-		ApiKey:                ApiKeyFromService(l.ApiKey),
+		APIKey:                APIKeyFromService(l.APIKey),
 		Account:               AccountFromService(l.Account),
 		Group:                 GroupFromServiceShallow(l.Group),
 		Subscription:          UserSubscriptionFromService(l.Subscription),

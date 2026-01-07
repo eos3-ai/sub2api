@@ -15,11 +15,11 @@ type User struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
-	ApiKeys       []ApiKey           `json:"api_keys,omitempty"`
+	APIKeys       []APIKey           `json:"api_keys,omitempty"`
 	Subscriptions []UserSubscription `json:"subscriptions,omitempty"`
 }
 
-type ApiKey struct {
+type APIKey struct {
 	ID        int64     `json:"id"`
 	UserID    int64     `json:"user_id"`
 	Key       string    `json:"key"`
@@ -47,6 +47,11 @@ type Group struct {
 	WeeklyLimitUSD   *float64 `json:"weekly_limit_usd"`
 	MonthlyLimitUSD  *float64 `json:"monthly_limit_usd"`
 
+	// 图片生成计费配置（仅 antigravity 平台使用）
+	ImagePrice1K *float64 `json:"image_price_1k"`
+	ImagePrice2K *float64 `json:"image_price_2k"`
+	ImagePrice4K *float64 `json:"image_price_4k"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -57,6 +62,7 @@ type Group struct {
 type Account struct {
 	ID           int64          `json:"id"`
 	Name         string         `json:"name"`
+	Notes        *string        `json:"notes"`
 	Platform     string         `json:"platform"`
 	Type         string         `json:"type"`
 	Credentials  map[string]any `json:"credentials"`
@@ -75,6 +81,9 @@ type Account struct {
 	RateLimitedAt    *time.Time `json:"rate_limited_at"`
 	RateLimitResetAt *time.Time `json:"rate_limit_reset_at"`
 	OverloadUntil    *time.Time `json:"overload_until"`
+
+	TempUnschedulableUntil  *time.Time `json:"temp_unschedulable_until"`
+	TempUnschedulableReason string     `json:"temp_unschedulable_reason"`
 
 	SessionWindowStart  *time.Time `json:"session_window_start"`
 	SessionWindowEnd    *time.Time `json:"session_window_end"`
@@ -136,7 +145,7 @@ type RedeemCode struct {
 type UsageLog struct {
 	ID        int64  `json:"id"`
 	UserID    int64  `json:"user_id"`
-	ApiKeyID  int64  `json:"api_key_id"`
+	APIKeyID  int64  `json:"api_key_id"`
 	AccountID int64  `json:"account_id"`
 	RequestID string `json:"request_id"`
 	Model     string `json:"model"`
@@ -165,10 +174,14 @@ type UsageLog struct {
 	DurationMs   *int `json:"duration_ms"`
 	FirstTokenMs *int `json:"first_token_ms"`
 
+	// 图片生成字段
+	ImageCount int     `json:"image_count"`
+	ImageSize  *string `json:"image_size"`
+
 	CreatedAt time.Time `json:"created_at"`
 
 	User         *User             `json:"user,omitempty"`
-	ApiKey       *ApiKey           `json:"api_key,omitempty"`
+	APIKey       *APIKey           `json:"api_key,omitempty"`
 	Account      *Account          `json:"account,omitempty"`
 	Group        *Group            `json:"group,omitempty"`
 	Subscription *UserSubscription `json:"subscription,omitempty"`

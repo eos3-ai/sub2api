@@ -1,3 +1,19 @@
+/**
+ * TokenCloud Design System - Global Styles
+ *
+ * 本项目采用 TokenCloud AI 设计规范
+ * 设计系统集中管理在 src/styles/design-tokens.ts
+ *
+ * 核心设计原则：
+ * - 主色调：Burnt Orange/Rust 暖橙红系 (#c44a2c)
+ * - 背景色：暖米色 (#f4f1ea) 营造温暖专业氛围
+ * - 字体：Merriweather 衬线体，优雅易读
+ * - 动画：fadeInUp 淡入上升效果，分层延迟
+ * - 圆角：偏好较大圆角 (12-16px)，柔和友好
+ *
+ * 设计来源: https://ai.tokencloud.ai/
+ */
+
 @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700;900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&display=swap');
 
@@ -72,13 +88,12 @@
   }
 
   .btn-primary {
-    background: linear-gradient(to right, #c44a2c, #a33d24);
-    @apply text-white shadow-md;
+    @apply bg-primary-600 text-white shadow-md;
     box-shadow: 0 4px 6px -1px rgb(196 74 44 / 0.25), 0 2px 4px -2px rgb(196 74 44 / 0.25);
   }
 
   .btn-primary:hover {
-    background: linear-gradient(to right, #a33d24, #873421);
+    @apply bg-primary-700;
     box-shadow: 0 10px 15px -3px rgb(196 74 44 / 0.3), 0 4px 6px -4px rgb(196 74 44 / 0.3);
   }
 
@@ -100,19 +115,22 @@
   }
 
   .btn-danger {
-    @apply bg-gradient-to-r from-red-500 to-red-600;
-    @apply text-white shadow-md shadow-red-500/25;
-    @apply hover:from-red-600 hover:to-red-700 hover:shadow-lg hover:shadow-red-500/30;
+    @apply bg-red-600 text-white shadow-md;
+    box-shadow: 0 4px 6px -1px rgb(239 68 68 / 0.25), 0 2px 4px -2px rgb(239 68 68 / 0.25);
+  }
+
+  .btn-danger:hover {
+    @apply bg-red-700;
+    box-shadow: 0 10px 15px -3px rgb(239 68 68 / 0.3), 0 4px 6px -4px rgb(239 68 68 / 0.3);
   }
 
   .btn-success {
-    background: linear-gradient(to right, #10b981, #059669);
-    @apply text-white shadow-md;
+    @apply bg-emerald-600 text-white shadow-md;
     box-shadow: 0 4px 6px -1px rgb(16 185 129 / 0.25), 0 2px 4px -2px rgb(16 185 129 / 0.25);
   }
 
   .btn-success:hover {
-    background: linear-gradient(to right, #059669, #047857);
+    @apply bg-emerald-700;
     box-shadow: 0 10px 15px -3px rgb(16 185 129 / 0.3), 0 4px 6px -4px rgb(16 185 129 / 0.3);
   }
 
@@ -121,10 +139,13 @@
   }
 
   .btn-warning {
-    @apply bg-gradient-to-r from-amber-500 to-amber-600;
-    @apply text-white shadow-md shadow-amber-500/25;
-    @apply hover:from-amber-600 hover:to-amber-700 hover:shadow-lg hover:shadow-amber-500/30;
-    @apply dark:shadow-amber-500/20;
+    @apply bg-amber-600 text-white shadow-md;
+    box-shadow: 0 4px 6px -1px rgb(245 158 11 / 0.25), 0 2px 4px -2px rgb(245 158 11 / 0.25);
+  }
+
+  .btn-warning:hover {
+    @apply bg-amber-700;
+    box-shadow: 0 10px 15px -3px rgb(245 158 11 / 0.3), 0 4px 6px -4px rgb(245 158 11 / 0.3);
   }
 
   .btn-sm {
@@ -204,11 +225,11 @@
     @apply rounded-2xl;
     @apply border border-gray-100 dark:border-dark-700/50;
     @apply shadow-card;
-    @apply transition-all duration-300;
+    @apply transition-all duration-300 ease-out;
   }
 
   .card-hover {
-    @apply hover:-translate-y-0.5 hover:shadow-card-hover;
+    @apply hover:-translate-y-1 hover:shadow-card-hover;
     @apply hover:border-gray-200 dark:hover:border-dark-600;
   }
 
@@ -217,6 +238,7 @@
     @apply backdrop-blur-xl;
     @apply border border-white/20 dark:border-dark-700/50;
     @apply shadow-glass;
+    @apply transition-all duration-300 ease-out;
   }
 
   .card-header {
@@ -661,8 +683,7 @@
   }
 
   .progress-bar {
-    background: linear-gradient(to right, #c44a2c, #e46a45);
-    @apply h-full;
+    @apply bg-primary-600 h-full;
     @apply transition-all duration-300;
   }
 
@@ -834,5 +855,27 @@
 
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* TokenCloud 分层动画延迟 */
+  /* 基于真实网站提取的递增规律：0.15s、0.3s、0.45s、0.6s */
+  .stagger-1 {
+    animation-delay: 0.15s;
+    animation-fill-mode: both;
+  }
+
+  .stagger-2 {
+    animation-delay: 0.3s;
+    animation-fill-mode: both;
+  }
+
+  .stagger-3 {
+    animation-delay: 0.45s;
+    animation-fill-mode: both;
+  }
+
+  .stagger-4 {
+    animation-delay: 0.6s;
+    animation-fill-mode: both;
   }
 }

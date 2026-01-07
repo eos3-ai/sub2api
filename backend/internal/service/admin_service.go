@@ -21,7 +21,7 @@ type AdminService interface {
 	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
 	DeleteUser(ctx context.Context, id int64) error
 	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
-	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]ApiKey, int64, error)
+	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]APIKey, int64, error)
 	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
 
 	// Group management
@@ -32,7 +32,7 @@ type AdminService interface {
 	CreateGroup(ctx context.Context, input *CreateGroupInput) (*Group, error)
 	UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error)
 	DeleteGroup(ctx context.Context, id int64) error
-	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]ApiKey, int64, error)
+	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error)
 
 	// Account management
 	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string) ([]Account, int64, error)
@@ -99,6 +99,10 @@ type CreateGroupInput struct {
 	DailyLimitUSD    *float64 // 日限额 (USD)
 	WeeklyLimitUSD   *float64 // 周限额 (USD)
 	MonthlyLimitUSD  *float64 // 月限额 (USD)
+	// 图片生成计费配置（仅 antigravity 平台使用）
+	ImagePrice1K *float64
+	ImagePrice2K *float64
+	ImagePrice4K *float64
 }
 
 type UpdateGroupInput struct {
@@ -112,6 +116,10 @@ type UpdateGroupInput struct {
 	DailyLimitUSD    *float64 // 日限额 (USD)
 	WeeklyLimitUSD   *float64 // 周限额 (USD)
 	MonthlyLimitUSD  *float64 // 月限额 (USD)
+	// 图片生成计费配置（仅 antigravity 平台使用）
+	ImagePrice1K *float64
+	ImagePrice2K *float64
+	ImagePrice4K *float64
 }
 
 type CreateAccountInput struct {
@@ -222,7 +230,7 @@ type adminServiceImpl struct {
 	groupRepo           GroupRepository
 	accountRepo         AccountRepository
 	proxyRepo           ProxyRepository
-	apiKeyRepo          ApiKeyRepository
+	apiKeyRepo          APIKeyRepository
 	redeemCodeRepo      RedeemCodeRepository
 	balanceService      *BalanceService
 	billingCacheService *BillingCacheService
@@ -237,7 +245,7 @@ func NewAdminService(
 	groupRepo GroupRepository,
 	accountRepo AccountRepository,
 	proxyRepo ProxyRepository,
-	apiKeyRepo ApiKeyRepository,
+	apiKeyRepo APIKeyRepository,
 	redeemCodeRepo RedeemCodeRepository,
 	balanceService *BalanceService,
 	billingCacheService *BillingCacheService,
@@ -517,7 +525,7 @@ func (s *adminServiceImpl) generateAdminOrderNo(now time.Time) string {
 
 func adminTimePtr(t time.Time) *time.Time { return &t }
 
-func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]ApiKey, int64, error) {
+func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]APIKey, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
 	keys, result, err := s.apiKeyRepo.ListByUserID(ctx, userID, params)
 	if err != nil {
@@ -575,6 +583,11 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	weeklyLimit := normalizeLimit(input.WeeklyLimitUSD)
 	monthlyLimit := normalizeLimit(input.MonthlyLimitUSD)
 
+	// 图片价格：负数表示清除（使用默认价格），0 保留（表示免费）
+	imagePrice1K := normalizePrice(input.ImagePrice1K)
+	imagePrice2K := normalizePrice(input.ImagePrice2K)
+	imagePrice4K := normalizePrice(input.ImagePrice4K)
+
 	group := &Group{
 		Name:             input.Name,
 		Description:      input.Description,
@@ -586,6 +599,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		DailyLimitUSD:    dailyLimit,
 		WeeklyLimitUSD:   weeklyLimit,
 		MonthlyLimitUSD:  monthlyLimit,
+		ImagePrice1K:     imagePrice1K,
+		ImagePrice2K:     imagePrice2K,
+		ImagePrice4K:     imagePrice4K,
 	}
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		return nil, err
@@ -599,6 +615,14 @@ func normalizeLimit(limit *float64) *float64 {
 		return nil
 	}
 	return limit
+}
+
+// normalizePrice 将负数转换为 nil（表示使用默认价格），0 保留（表示免费）
+func normalizePrice(price *float64) *float64 {
+	if price == nil || *price < 0 {
+		return nil
+	}
+	return price
 }
 
 func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *UpdateGroupInput) (*Group, error) {
@@ -640,6 +664,16 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.MonthlyLimitUSD != nil {
 		group.MonthlyLimitUSD = normalizeLimit(input.MonthlyLimitUSD)
 	}
+	// 图片生成计费配置：负数表示清除（使用默认价格）
+	if input.ImagePrice1K != nil {
+		group.ImagePrice1K = normalizePrice(input.ImagePrice1K)
+	}
+	if input.ImagePrice2K != nil {
+		group.ImagePrice2K = normalizePrice(input.ImagePrice2K)
+	}
+	if input.ImagePrice4K != nil {
+		group.ImagePrice4K = normalizePrice(input.ImagePrice4K)
+	}
 
 	if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err
@@ -670,7 +704,7 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]ApiKey, int64, error) {
+func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
 	keys, result, err := s.apiKeyRepo.ListByGroupID(ctx, groupID, params)
 	if err != nil {
@@ -768,7 +802,12 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.Extra = input.Extra
 	}
 	if input.ProxyID != nil {
-		account.ProxyID = input.ProxyID
+		// 0 表示清除代理（前端发送 0 而不是 null 来表达清除意图）
+		if *input.ProxyID == 0 {
+			account.ProxyID = nil
+		} else {
+			account.ProxyID = input.ProxyID
+		}
 		account.Proxy = nil // 清除关联对象，防止 GORM Save 时根据 Proxy.ID 覆盖 ProxyID
 	}
 	// 只在指针非 nil 时更新 Concurrency（支持设置为 0）

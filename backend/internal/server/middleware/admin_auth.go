@@ -1,3 +1,4 @@
+// Package middleware provides HTTP middleware for authentication, authorization, and request processing.
 package middleware
 
 import (
@@ -32,7 +33,7 @@ func adminAuth(
 		// 检查 x-api-key header（Admin API Key 认证）
 		apiKey := c.GetHeader("x-api-key")
 		if apiKey != "" {
-			if !validateAdminApiKey(c, apiKey, settingService, userService) {
+			if !validateAdminAPIKey(c, apiKey, settingService, userService) {
 				return
 			}
 			c.Next()
@@ -57,8 +58,8 @@ func adminAuth(
 	}
 }
 
-// validateAdminApiKey 验证管理员 API Key
-func validateAdminApiKey(
+// validateAdminAPIKey 验证管理员 API Key
+func validateAdminAPIKey(
 	c *gin.Context,
 	key string,
 	settingService *service.SettingService,

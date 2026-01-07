@@ -45,6 +45,12 @@ type Group struct {
 	MonthlyLimitUsd *float64 `json:"monthly_limit_usd,omitempty"`
 	// DefaultValidityDays holds the value of the "default_validity_days" field.
 	DefaultValidityDays int `json:"default_validity_days,omitempty"`
+	// ImagePrice1k holds the value of the "image_price_1k" field.
+	ImagePrice1k *float64 `json:"image_price_1k,omitempty"`
+	// ImagePrice2k holds the value of the "image_price_2k" field.
+	ImagePrice2k *float64 `json:"image_price_2k,omitempty"`
+	// ImagePrice4k holds the value of the "image_price_4k" field.
+	ImagePrice4k *float64 `json:"image_price_4k,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the GroupQuery when eager-loading is set.
 	Edges        GroupEdges `json:"edges"`
@@ -54,7 +60,7 @@ type Group struct {
 // GroupEdges holds the relations/edges for other nodes in the graph.
 type GroupEdges struct {
 	// APIKeys holds the value of the api_keys edge.
-	APIKeys []*ApiKey `json:"api_keys,omitempty"`
+	APIKeys []*APIKey `json:"api_keys,omitempty"`
 	// RedeemCodes holds the value of the redeem_codes edge.
 	RedeemCodes []*RedeemCode `json:"redeem_codes,omitempty"`
 	// Subscriptions holds the value of the subscriptions edge.
@@ -76,7 +82,7 @@ type GroupEdges struct {
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
 // was not loaded in eager-loading.
-func (e GroupEdges) APIKeysOrErr() ([]*ApiKey, error) {
+func (e GroupEdges) APIKeysOrErr() ([]*APIKey, error) {
 	if e.loadedTypes[0] {
 		return e.APIKeys, nil
 	}
@@ -153,7 +159,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldIsExclusive:
 			values[i] = new(sql.NullBool)
-		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd:
+		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k:
 			values[i] = new(sql.NullFloat64)
 		case group.FieldID, group.FieldDefaultValidityDays:
 			values[i] = new(sql.NullInt64)
@@ -271,6 +277,27 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.DefaultValidityDays = int(value.Int64)
 			}
+		case group.FieldImagePrice1k:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field image_price_1k", values[i])
+			} else if value.Valid {
+				_m.ImagePrice1k = new(float64)
+				*_m.ImagePrice1k = value.Float64
+			}
+		case group.FieldImagePrice2k:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field image_price_2k", values[i])
+			} else if value.Valid {
+				_m.ImagePrice2k = new(float64)
+				*_m.ImagePrice2k = value.Float64
+			}
+		case group.FieldImagePrice4k:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field image_price_4k", values[i])
+			} else if value.Valid {
+				_m.ImagePrice4k = new(float64)
+				*_m.ImagePrice4k = value.Float64
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -285,7 +312,7 @@ func (_m *Group) Value(name string) (ent.Value, error) {
 }
 
 // QueryAPIKeys queries the "api_keys" edge of the Group entity.
-func (_m *Group) QueryAPIKeys() *ApiKeyQuery {
+func (_m *Group) QueryAPIKeys() *APIKeyQuery {
 	return NewGroupClient(_m.config).QueryAPIKeys(_m)
 }
 
@@ -398,6 +425,21 @@ func (_m *Group) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("default_validity_days=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DefaultValidityDays))
+	builder.WriteString(", ")
+	if v := _m.ImagePrice1k; v != nil {
+		builder.WriteString("image_price_1k=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ImagePrice2k; v != nil {
+		builder.WriteString("image_price_2k=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ImagePrice4k; v != nil {
+		builder.WriteString("image_price_4k=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -97,6 +97,14 @@ func (UsageLog) Fields() []ent.Field {
 			Optional().
 			Nillable(),
 
+		// 图片生成字段（仅 gemini-3-pro-image 等图片模型使用）
+		field.Int("image_count").
+			Default(0),
+		field.String("image_size").
+			MaxLen(10).
+			Optional().
+			Nillable(),
+
 		// 时间戳（只有 created_at，日志不可修改）
 		field.Time("created_at").
 			Default(time.Now).
@@ -113,7 +121,7 @@ func (UsageLog) Edges() []ent.Edge {
 			Field("user_id").
 			Required().
 			Unique(),
-		edge.From("api_key", ApiKey.Type).
+		edge.From("api_key", APIKey.Type).
 			Ref("usage_logs").
 			Field("api_key_id").
 			Required().

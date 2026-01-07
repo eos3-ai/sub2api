@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -21,7 +22,7 @@ import (
 	"github.com/lib/pq"
 )
 
-const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, billing_type, stream, duration_ms, first_token_ms, created_at"
+const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, billing_type, stream, duration_ms, first_token_ms, image_count, image_size, created_at"
 
 type usageLogRepository struct {
 	client *dbent.Client
@@ -60,15 +61,25 @@ func (r *usageLogRepository) getPerformanceStats(ctx context.Context, userID int
 	return requestCount / 5, tokenCount / 5, nil
 }
 
-func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) error {
+func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) (bool, error) {
 	if log == nil {
-		return nil
+		return false, nil
+	}
+
+	// 在事务上下文中，使用 tx 绑定的 ExecQuerier 执行原生 SQL，保证与其他更新同事务。
+	// 无事务时回退到默认的 *sql.DB 执行器。
+	sqlq := r.sql
+	if tx := dbent.TxFromContext(ctx); tx != nil {
+		sqlq = tx.Client()
 	}
 
 	createdAt := log.CreatedAt
 	if createdAt.IsZero() {
 		createdAt = time.Now()
 	}
+
+	requestID := strings.TrimSpace(log.RequestID)
+	log.RequestID = requestID
 
 	rateMultiplier := log.RateMultiplier
 
@@ -98,6 +109,8 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 			stream,
 			duration_ms,
 			first_token_ms,
+			image_count,
+			image_size,
 			created_at
 		) VALUES (
 			$1, $2, $3, $4, $5,
@@ -105,8 +118,10 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 			$8, $9, $10, $11,
 			$12, $13,
 			$14, $15, $16, $17, $18, $19,
-			$20, $21, $22, $23, $24, $25
+			$20, $21, $22, $23, $24,
+			$25, $26, $27
 		)
+		ON CONFLICT (request_id, api_key_id) DO NOTHING
 		RETURNING id, created_at
 	`
 
@@ -114,12 +129,18 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 	subscriptionID := nullInt64(log.SubscriptionID)
 	duration := nullInt(log.DurationMs)
 	firstToken := nullInt(log.FirstTokenMs)
+	imageSize := nullString(log.ImageSize)
+
+	var requestIDArg any
+	if requestID != "" {
+		requestIDArg = requestID
+	}
 
 	args := []any{
 		log.UserID,
-		log.ApiKeyID,
+		log.APIKeyID,
 		log.AccountID,
-		log.RequestID,
+		requestIDArg,
 		log.Model,
 		groupID,
 		subscriptionID,
@@ -140,13 +161,24 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 		log.Stream,
 		duration,
 		firstToken,
+		log.ImageCount,
+		imageSize,
 		createdAt,
 	}
-	if err := scanSingleRow(ctx, r.sql, query, args, &log.ID, &log.CreatedAt); err != nil {
-		return err
+	if err := scanSingleRow(ctx, sqlq, query, args, &log.ID, &log.CreatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) && requestID != "" {
+			selectQuery := "SELECT id, created_at FROM usage_logs WHERE request_id = $1 AND api_key_id = $2"
+			if err := scanSingleRow(ctx, sqlq, selectQuery, []any{requestID, log.APIKeyID}, &log.ID, &log.CreatedAt); err != nil {
+				return false, err
+			}
+			log.RateMultiplier = rateMultiplier
+			return false, nil
+		} else {
+			return false, err
+		}
 	}
 	log.RateMultiplier = rateMultiplier
-	return nil
+	return true, nil
 }
 
 func (r *usageLogRepository) GetByID(ctx context.Context, id int64) (log *service.UsageLog, err error) {
@@ -183,7 +215,7 @@ func (r *usageLogRepository) ListByUser(ctx context.Context, userID int64, param
 	return r.listUsageLogsWithPagination(ctx, "WHERE user_id = $1", []any{userID}, params)
 }
 
-func (r *usageLogRepository) ListByApiKey(ctx context.Context, apiKeyID int64, params pagination.PaginationParams) ([]service.UsageLog, *pagination.PaginationResult, error) {
+func (r *usageLogRepository) ListByAPIKey(ctx context.Context, apiKeyID int64, params pagination.PaginationParams) ([]service.UsageLog, *pagination.PaginationResult, error) {
 	return r.listUsageLogsWithPagination(ctx, "WHERE api_key_id = $1", []any{apiKeyID}, params)
 }
 
@@ -270,8 +302,8 @@ func (r *usageLogRepository) GetDashboardStats(ctx context.Context) (*DashboardS
 		r.sql,
 		apiKeyStatsQuery,
 		[]any{service.StatusActive},
-		&stats.TotalApiKeys,
-		&stats.ActiveApiKeys,
+		&stats.TotalAPIKeys,
+		&stats.ActiveAPIKeys,
 	); err != nil {
 		return nil, err
 	}
@@ -418,8 +450,8 @@ func (r *usageLogRepository) GetUserStatsAggregated(ctx context.Context, userID 
 	return &stats, nil
 }
 
-// GetApiKeyStatsAggregated returns aggregated usage statistics for an API key using database-level aggregation
-func (r *usageLogRepository) GetApiKeyStatsAggregated(ctx context.Context, apiKeyID int64, startTime, endTime time.Time) (*usagestats.UsageStats, error) {
+// GetAPIKeyStatsAggregated returns aggregated usage statistics for an API key using database-level aggregation
+func (r *usageLogRepository) GetAPIKeyStatsAggregated(ctx context.Context, apiKeyID int64, startTime, endTime time.Time) (*usagestats.UsageStats, error) {
 	query := `
 		SELECT
 			COUNT(*) as total_requests,
@@ -623,7 +655,7 @@ func resolveUsageStatsTimezone() string {
 	return "UTC"
 }
 
-func (r *usageLogRepository) ListByApiKeyAndTimeRange(ctx context.Context, apiKeyID int64, startTime, endTime time.Time) ([]service.UsageLog, *pagination.PaginationResult, error) {
+func (r *usageLogRepository) ListByAPIKeyAndTimeRange(ctx context.Context, apiKeyID int64, startTime, endTime time.Time) ([]service.UsageLog, *pagination.PaginationResult, error) {
 	query := "SELECT " + usageLogSelectColumns + " FROM usage_logs WHERE api_key_id = $1 AND created_at >= $2 AND created_at < $3 ORDER BY id DESC"
 	logs, err := r.queryUsageLogs(ctx, query, apiKeyID, startTime, endTime)
 	return logs, nil, err
@@ -709,11 +741,11 @@ type ModelStat = usagestats.ModelStat
 // UserUsageTrendPoint represents user usage trend data point
 type UserUsageTrendPoint = usagestats.UserUsageTrendPoint
 
-// ApiKeyUsageTrendPoint represents API key usage trend data point
-type ApiKeyUsageTrendPoint = usagestats.ApiKeyUsageTrendPoint
+// APIKeyUsageTrendPoint represents API key usage trend data point
+type APIKeyUsageTrendPoint = usagestats.APIKeyUsageTrendPoint
 
-// GetApiKeyUsageTrend returns usage trend data grouped by API key and date
-func (r *usageLogRepository) GetApiKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) (results []ApiKeyUsageTrendPoint, err error) {
+// GetAPIKeyUsageTrend returns usage trend data grouped by API key and date
+func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) (results []APIKeyUsageTrendPoint, err error) {
 	dateFormat := "YYYY-MM-DD"
 	if granularity == "hour" {
 		dateFormat = "YYYY-MM-DD HH24:00"
@@ -755,10 +787,10 @@ func (r *usageLogRepository) GetApiKeyUsageTrend(ctx context.Context, startTime,
 		}
 	}()
 
-	results = make([]ApiKeyUsageTrendPoint, 0)
+	results = make([]APIKeyUsageTrendPoint, 0)
 	for rows.Next() {
-		var row ApiKeyUsageTrendPoint
-		if err = rows.Scan(&row.Date, &row.ApiKeyID, &row.KeyName, &row.Requests, &row.Tokens); err != nil {
+		var row APIKeyUsageTrendPoint
+		if err = rows.Scan(&row.Date, &row.APIKeyID, &row.KeyName, &row.Requests, &row.Tokens); err != nil {
 			return nil, err
 		}
 		results = append(results, row)
@@ -844,7 +876,7 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 		r.sql,
 		"SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND deleted_at IS NULL",
 		[]any{userID},
-		&stats.TotalApiKeys,
+		&stats.TotalAPIKeys,
 	); err != nil {
 		return nil, err
 	}
@@ -853,7 +885,7 @@ func (r *usageLogRepository) GetUserDashboardStats(ctx context.Context, userID i
 		r.sql,
 		"SELECT COUNT(*) FROM api_keys WHERE user_id = $1 AND status = $2 AND deleted_at IS NULL",
 		[]any{userID, service.StatusActive},
-		&stats.ActiveApiKeys,
+		&stats.ActiveAPIKeys,
 	); err != nil {
 		return nil, err
 	}
@@ -1023,9 +1055,9 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		conditions = append(conditions, fmt.Sprintf("user_id = $%d", len(args)+1))
 		args = append(args, filters.UserID)
 	}
-	if filters.ApiKeyID > 0 {
+	if filters.APIKeyID > 0 {
 		conditions = append(conditions, fmt.Sprintf("api_key_id = $%d", len(args)+1))
-		args = append(args, filters.ApiKeyID)
+		args = append(args, filters.APIKeyID)
 	}
 	if filters.AccountID > 0 {
 		conditions = append(conditions, fmt.Sprintf("account_id = $%d", len(args)+1))
@@ -1145,18 +1177,18 @@ func (r *usageLogRepository) GetBatchUserUsageStats(ctx context.Context, userIDs
 	return result, nil
 }
 
-// BatchApiKeyUsageStats represents usage stats for a single API key
-type BatchApiKeyUsageStats = usagestats.BatchApiKeyUsageStats
+// BatchAPIKeyUsageStats represents usage stats for a single API key
+type BatchAPIKeyUsageStats = usagestats.BatchAPIKeyUsageStats
 
-// GetBatchApiKeyUsageStats gets today and total actual_cost for multiple API keys
-func (r *usageLogRepository) GetBatchApiKeyUsageStats(ctx context.Context, apiKeyIDs []int64) (map[int64]*BatchApiKeyUsageStats, error) {
-	result := make(map[int64]*BatchApiKeyUsageStats)
+// GetBatchAPIKeyUsageStats gets today and total actual_cost for multiple API keys
+func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKeyIDs []int64) (map[int64]*BatchAPIKeyUsageStats, error) {
+	result := make(map[int64]*BatchAPIKeyUsageStats)
 	if len(apiKeyIDs) == 0 {
 		return result, nil
 	}
 
 	for _, id := range apiKeyIDs {
-		result[id] = &BatchApiKeyUsageStats{ApiKeyID: id}
+		result[id] = &BatchAPIKeyUsageStats{APIKeyID: id}
 	}
 
 	query := `
@@ -1342,6 +1374,81 @@ func (r *usageLogRepository) GetGlobalStats(ctx context.Context, startTime, endT
 		r.sql,
 		query,
 		[]any{startTime, endTime},
+		&stats.TotalRequests,
+		&stats.TotalInputTokens,
+		&stats.TotalOutputTokens,
+		&stats.TotalCacheTokens,
+		&stats.TotalCost,
+		&stats.TotalActualCost,
+		&stats.AverageDurationMs,
+	); err != nil {
+		return nil, err
+	}
+	stats.TotalTokens = stats.TotalInputTokens + stats.TotalOutputTokens + stats.TotalCacheTokens
+	return stats, nil
+}
+
+// GetStatsWithFilters gets usage statistics with optional filters
+func (r *usageLogRepository) GetStatsWithFilters(ctx context.Context, filters UsageLogFilters) (*UsageStats, error) {
+	conditions := make([]string, 0, 9)
+	args := make([]any, 0, 9)
+
+	if filters.UserID > 0 {
+		conditions = append(conditions, fmt.Sprintf("user_id = $%d", len(args)+1))
+		args = append(args, filters.UserID)
+	}
+	if filters.APIKeyID > 0 {
+		conditions = append(conditions, fmt.Sprintf("api_key_id = $%d", len(args)+1))
+		args = append(args, filters.APIKeyID)
+	}
+	if filters.AccountID > 0 {
+		conditions = append(conditions, fmt.Sprintf("account_id = $%d", len(args)+1))
+		args = append(args, filters.AccountID)
+	}
+	if filters.GroupID > 0 {
+		conditions = append(conditions, fmt.Sprintf("group_id = $%d", len(args)+1))
+		args = append(args, filters.GroupID)
+	}
+	if filters.Model != "" {
+		conditions = append(conditions, fmt.Sprintf("model = $%d", len(args)+1))
+		args = append(args, filters.Model)
+	}
+	if filters.Stream != nil {
+		conditions = append(conditions, fmt.Sprintf("stream = $%d", len(args)+1))
+		args = append(args, *filters.Stream)
+	}
+	if filters.BillingType != nil {
+		conditions = append(conditions, fmt.Sprintf("billing_type = $%d", len(args)+1))
+		args = append(args, int16(*filters.BillingType))
+	}
+	if filters.StartTime != nil {
+		conditions = append(conditions, fmt.Sprintf("created_at >= $%d", len(args)+1))
+		args = append(args, *filters.StartTime)
+	}
+	if filters.EndTime != nil {
+		conditions = append(conditions, fmt.Sprintf("created_at <= $%d", len(args)+1))
+		args = append(args, *filters.EndTime)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT
+			COUNT(*) as total_requests,
+			COALESCE(SUM(input_tokens), 0) as total_input_tokens,
+			COALESCE(SUM(output_tokens), 0) as total_output_tokens,
+			COALESCE(SUM(cache_creation_tokens + cache_read_tokens), 0) as total_cache_tokens,
+			COALESCE(SUM(total_cost), 0) as total_cost,
+			COALESCE(SUM(actual_cost), 0) as total_actual_cost,
+			COALESCE(AVG(duration_ms), 0) as avg_duration_ms
+		FROM usage_logs
+		%s
+	`, buildWhere(conditions))
+
+	stats := &UsageStats{}
+	if err := scanSingleRow(
+		ctx,
+		r.sql,
+		query,
+		args,
 		&stats.TotalRequests,
 		&stats.TotalInputTokens,
 		&stats.TotalOutputTokens,
@@ -1582,7 +1689,7 @@ func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, lo
 	if err != nil {
 		return err
 	}
-	apiKeys, err := r.loadApiKeys(ctx, ids.apiKeyIDs)
+	apiKeys, err := r.loadAPIKeys(ctx, ids.apiKeyIDs)
 	if err != nil {
 		return err
 	}
@@ -1603,8 +1710,8 @@ func (r *usageLogRepository) hydrateUsageLogAssociations(ctx context.Context, lo
 		if user, ok := users[logs[i].UserID]; ok {
 			logs[i].User = user
 		}
-		if key, ok := apiKeys[logs[i].ApiKeyID]; ok {
-			logs[i].ApiKey = key
+		if key, ok := apiKeys[logs[i].APIKeyID]; ok {
+			logs[i].APIKey = key
 		}
 		if acc, ok := accounts[logs[i].AccountID]; ok {
 			logs[i].Account = acc
@@ -1642,7 +1749,7 @@ func collectUsageLogIDs(logs []service.UsageLog) usageLogIDs {
 
 	for i := range logs {
 		userIDs[logs[i].UserID] = struct{}{}
-		apiKeyIDs[logs[i].ApiKeyID] = struct{}{}
+		apiKeyIDs[logs[i].APIKeyID] = struct{}{}
 		accountIDs[logs[i].AccountID] = struct{}{}
 		if logs[i].GroupID != nil {
 			groupIDs[*logs[i].GroupID] = struct{}{}
@@ -1676,12 +1783,12 @@ func (r *usageLogRepository) loadUsers(ctx context.Context, ids []int64) (map[in
 	return out, nil
 }
 
-func (r *usageLogRepository) loadApiKeys(ctx context.Context, ids []int64) (map[int64]*service.ApiKey, error) {
-	out := make(map[int64]*service.ApiKey)
+func (r *usageLogRepository) loadAPIKeys(ctx context.Context, ids []int64) (map[int64]*service.APIKey, error) {
+	out := make(map[int64]*service.APIKey)
 	if len(ids) == 0 {
 		return out, nil
 	}
-	models, err := r.client.ApiKey.Query().Where(dbapikey.IDIn(ids...)).All(ctx)
+	models, err := r.client.APIKey.Query().Where(dbapikey.IDIn(ids...)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1763,6 +1870,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		stream              bool
 		durationMs          sql.NullInt64
 		firstTokenMs        sql.NullInt64
+		imageCount          int
+		imageSize           sql.NullString
 		createdAt           time.Time
 	)
 
@@ -1792,6 +1901,8 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		&stream,
 		&durationMs,
 		&firstTokenMs,
+		&imageCount,
+		&imageSize,
 		&createdAt,
 	); err != nil {
 		return nil, err
@@ -1800,7 +1911,7 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 	log := &service.UsageLog{
 		ID:                    id,
 		UserID:                userID,
-		ApiKeyID:              apiKeyID,
+		APIKeyID:              apiKeyID,
 		AccountID:             accountID,
 		Model:                 model,
 		InputTokens:           inputTokens,
@@ -1818,6 +1929,7 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 		RateMultiplier:        rateMultiplier,
 		BillingType:           int8(billingType),
 		Stream:                stream,
+		ImageCount:            imageCount,
 		CreatedAt:             createdAt,
 	}
 
@@ -1839,6 +1951,9 @@ func scanUsageLog(scanner interface{ Scan(...any) error }) (*service.UsageLog, e
 	if firstTokenMs.Valid {
 		value := int(firstTokenMs.Int64)
 		log.FirstTokenMs = &value
+	}
+	if imageSize.Valid {
+		log.ImageSize = &imageSize.String
 	}
 
 	return log, nil
@@ -1910,6 +2025,13 @@ func nullInt(v *int) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: int64(*v), Valid: true}
+}
+
+func nullString(v *string) sql.NullString {
+	if v == nil || *v == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: *v, Valid: true}
 }
 
 func setToSlice(set map[int64]struct{}) []int64 {

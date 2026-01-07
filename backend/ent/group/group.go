@@ -43,6 +43,12 @@ const (
 	FieldMonthlyLimitUsd = "monthly_limit_usd"
 	// FieldDefaultValidityDays holds the string denoting the default_validity_days field in the database.
 	FieldDefaultValidityDays = "default_validity_days"
+	// FieldImagePrice1k holds the string denoting the image_price_1k field in the database.
+	FieldImagePrice1k = "image_price_1k"
+	// FieldImagePrice2k holds the string denoting the image_price_2k field in the database.
+	FieldImagePrice2k = "image_price_2k"
+	// FieldImagePrice4k holds the string denoting the image_price_4k field in the database.
+	FieldImagePrice4k = "image_price_4k"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -63,7 +69,7 @@ const (
 	Table = "groups"
 	// APIKeysTable is the table that holds the api_keys relation/edge.
 	APIKeysTable = "api_keys"
-	// APIKeysInverseTable is the table name for the ApiKey entity.
+	// APIKeysInverseTable is the table name for the APIKey entity.
 	// It exists in this package in order to avoid circular dependency with the "apikey" package.
 	APIKeysInverseTable = "api_keys"
 	// APIKeysColumn is the table column denoting the api_keys relation/edge.
@@ -132,6 +138,9 @@ var Columns = []string{
 	FieldWeeklyLimitUsd,
 	FieldMonthlyLimitUsd,
 	FieldDefaultValidityDays,
+	FieldImagePrice1k,
+	FieldImagePrice2k,
+	FieldImagePrice4k,
 }
 
 var (
@@ -265,6 +274,21 @@ func ByMonthlyLimitUsd(opts ...sql.OrderTermOption) OrderOption {
 // ByDefaultValidityDays orders the results by the default_validity_days field.
 func ByDefaultValidityDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultValidityDays, opts...).ToFunc()
+}
+
+// ByImagePrice1k orders the results by the image_price_1k field.
+func ByImagePrice1k(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImagePrice1k, opts...).ToFunc()
+}
+
+// ByImagePrice2k orders the results by the image_price_2k field.
+func ByImagePrice2k(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImagePrice2k, opts...).ToFunc()
+}
+
+// ByImagePrice4k orders the results by the image_price_4k field.
+func ByImagePrice4k(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImagePrice4k, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

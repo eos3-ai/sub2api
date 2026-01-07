@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 	"log"
+	mathrand "math/rand"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,10 +23,27 @@ import (
 
 const (
 	antigravityStickySessionTTL = time.Hour
-	antigravityMaxRetries       = 5
+	antigravityMaxRetries       = 3
 	antigravityRetryBaseDelay   = 1 * time.Second
 	antigravityRetryMaxDelay    = 16 * time.Second
+	defaultMaxLineSize          = 10 * 1024 * 1024 // 10MB
 )
+
+// getSessionID 从 gin.Context 获取 session_id（用于日志追踪）
+func getSessionID(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	return c.GetHeader("session_id")
+}
+
+// logPrefix 生成统一的日志前缀
+func logPrefix(sessionID, accountName string) string {
+	if sessionID != "" {
+		return fmt.Sprintf("[antigravity-Forward] session=%s account=%s", sessionID, accountName)
+	}
+	return fmt.Sprintf("[antigravity-Forward] account=%s", accountName)
+}
 
 // Antigravity 直接支持的模型（精确匹配透传）
 var antigravitySupportedModels = map[string]bool{
@@ -46,10 +66,11 @@ var antigravityPrefixMapping = []struct {
 	target string
 }{
 	// 长前缀优先
-	{"gemini-3-pro-image", "gemini-3-pro-image"}, // gemini-3-pro-image-preview 等
-	{"claude-3-5-sonnet", "claude-sonnet-4-5"},   // 旧版 claude-3-5-sonnet-xxx
-	{"claude-sonnet-4-5", "claude-sonnet-4-5"},   // claude-sonnet-4-5-xxx
-	{"claude-haiku-4-5", "claude-sonnet-4-5"},    // claude-haiku-4-5-xxx → sonnet
+	{"gemini-2.5-flash-image", "gemini-3-pro-image"}, // gemini-2.5-flash-image → 3-pro-image
+	{"gemini-3-pro-image", "gemini-3-pro-image"},     // gemini-3-pro-image-preview 等
+	{"claude-3-5-sonnet", "claude-sonnet-4-5"},       // 旧版 claude-3-5-sonnet-xxx
+	{"claude-sonnet-4-5", "claude-sonnet-4-5"},       // claude-sonnet-4-5-xxx
+	{"claude-haiku-4-5", "claude-sonnet-4-5"},        // claude-haiku-4-5-xxx → sonnet
 	{"claude-opus-4-5", "claude-opus-4-5-thinking"},
 	{"claude-3-haiku", "claude-sonnet-4-5"}, // 旧版 claude-3-haiku-xxx → sonnet
 	{"claude-sonnet-4", "claude-sonnet-4-5"},
@@ -64,6 +85,7 @@ type AntigravityGatewayService struct {
 	tokenProvider    *AntigravityTokenProvider
 	rateLimitService *RateLimitService
 	httpUpstream     HTTPUpstream
+	cfg              *config.Config
 }
 
 func NewAntigravityGatewayService(
@@ -72,12 +94,14 @@ func NewAntigravityGatewayService(
 	tokenProvider *AntigravityTokenProvider,
 	rateLimitService *RateLimitService,
 	httpUpstream HTTPUpstream,
+	cfg *config.Config,
 ) *AntigravityGatewayService {
 	return &AntigravityGatewayService{
 		accountRepo:      accountRepo,
 		tokenProvider:    tokenProvider,
 		rateLimitService: rateLimitService,
 		httpUpstream:     httpUpstream,
+		cfg:              cfg,
 	}
 }
 
@@ -307,9 +331,79 @@ func (s *AntigravityGatewayService) unwrapV1InternalResponse(body []byte) ([]byt
 	return body, nil
 }
 
+// isSignatureRelatedError 检测是否为 signature 相关的 400 错误
+func isSignatureRelatedError(statusCode int, body []byte) bool {
+	if statusCode != 400 {
+		return false
+	}
+
+	bodyStr := strings.ToLower(string(body))
+	keywords := []string{
+		"signature",
+		"thought_signature",
+		"thoughtsignature",
+		"thinking",
+		"invalid signature",
+		"signature validation",
+	}
+
+	for _, keyword := range keywords {
+		if strings.Contains(bodyStr, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// stripThinkingFromClaudeRequest 从 Claude 请求中移除所有 thinking 相关内容
+func stripThinkingFromClaudeRequest(req *antigravity.ClaudeRequest) *antigravity.ClaudeRequest {
+	// 创建副本
+	stripped := *req
+
+	// 移除 thinking 配置
+	stripped.Thinking = nil
+
+	// 移除消息中的 thinking 块
+	if len(stripped.Messages) > 0 {
+		newMessages := make([]antigravity.ClaudeMessage, 0, len(stripped.Messages))
+		for _, msg := range stripped.Messages {
+			newMsg := msg
+
+			// 如果 content 是数组，过滤 thinking 块
+			var blocks []map[string]any
+			if err := json.Unmarshal(msg.Content, &blocks); err == nil {
+				filtered := make([]map[string]any, 0, len(blocks))
+				for _, block := range blocks {
+					// 跳过有 type="thinking" 的块
+					if blockType, ok := block["type"].(string); ok && blockType == "thinking" {
+						continue
+					}
+					// 跳过没有 type 但有 thinking 字段的块（untyped thinking blocks）
+					if _, hasType := block["type"]; !hasType {
+						if _, hasThinking := block["thinking"]; hasThinking {
+							continue
+						}
+					}
+					filtered = append(filtered, block)
+				}
+				if newContent, err := json.Marshal(filtered); err == nil {
+					newMsg.Content = newContent
+				}
+			}
+
+			newMessages = append(newMessages, newMsg)
+		}
+		stripped.Messages = newMessages
+	}
+
+	return &stripped
+}
+
 // Forward 转发 Claude 协议请求（Claude → Gemini 转换）
 func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context, account *Account, body []byte) (*ForwardResult, error) {
 	startTime := time.Now()
+	sessionID := getSessionID(c)
+	prefix := logPrefix(sessionID, account.Name)
 
 	// 解析 Claude 请求
 	var claudeReq antigravity.ClaudeRequest
@@ -356,6 +450,14 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	// 重试循环
 	var resp *http.Response
 	for attempt := 1; attempt <= antigravityMaxRetries; attempt++ {
+		// 检查 context 是否已取消（客户端断开连接）
+		select {
+		case <-ctx.Done():
+			log.Printf("%s status=context_canceled error=%v", prefix, ctx.Err())
+			return nil, ctx.Err()
+		default:
+		}
+
 		upstreamReq, err := antigravity.NewAPIRequest(ctx, action, accessToken, geminiBody)
 		if err != nil {
 			return nil, err
@@ -364,10 +466,14 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
-				log.Printf("Antigravity account %d: upstream request failed, retry %d/%d: %v", account.ID, attempt, antigravityMaxRetries, err)
-				sleepAntigravityBackoff(attempt)
+				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
+				if !sleepAntigravityBackoffWithContext(ctx, attempt) {
+					log.Printf("%s status=context_canceled_during_backoff", prefix)
+					return nil, ctx.Err()
+				}
 				continue
 			}
+			log.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
 			return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Upstream request failed after retries")
 		}
 
@@ -376,13 +482,16 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 			_ = resp.Body.Close()
 
 			if attempt < antigravityMaxRetries {
-				log.Printf("Antigravity account %d: upstream status %d, retry %d/%d", account.ID, resp.StatusCode, attempt, antigravityMaxRetries)
-				sleepAntigravityBackoff(attempt)
+				log.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
+				if !sleepAntigravityBackoffWithContext(ctx, attempt) {
+					log.Printf("%s status=context_canceled_during_backoff", prefix)
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			// 所有重试都失败，标记限流状态
 			if resp.StatusCode == 429 {
-				s.handleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+				s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody)
 			}
 			// 最后一次尝试也失败
 			resp = &http.Response{
@@ -400,13 +509,72 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	// 处理错误响应
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-		s.handleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+		s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody)
 
-		if s.shouldFailoverUpstreamError(resp.StatusCode) {
-			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+		// Auto 模式：检测 signature 错误并自动降级重试
+		if isSignatureRelatedError(resp.StatusCode, respBody) && claudeReq.Thinking != nil {
+			log.Printf("[Antigravity] Detected signature-related error, retrying without thinking blocks (account: %s, model: %s)", account.Name, mappedModel)
+
+			// 关闭原始响应，释放连接（respBody 已读取到内存）
+			_ = resp.Body.Close()
+
+			// 移除 thinking 块并重试一次
+			strippedReq := stripThinkingFromClaudeRequest(&claudeReq)
+			strippedBody, err := antigravity.TransformClaudeToGemini(strippedReq, projectID, mappedModel)
+			if err != nil {
+				log.Printf("[Antigravity] Failed to transform stripped request: %v", err)
+				// 降级失败，返回原始错误
+				if s.shouldFailoverUpstreamError(resp.StatusCode) {
+					return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+				}
+				return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+			}
+
+			// 发送降级请求
+			retryReq, err := antigravity.NewAPIRequest(ctx, action, accessToken, strippedBody)
+			if err != nil {
+				log.Printf("[Antigravity] Failed to create retry request: %v", err)
+				if s.shouldFailoverUpstreamError(resp.StatusCode) {
+					return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+				}
+				return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+			}
+
+			retryResp, err := s.httpUpstream.Do(retryReq, proxyURL, account.ID, account.Concurrency)
+			if err != nil {
+				log.Printf("[Antigravity] Retry request failed: %v", err)
+				if s.shouldFailoverUpstreamError(resp.StatusCode) {
+					return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+				}
+				return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+			}
+
+			// 如果重试成功，使用重试的响应（不要 return，让后面的代码处理响应）
+			if retryResp.StatusCode < 400 {
+				log.Printf("[Antigravity] Retry succeeded after stripping thinking blocks (account: %s, model: %s)", account.Name, mappedModel)
+				resp = retryResp
+			} else {
+				// 重试也失败，返回重试的错误
+				retryRespBody, _ := io.ReadAll(io.LimitReader(retryResp.Body, 2<<20))
+				_ = retryResp.Body.Close()
+				log.Printf("[Antigravity] Retry also failed with status %d: %s", retryResp.StatusCode, string(retryRespBody))
+				s.handleUpstreamError(ctx, "Antigravity", account, retryResp.StatusCode, retryResp.Header, retryRespBody)
+
+				if s.shouldFailoverUpstreamError(retryResp.StatusCode) {
+					return nil, &UpstreamFailoverError{StatusCode: retryResp.StatusCode}
+				}
+				return nil, s.writeMappedClaudeError(c, retryResp.StatusCode, retryRespBody)
+			}
 		}
 
-		return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+		// 不是 signature 错误，或者已经没有 thinking 块，直接返回错误
+		if resp.StatusCode >= 400 {
+			if s.shouldFailoverUpstreamError(resp.StatusCode) {
+				return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
+			}
+
+			return nil, s.writeMappedClaudeError(c, resp.StatusCode, respBody)
+		}
 	}
 
 	requestID := resp.Header.Get("x-request-id")
@@ -419,6 +587,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 	if claudeReq.Stream {
 		streamRes, err := s.handleClaudeStreamingResponse(c, resp, startTime, originalModel)
 		if err != nil {
+			log.Printf("%s status=stream_error error=%v", prefix, err)
 			return nil, err
 		}
 		usage = streamRes.usage
@@ -443,6 +612,8 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 // ForwardGemini 转发 Gemini 协议请求
 func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Context, account *Account, originalModel string, action string, stream bool, body []byte) (*ForwardResult, error) {
 	startTime := time.Now()
+	sessionID := getSessionID(c)
+	prefix := logPrefix(sessionID, account.Name)
 
 	if strings.TrimSpace(originalModel) == "" {
 		return nil, s.writeGoogleError(c, http.StatusBadRequest, "Missing model in URL")
@@ -453,6 +624,9 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	if len(body) == 0 {
 		return nil, s.writeGoogleError(c, http.StatusBadRequest, "Request body is empty")
 	}
+
+	// 解析请求以获取 image_size（用于图片计费）
+	imageSize := s.extractImageSize(body)
 
 	switch action {
 	case "generateContent", "streamGenerateContent":
@@ -510,6 +684,14 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	// 重试循环
 	var resp *http.Response
 	for attempt := 1; attempt <= antigravityMaxRetries; attempt++ {
+		// 检查 context 是否已取消（客户端断开连接）
+		select {
+		case <-ctx.Done():
+			log.Printf("%s status=context_canceled error=%v", prefix, ctx.Err())
+			return nil, ctx.Err()
+		default:
+		}
+
 		upstreamReq, err := antigravity.NewAPIRequest(ctx, upstreamAction, accessToken, wrappedBody)
 		if err != nil {
 			return nil, err
@@ -518,10 +700,14 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		resp, err = s.httpUpstream.Do(upstreamReq, proxyURL, account.ID, account.Concurrency)
 		if err != nil {
 			if attempt < antigravityMaxRetries {
-				log.Printf("Antigravity account %d: upstream request failed, retry %d/%d: %v", account.ID, attempt, antigravityMaxRetries, err)
-				sleepAntigravityBackoff(attempt)
+				log.Printf("%s status=request_failed retry=%d/%d error=%v", prefix, attempt, antigravityMaxRetries, err)
+				if !sleepAntigravityBackoffWithContext(ctx, attempt) {
+					log.Printf("%s status=context_canceled_during_backoff", prefix)
+					return nil, ctx.Err()
+				}
 				continue
 			}
+			log.Printf("%s status=request_failed retries_exhausted error=%v", prefix, err)
 			return nil, s.writeGoogleError(c, http.StatusBadGateway, "Upstream request failed after retries")
 		}
 
@@ -530,13 +716,16 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 			_ = resp.Body.Close()
 
 			if attempt < antigravityMaxRetries {
-				log.Printf("Antigravity account %d: upstream status %d, retry %d/%d", account.ID, resp.StatusCode, attempt, antigravityMaxRetries)
-				sleepAntigravityBackoff(attempt)
+				log.Printf("%s status=%d retry=%d/%d", prefix, resp.StatusCode, attempt, antigravityMaxRetries)
+				if !sleepAntigravityBackoffWithContext(ctx, attempt) {
+					log.Printf("%s status=context_canceled_during_backoff", prefix)
+					return nil, ctx.Err()
+				}
 				continue
 			}
 			// 所有重试都失败，标记限流状态
 			if resp.StatusCode == 429 {
-				s.handleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+				s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody)
 			}
 			resp = &http.Response{
 				StatusCode: resp.StatusCode,
@@ -558,7 +747,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	// 处理错误响应
 	if resp.StatusCode >= 400 {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-		s.handleUpstreamError(ctx, account, resp.StatusCode, resp.Header, respBody)
+		s.handleUpstreamError(ctx, prefix, account, resp.StatusCode, resp.Header, respBody)
 
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			return nil, &UpstreamFailoverError{StatusCode: resp.StatusCode}
@@ -580,6 +769,7 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 	if stream || upstreamAction == "streamGenerateContent" {
 		streamRes, err := s.handleGeminiStreamingResponse(c, resp, startTime)
 		if err != nil {
+			log.Printf("%s status=stream_error error=%v", prefix, err)
 			return nil, err
 		}
 		usage = streamRes.usage
@@ -596,6 +786,13 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		usage = &ClaudeUsage{}
 	}
 
+	// 判断是否为图片生成模型
+	imageCount := 0
+	if isImageGenerationModel(mappedModel) {
+		// Gemini 图片生成 API 每次请求只生成一张图片（API 限制）
+		imageCount = 1
+	}
+
 	return &ForwardResult{
 		RequestID:    requestID,
 		Usage:        *usage,
@@ -603,6 +800,8 @@ func (s *AntigravityGatewayService) ForwardGemini(ctx context.Context, c *gin.Co
 		Stream:       stream,
 		Duration:     time.Since(startTime),
 		FirstTokenMs: firstTokenMs,
+		ImageCount:   imageCount,
+		ImageSize:    imageSize,
 	}, nil
 }
 
@@ -624,11 +823,31 @@ func (s *AntigravityGatewayService) shouldFailoverUpstreamError(statusCode int) 
 	}
 }
 
-func sleepAntigravityBackoff(attempt int) {
-	sleepGeminiBackoff(attempt) // 复用 Gemini 的退避逻辑
+// sleepAntigravityBackoffWithContext 带 context 取消检查的退避等待
+// 返回 true 表示正常完成等待，false 表示 context 已取消
+func sleepAntigravityBackoffWithContext(ctx context.Context, attempt int) bool {
+	delay := geminiRetryBaseDelay * time.Duration(1<<uint(attempt-1))
+	if delay > geminiRetryMaxDelay {
+		delay = geminiRetryMaxDelay
+	}
+
+	// +/- 20% jitter
+	r := mathrand.New(mathrand.NewSource(time.Now().UnixNano()))
+	jitter := time.Duration(float64(delay) * 0.2 * (r.Float64()*2 - 1))
+	sleepFor := delay + jitter
+	if sleepFor < 0 {
+		sleepFor = 0
+	}
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(sleepFor):
+		return true
+	}
 }
 
-func (s *AntigravityGatewayService) handleUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, body []byte) {
+func (s *AntigravityGatewayService) handleUpstreamError(ctx context.Context, prefix string, account *Account, statusCode int, headers http.Header, body []byte) {
 	// 429 使用 Gemini 格式解析（从 body 解析重置时间）
 	if statusCode == 429 {
 		resetAt := ParseGeminiRateLimitResetTime(body)
@@ -639,17 +858,23 @@ func (s *AntigravityGatewayService) handleUpstreamError(ctx context.Context, acc
 				defaultDur = 5 * time.Minute
 			}
 			ra := time.Now().Add(defaultDur)
+			log.Printf("%s status=429 rate_limited reset_in=%v (fallback)", prefix, defaultDur)
 			_ = s.accountRepo.SetRateLimited(ctx, account.ID, ra)
 			return
 		}
-		_ = s.accountRepo.SetRateLimited(ctx, account.ID, time.Unix(*resetAt, 0))
+		resetTime := time.Unix(*resetAt, 0)
+		log.Printf("%s status=429 rate_limited reset_at=%v reset_in=%v", prefix, resetTime.Format("15:04:05"), time.Until(resetTime).Truncate(time.Second))
+		_ = s.accountRepo.SetRateLimited(ctx, account.ID, resetTime)
 		return
 	}
 	// 其他错误码继续使用 rateLimitService
 	if s.rateLimitService == nil {
 		return
 	}
-	s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, body)
+	shouldDisable := s.rateLimitService.HandleUpstreamError(ctx, account, statusCode, headers, body)
+	if shouldDisable {
+		log.Printf("%s status=%d marked_error", prefix, statusCode)
+	}
 }
 
 type antigravityStreamResult struct {
@@ -674,57 +899,145 @@ func (s *AntigravityGatewayService) handleGeminiStreamingResponse(c *gin.Context
 		return nil, errors.New("streaming not supported")
 	}
 
-	reader := bufio.NewReader(resp.Body)
+	// 使用 Scanner 并限制单行大小，避免 ReadString 无上限导致 OOM
+	scanner := bufio.NewScanner(resp.Body)
+	maxLineSize := defaultMaxLineSize
+	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
+		maxLineSize = s.cfg.Gateway.MaxLineSize
+	}
+	scanner.Buffer(make([]byte, 64*1024), maxLineSize)
 	usage := &ClaudeUsage{}
 	var firstTokenMs *int
 
+	type scanEvent struct {
+		line string
+		err  error
+	}
+	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
+	events := make(chan scanEvent, 16)
+	done := make(chan struct{})
+	sendEvent := func(ev scanEvent) bool {
+		select {
+		case events <- ev:
+			return true
+		case <-done:
+			return false
+		}
+	}
+	var lastReadAt int64
+	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
+	go func() {
+		defer close(events)
+		for scanner.Scan() {
+			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
+			if !sendEvent(scanEvent{line: scanner.Text()}) {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			_ = sendEvent(scanEvent{err: err})
+		}
+	}()
+	defer close(done)
+
+	// 上游数据间隔超时保护（防止上游挂起长期占用连接）
+	streamInterval := time.Duration(0)
+	if s.cfg != nil && s.cfg.Gateway.StreamDataIntervalTimeout > 0 {
+		streamInterval = time.Duration(s.cfg.Gateway.StreamDataIntervalTimeout) * time.Second
+	}
+	var intervalTicker *time.Ticker
+	if streamInterval > 0 {
+		intervalTicker = time.NewTicker(streamInterval)
+		defer intervalTicker.Stop()
+	}
+	var intervalCh <-chan time.Time
+	if intervalTicker != nil {
+		intervalCh = intervalTicker.C
+	}
+
+	// 仅发送一次错误事件，避免多次写入导致协议混乱
+	errorEventSent := false
+	sendErrorEvent := func(reason string) {
+		if errorEventSent {
+			return
+		}
+		errorEventSent = true
+		_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: {\"error\":\"%s\"}\n\n", reason)
+		flusher.Flush()
+	}
+
 	for {
-		line, err := reader.ReadString('\n')
-		if len(line) > 0 {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, nil
+			}
+			if ev.err != nil {
+				if errors.Is(ev.err, bufio.ErrTooLong) {
+					log.Printf("SSE line too long (antigravity): max_size=%d error=%v", maxLineSize, ev.err)
+					sendErrorEvent("response_too_large")
+					return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, ev.err
+				}
+				sendErrorEvent("stream_read_error")
+				return nil, ev.err
+			}
+
+			line := ev.line
 			trimmed := strings.TrimRight(line, "\r\n")
 			if strings.HasPrefix(trimmed, "data:") {
 				payload := strings.TrimSpace(strings.TrimPrefix(trimmed, "data:"))
 				if payload == "" || payload == "[DONE]" {
-					_, _ = io.WriteString(c.Writer, line)
+					if _, err := fmt.Fprintf(c.Writer, "%s\n", line); err != nil {
+						sendErrorEvent("write_failed")
+						return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, err
+					}
 					flusher.Flush()
-				} else {
-					// 解包 v1internal 响应
-					inner, parseErr := s.unwrapV1InternalResponse([]byte(payload))
-					if parseErr == nil && inner != nil {
-						payload = string(inner)
-					}
-
-					// 解析 usage
-					var parsed map[string]any
-					if json.Unmarshal(inner, &parsed) == nil {
-						if u := extractGeminiUsage(parsed); u != nil {
-							usage = u
-						}
-					}
-
-					if firstTokenMs == nil {
-						ms := int(time.Since(startTime).Milliseconds())
-						firstTokenMs = &ms
-					}
-
-					_, _ = fmt.Fprintf(c.Writer, "data: %s\n\n", payload)
-					flusher.Flush()
+					continue
 				}
-			} else {
-				_, _ = io.WriteString(c.Writer, line)
-				flusher.Flush()
-			}
-		}
 
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, err
+				// 解包 v1internal 响应
+				inner, parseErr := s.unwrapV1InternalResponse([]byte(payload))
+				if parseErr == nil && inner != nil {
+					payload = string(inner)
+				}
+
+				// 解析 usage
+				var parsed map[string]any
+				if json.Unmarshal(inner, &parsed) == nil {
+					if u := extractGeminiUsage(parsed); u != nil {
+						usage = u
+					}
+				}
+
+				if firstTokenMs == nil {
+					ms := int(time.Since(startTime).Milliseconds())
+					firstTokenMs = &ms
+				}
+
+				if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", payload); err != nil {
+					sendErrorEvent("write_failed")
+					return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, err
+				}
+				flusher.Flush()
+				continue
+			}
+
+			if _, err := fmt.Fprintf(c.Writer, "%s\n", line); err != nil {
+				sendErrorEvent("write_failed")
+				return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, err
+			}
+			flusher.Flush()
+
+		case <-intervalCh:
+			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
+			if time.Since(lastRead) < streamInterval {
+				continue
+			}
+			log.Printf("Stream data interval timeout (antigravity)")
+			sendErrorEvent("stream_timeout")
+			return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, fmt.Errorf("stream data interval timeout")
 		}
 	}
-
-	return &antigravityStreamResult{usage: usage, firstTokenMs: firstTokenMs}, nil
 }
 
 func (s *AntigravityGatewayService) handleGeminiNonStreamingResponse(c *gin.Context, resp *http.Response) (*ClaudeUsage, error) {
@@ -758,7 +1071,7 @@ func (s *AntigravityGatewayService) writeClaudeError(c *gin.Context, status int,
 
 func (s *AntigravityGatewayService) writeMappedClaudeError(c *gin.Context, upstreamStatus int, body []byte) error {
 	// 记录上游错误详情便于调试
-	log.Printf("Antigravity upstream error %d: %s", upstreamStatus, string(body))
+	log.Printf("[antigravity-Forward] upstream_error status=%d body=%s", upstreamStatus, string(body))
 
 	var statusCode int
 	var errType, errMsg string
@@ -832,7 +1145,7 @@ func (s *AntigravityGatewayService) handleClaudeNonStreamingResponse(c *gin.Cont
 	// 转换 Gemini 响应为 Claude 格式
 	claudeResp, agUsage, err := antigravity.TransformGeminiToClaude(body, originalModel)
 	if err != nil {
-		log.Printf("Transform Gemini to Claude failed: %v, body: %s", err, string(body))
+		log.Printf("[antigravity-Forward] transform_error error=%v body=%s", err, string(body))
 		return nil, s.writeClaudeError(c, http.StatusBadGateway, "upstream_error", "Failed to parse upstream response")
 	}
 
@@ -863,7 +1176,13 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 
 	processor := antigravity.NewStreamingProcessor(originalModel)
 	var firstTokenMs *int
-	reader := bufio.NewReader(resp.Body)
+	// 使用 Scanner 并限制单行大小，避免 ReadString 无上限导致 OOM
+	scanner := bufio.NewScanner(resp.Body)
+	maxLineSize := defaultMaxLineSize
+	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
+		maxLineSize = s.cfg.Gateway.MaxLineSize
+	}
+	scanner.Buffer(make([]byte, 64*1024), maxLineSize)
 
 	// 辅助函数：转换 antigravity.ClaudeUsage 到 service.ClaudeUsage
 	convertUsage := func(agUsage *antigravity.ClaudeUsage) *ClaudeUsage {
@@ -878,13 +1197,85 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 		}
 	}
 
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil && !errors.Is(err, io.EOF) {
-			return nil, fmt.Errorf("stream read error: %w", err)
+	type scanEvent struct {
+		line string
+		err  error
+	}
+	// 独立 goroutine 读取上游，避免读取阻塞影响超时处理
+	events := make(chan scanEvent, 16)
+	done := make(chan struct{})
+	sendEvent := func(ev scanEvent) bool {
+		select {
+		case events <- ev:
+			return true
+		case <-done:
+			return false
 		}
+	}
+	var lastReadAt int64
+	atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
+	go func() {
+		defer close(events)
+		for scanner.Scan() {
+			atomic.StoreInt64(&lastReadAt, time.Now().UnixNano())
+			if !sendEvent(scanEvent{line: scanner.Text()}) {
+				return
+			}
+		}
+		if err := scanner.Err(); err != nil {
+			_ = sendEvent(scanEvent{err: err})
+		}
+	}()
+	defer close(done)
 
-		if len(line) > 0 {
+	streamInterval := time.Duration(0)
+	if s.cfg != nil && s.cfg.Gateway.StreamDataIntervalTimeout > 0 {
+		streamInterval = time.Duration(s.cfg.Gateway.StreamDataIntervalTimeout) * time.Second
+	}
+	var intervalTicker *time.Ticker
+	if streamInterval > 0 {
+		intervalTicker = time.NewTicker(streamInterval)
+		defer intervalTicker.Stop()
+	}
+	var intervalCh <-chan time.Time
+	if intervalTicker != nil {
+		intervalCh = intervalTicker.C
+	}
+
+	// 仅发送一次错误事件，避免多次写入导致协议混乱
+	errorEventSent := false
+	sendErrorEvent := func(reason string) {
+		if errorEventSent {
+			return
+		}
+		errorEventSent = true
+		_, _ = fmt.Fprintf(c.Writer, "event: error\ndata: {\"error\":\"%s\"}\n\n", reason)
+		flusher.Flush()
+	}
+
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				// 发送结束事件
+				finalEvents, agUsage := processor.Finish()
+				if len(finalEvents) > 0 {
+					_, _ = c.Writer.Write(finalEvents)
+					flusher.Flush()
+				}
+				return &antigravityStreamResult{usage: convertUsage(agUsage), firstTokenMs: firstTokenMs}, nil
+			}
+			if ev.err != nil {
+				if errors.Is(ev.err, bufio.ErrTooLong) {
+					log.Printf("SSE line too long (antigravity): max_size=%d error=%v", maxLineSize, ev.err)
+					sendErrorEvent("response_too_large")
+					return &antigravityStreamResult{usage: convertUsage(nil), firstTokenMs: firstTokenMs}, ev.err
+				}
+				sendErrorEvent("stream_read_error")
+				return nil, fmt.Errorf("stream read error: %w", ev.err)
+			}
+
+			line := ev.line
 			// 处理 SSE 行，转换为 Claude 格式
 			claudeEvents := processor.ProcessLine(strings.TrimRight(line, "\r\n"))
 
@@ -899,23 +1290,54 @@ func (s *AntigravityGatewayService) handleClaudeStreamingResponse(c *gin.Context
 					if len(finalEvents) > 0 {
 						_, _ = c.Writer.Write(finalEvents)
 					}
+					sendErrorEvent("write_failed")
 					return &antigravityStreamResult{usage: convertUsage(agUsage), firstTokenMs: firstTokenMs}, writeErr
 				}
 				flusher.Flush()
 			}
-		}
 
-		if errors.Is(err, io.EOF) {
-			break
+		case <-intervalCh:
+			lastRead := time.Unix(0, atomic.LoadInt64(&lastReadAt))
+			if time.Since(lastRead) < streamInterval {
+				continue
+			}
+			log.Printf("Stream data interval timeout (antigravity)")
+			sendErrorEvent("stream_timeout")
+			return &antigravityStreamResult{usage: convertUsage(nil), firstTokenMs: firstTokenMs}, fmt.Errorf("stream data interval timeout")
 		}
 	}
 
-	// 发送结束事件
-	finalEvents, agUsage := processor.Finish()
-	if len(finalEvents) > 0 {
-		_, _ = c.Writer.Write(finalEvents)
-		flusher.Flush()
+}
+
+// extractImageSize 从 Gemini 请求中提取 image_size 参数
+func (s *AntigravityGatewayService) extractImageSize(body []byte) string {
+	var req antigravity.GeminiRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		return "2K" // 默认 2K
 	}
 
-	return &antigravityStreamResult{usage: convertUsage(agUsage), firstTokenMs: firstTokenMs}, nil
+	if req.GenerationConfig != nil && req.GenerationConfig.ImageConfig != nil {
+		size := strings.ToUpper(strings.TrimSpace(req.GenerationConfig.ImageConfig.ImageSize))
+		if size == "1K" || size == "2K" || size == "4K" {
+			return size
+		}
+	}
+
+	return "2K" // 默认 2K
+}
+
+// isImageGenerationModel 判断模型是否为图片生成模型
+// 支持的模型：gemini-3-pro-image, gemini-3-pro-image-preview, gemini-2.5-flash-image 等
+func isImageGenerationModel(model string) bool {
+	modelLower := strings.ToLower(model)
+	// 移除 models/ 前缀
+	modelLower = strings.TrimPrefix(modelLower, "models/")
+
+	// 精确匹配或前缀匹配
+	return modelLower == "gemini-3-pro-image" ||
+		modelLower == "gemini-3-pro-image-preview" ||
+		strings.HasPrefix(modelLower, "gemini-3-pro-image-") ||
+		modelLower == "gemini-2.5-flash-image" ||
+		modelLower == "gemini-2.5-flash-image-preview" ||
+		strings.HasPrefix(modelLower, "gemini-2.5-flash-image-")
 }

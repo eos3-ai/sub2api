@@ -1,9 +1,11 @@
+// Package admin provides HTTP handlers for administrative operations.
 package admin
 
 import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
@@ -31,15 +33,16 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 
 // AccountHandler handles admin account management
 type AccountHandler struct {
-	adminService        service.AdminService
-	oauthService        *service.OAuthService
-	openaiOAuthService  *service.OpenAIOAuthService
-	geminiOAuthService  *service.GeminiOAuthService
-	rateLimitService    *service.RateLimitService
-	accountUsageService *service.AccountUsageService
-	accountTestService  *service.AccountTestService
-	concurrencyService  *service.ConcurrencyService
-	crsSyncService      *service.CRSSyncService
+	adminService            service.AdminService
+	oauthService            *service.OAuthService
+	openaiOAuthService      *service.OpenAIOAuthService
+	geminiOAuthService      *service.GeminiOAuthService
+	antigravityOAuthService *service.AntigravityOAuthService
+	rateLimitService        *service.RateLimitService
+	accountUsageService     *service.AccountUsageService
+	accountTestService      *service.AccountTestService
+	concurrencyService      *service.ConcurrencyService
+	crsSyncService          *service.CRSSyncService
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -48,6 +51,7 @@ func NewAccountHandler(
 	oauthService *service.OAuthService,
 	openaiOAuthService *service.OpenAIOAuthService,
 	geminiOAuthService *service.GeminiOAuthService,
+	antigravityOAuthService *service.AntigravityOAuthService,
 	rateLimitService *service.RateLimitService,
 	accountUsageService *service.AccountUsageService,
 	accountTestService *service.AccountTestService,
@@ -55,56 +59,62 @@ func NewAccountHandler(
 	crsSyncService *service.CRSSyncService,
 ) *AccountHandler {
 	return &AccountHandler{
-		adminService:        adminService,
-		oauthService:        oauthService,
-		openaiOAuthService:  openaiOAuthService,
-		geminiOAuthService:  geminiOAuthService,
-		rateLimitService:    rateLimitService,
-		accountUsageService: accountUsageService,
-		accountTestService:  accountTestService,
-		concurrencyService:  concurrencyService,
-		crsSyncService:      crsSyncService,
+		adminService:            adminService,
+		oauthService:            oauthService,
+		openaiOAuthService:      openaiOAuthService,
+		geminiOAuthService:      geminiOAuthService,
+		antigravityOAuthService: antigravityOAuthService,
+		rateLimitService:        rateLimitService,
+		accountUsageService:     accountUsageService,
+		accountTestService:      accountTestService,
+		concurrencyService:      concurrencyService,
+		crsSyncService:          crsSyncService,
 	}
 }
 
 // CreateAccountRequest represents create account request
 type CreateAccountRequest struct {
-	Name        string         `json:"name" binding:"required"`
-	Platform    string         `json:"platform" binding:"required"`
-	Type        string         `json:"type" binding:"required,oneof=oauth setup-token apikey"`
-	Credentials map[string]any `json:"credentials" binding:"required"`
-	Extra       map[string]any `json:"extra"`
-	ProxyID     *int64         `json:"proxy_id"`
-	Concurrency int            `json:"concurrency"`
-	Priority    int            `json:"priority"`
-	GroupIDs    []int64        `json:"group_ids"`
+	Name                    string         `json:"name" binding:"required"`
+	Notes                   *string        `json:"notes"`
+	Platform                string         `json:"platform" binding:"required"`
+	Type                    string         `json:"type" binding:"required,oneof=oauth setup-token apikey"`
+	Credentials             map[string]any `json:"credentials" binding:"required"`
+	Extra                   map[string]any `json:"extra"`
+	ProxyID                 *int64         `json:"proxy_id"`
+	Concurrency             int            `json:"concurrency"`
+	Priority                int            `json:"priority"`
+	GroupIDs                []int64        `json:"group_ids"`
+	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
 // UpdateAccountRequest represents update account request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateAccountRequest struct {
-	Name        string         `json:"name"`
-	Type        string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey"`
-	Credentials map[string]any `json:"credentials"`
-	Extra       map[string]any `json:"extra"`
-	ProxyID     *int64         `json:"proxy_id"`
-	Concurrency *int           `json:"concurrency"`
-	Priority    *int           `json:"priority"`
-	Status      string         `json:"status" binding:"omitempty,oneof=active inactive"`
-	GroupIDs    *[]int64       `json:"group_ids"`
+	Name                    string         `json:"name"`
+	Notes                   *string        `json:"notes"`
+	Type                    string         `json:"type" binding:"omitempty,oneof=oauth setup-token apikey"`
+	Credentials             map[string]any `json:"credentials"`
+	Extra                   map[string]any `json:"extra"`
+	ProxyID                 *int64         `json:"proxy_id"`
+	Concurrency             *int           `json:"concurrency"`
+	Priority                *int           `json:"priority"`
+	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive"`
+	GroupIDs                *[]int64       `json:"group_ids"`
+	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
 // BulkUpdateAccountsRequest represents the payload for bulk editing accounts
 type BulkUpdateAccountsRequest struct {
-	AccountIDs  []int64        `json:"account_ids" binding:"required,min=1"`
-	Name        string         `json:"name"`
-	ProxyID     *int64         `json:"proxy_id"`
-	Concurrency *int           `json:"concurrency"`
-	Priority    *int           `json:"priority"`
-	Status      string         `json:"status" binding:"omitempty,oneof=active inactive error"`
-	GroupIDs    *[]int64       `json:"group_ids"`
-	Credentials map[string]any `json:"credentials"`
-	Extra       map[string]any `json:"extra"`
+	AccountIDs              []int64        `json:"account_ids" binding:"required,min=1"`
+	Name                    string         `json:"name"`
+	ProxyID                 *int64         `json:"proxy_id"`
+	Concurrency             *int           `json:"concurrency"`
+	Priority                *int           `json:"priority"`
+	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive error"`
+	GroupIDs                *[]int64       `json:"group_ids"`
+	Credentials             map[string]any `json:"credentials"`
+	Extra                   map[string]any `json:"extra"`
+	ConfirmMixedChannelRisk *bool          `json:"confirm_mixed_channel_risk"` // 用户确认混合渠道风险
 }
 
 // AccountWithConcurrency extends Account with real-time concurrency info
@@ -190,7 +200,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		Priority:    req.Priority,
 		GroupIDs:    req.GroupIDs,
 	})
-	if err != nil {
+	if err != nil{
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -213,16 +223,18 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// 确定是否跳过混合渠道检查
+
 	account, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
-		Name:        req.Name,
-		Type:        req.Type,
-		Credentials: req.Credentials,
-		Extra:       req.Extra,
-		ProxyID:     req.ProxyID,
-		Concurrency: req.Concurrency, // 指针类型，nil 表示未提供
-		Priority:    req.Priority,    // 指针类型，nil 表示未提供
-		Status:      req.Status,
-		GroupIDs:    req.GroupIDs,
+		Name:                  req.Name,
+		Type:                  req.Type,
+		Credentials:           req.Credentials,
+		Extra:                 req.Extra,
+		ProxyID:               req.ProxyID,
+		Concurrency:           req.Concurrency, // 指针类型，nil 表示未提供
+		Priority:              req.Priority,    // 指针类型，nil 表示未提供
+		Status:                req.Status,
+		GroupIDs:              req.GroupIDs,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -304,7 +316,8 @@ func (h *AccountHandler) SyncFromCRS(c *gin.Context) {
 		SyncProxies: syncProxies,
 	})
 	if err != nil {
-		response.ErrorFrom(c, err)
+		// Provide detailed error message for CRS sync failures
+		response.InternalError(c, "CRS sync failed: "+err.Error())
 		return
 	}
 
@@ -360,6 +373,19 @@ func (h *AccountHandler) Refresh(c *gin.Context) {
 		}
 
 		newCredentials = h.geminiOAuthService.BuildAccountCredentials(tokenInfo)
+		for k, v := range account.Credentials {
+			if _, exists := newCredentials[k]; !exists {
+				newCredentials[k] = v
+			}
+		}
+	} else if account.Platform == service.PlatformAntigravity {
+		tokenInfo, err := h.antigravityOAuthService.RefreshAccountToken(c.Request.Context(), account)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+
+		newCredentials = h.antigravityOAuthService.BuildAccountCredentials(tokenInfo)
 		for k, v := range account.Credentials {
 			if _, exists := newCredentials[k]; !exists {
 				newCredentials[k] = v
@@ -568,6 +594,8 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		return
 	}
 
+	// 确定是否跳过混合渠道检查
+
 	hasUpdates := req.Name != "" ||
 		req.ProxyID != nil ||
 		req.Concurrency != nil ||
@@ -583,15 +611,15 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	}
 
 	result, err := h.adminService.BulkUpdateAccounts(c.Request.Context(), &service.BulkUpdateAccountsInput{
-		AccountIDs:  req.AccountIDs,
-		Name:        req.Name,
-		ProxyID:     req.ProxyID,
-		Concurrency: req.Concurrency,
-		Priority:    req.Priority,
-		Status:      req.Status,
-		GroupIDs:    req.GroupIDs,
-		Credentials: req.Credentials,
-		Extra:       req.Extra,
+		AccountIDs:            req.AccountIDs,
+		Name:                  req.Name,
+		ProxyID:               req.ProxyID,
+		Concurrency:           req.Concurrency,
+		Priority:              req.Priority,
+		Status:                req.Status,
+		GroupIDs:              req.GroupIDs,
+		Credentials:           req.Credentials,
+		Extra:                 req.Extra,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -779,6 +807,49 @@ func (h *AccountHandler) ClearRateLimit(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "Rate limit cleared successfully"})
+}
+
+// GetTempUnschedulable handles getting temporary unschedulable status
+// GET /api/v1/admin/accounts/:id/temp-unschedulable
+func (h *AccountHandler) GetTempUnschedulable(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	state, err := h.rateLimitService.GetTempUnschedStatus(c.Request.Context(), accountID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	if state == nil || state.UntilUnix <= time.Now().Unix() {
+		response.Success(c, gin.H{"active": false})
+		return
+	}
+
+	response.Success(c, gin.H{
+		"active": true,
+		"state":  state,
+	})
+}
+
+// ClearTempUnschedulable handles clearing temporary unschedulable status
+// DELETE /api/v1/admin/accounts/:id/temp-unschedulable
+func (h *AccountHandler) ClearTempUnschedulable(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	if err := h.rateLimitService.ClearTempUnschedulable(c.Request.Context(), accountID); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Temp unschedulable cleared successfully"})
 }
 
 // GetTodayStats handles getting account today statistics
@@ -1147,7 +1218,6 @@ func (h *AccountHandler) BatchRefreshTier(c *gin.Context) {
 		"total":   len(accounts),
 		"success": successCount,
 		"failed":  failedCount,
-		"errors":  errors,
 	}
 
 	response.Success(c, results)

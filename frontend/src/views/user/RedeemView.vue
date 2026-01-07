@@ -500,7 +500,7 @@ const getHistoryItemTitle = (item: RedeemHistoryItem) => {
   } else if (item.type === 'subscription') {
     return t('redeem.subscriptionAssigned')
   }
-  return 'Unknown'
+  return t('common.unknown')
 }
 
 const formatHistoryValue = (item: RedeemHistoryItem) => {
@@ -531,6 +531,7 @@ const fetchHistory = async () => {
 
 const handleRedeem = async () => {
   if (!redeemCode.value.trim()) {
+    appStore.showError(t('redeem.pleaseEnterCode'))
     return
   }
 

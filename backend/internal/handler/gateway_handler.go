@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -19,6 +21,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+const maxGatewayRequestBodyBytes int64 = 10 * 1024 * 1024 // 10MB
+
+var errEmptyRequestBody = errors.New("request body is empty")
 
 // GatewayHandler handles API gateway requests
 type GatewayHandler struct {
@@ -30,6 +36,23 @@ type GatewayHandler struct {
 	concurrencyHelper         *ConcurrencyHelper
 }
 
+func (h *GatewayHandler) recordUsageSync(apiKey *service.APIKey, subscription *service.UserSubscription, result *service.ForwardResult, usedAccount *service.Account) {
+	// 计费属于关键数据：同步写入，避免 goroutine 异步导致进程崩溃时丢失使用量/扣费数据。
+	// 使用独立 Background context，避免客户端取消请求导致计费中断。
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
+		Result:       result,
+		APIKey:       apiKey,
+		User:         apiKey.User,
+		Account:      usedAccount,
+		Subscription: subscription,
+	}); err != nil {
+		log.Printf("Record usage failed: request_id=%s user=%d api_key=%d account=%d err=%v", result.RequestID, apiKey.UserID, apiKey.ID, usedAccount.ID, err)
+	}
+}
+
 // NewGatewayHandler creates a new GatewayHandler
 func NewGatewayHandler(
 	gatewayService *service.GatewayService,
@@ -38,22 +61,99 @@ func NewGatewayHandler(
 	userService *service.UserService,
 	concurrencyService *service.ConcurrencyService,
 	billingCacheService *service.BillingCacheService,
+	cfg *config.Config,
 ) *GatewayHandler {
+	pingInterval := time.Duration(0)
+	if cfg != nil {
+		pingInterval = time.Duration(cfg.Concurrency.PingInterval) * time.Second
+	}
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
 		geminiCompatService:       geminiCompatService,
 		antigravityGatewayService: antigravityGatewayService,
 		userService:               userService,
 		billingCacheService:       billingCacheService,
-		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude),
+		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
 	}
+}
+
+func parseGatewayRequestStream(r io.Reader, limit int64) (*service.ParsedRequest, error) {
+	if r == nil {
+		return nil, errEmptyRequestBody
+	}
+
+	var raw bytes.Buffer
+	limited := io.LimitReader(r, limit+1)
+	tee := io.TeeReader(limited, &raw)
+	decoder := json.NewDecoder(tee)
+
+	var req map[string]any
+	if err := decoder.Decode(&req); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, errEmptyRequestBody
+		}
+		if int64(raw.Len()) > limit {
+			return nil, &http.MaxBytesError{Limit: limit}
+		}
+		return nil, err
+	}
+
+	// Ensure the body contains exactly one JSON value (allowing trailing whitespace).
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		if int64(raw.Len()) > limit {
+			return nil, &http.MaxBytesError{Limit: limit}
+		}
+		if err == nil {
+			return nil, fmt.Errorf("request body must contain a single JSON object")
+		}
+		return nil, err
+	}
+	if int64(raw.Len()) > limit {
+		return nil, &http.MaxBytesError{Limit: limit}
+	}
+
+	parsed := &service.ParsedRequest{
+		Body: raw.Bytes(),
+	}
+
+	if rawModel, exists := req["model"]; exists {
+		model, ok := rawModel.(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid model field type")
+		}
+		parsed.Model = model
+	}
+	if rawStream, exists := req["stream"]; exists {
+		stream, ok := rawStream.(bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid stream field type")
+		}
+		parsed.Stream = stream
+	}
+	if metadata, ok := req["metadata"].(map[string]any); ok {
+		if userID, ok := metadata["user_id"].(string); ok {
+			parsed.MetadataUserID = userID
+		}
+	}
+	// system 字段只要存在就视为显式提供（即使为 null），
+	// 以避免客户端传 null 时被默认 system 误注入。
+	if system, ok := req["system"]; ok {
+		parsed.HasSystem = true
+		parsed.System = system
+	}
+	if messages, ok := req["messages"].([]any); ok {
+		parsed.Messages = messages
+	}
+
+	return parsed, nil
 }
 
 // Messages handles Claude API compatible messages endpoint
 // POST /v1/messages
 func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
-	apiKey, ok := middleware2.GetApiKeyFromContext(c)
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
@@ -65,25 +165,27 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
-	// 读取请求体
-	body, err := io.ReadAll(c.Request.Body)
+	parsedReq, err := parseGatewayRequestStream(c.Request.Body, maxGatewayRequestBodyBytes)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
+		if errors.Is(err, errEmptyRequestBody) {
+			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
+			return
+		}
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) || errors.Is(err, io.ErrUnexpectedEOF) {
+			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
+			return
+		}
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
-
-	if len(body) == 0 {
+	if len(parsedReq.Body) == 0 {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
-		return
-	}
-
-	parsedReq, err := service.ParseGatewayRequest(body)
-	if err != nil {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 		return
 	}
 	reqModel := parsedReq.Model
@@ -121,6 +223,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		h.handleConcurrencyError(c, err, "user", streamStarted)
 		return
 	}
+	// 在请求结束或 Context 取消时确保释放槽位，避免客户端断开造成泄漏
+	userReleaseFunc = wrapReleaseOnDone(c.Request.Context(), userReleaseFunc)
 	if userReleaseFunc != nil {
 		defer userReleaseFunc()
 	}
@@ -128,7 +232,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	// 2. 【新增】Wait后二次检查余额/订阅
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
 		log.Printf("Billing eligibility check failed after wait: %v", err)
-		h.handleStreamingAwareError(c, http.StatusForbidden, "billing_error", err.Error(), streamStarted)
+		h.handleStreamingAwareError(c, http.StatusForbidden, "permission_error", "Insufficient balance or active subscription required", streamStarted)
 		return
 	}
 
@@ -156,8 +260,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		for {
 			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs)
 			if err != nil {
+				log.Printf("Select account failed: %v", err)
 				if len(failedAccountIDs) == 0 {
-					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
+					h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts for requested model", streamStarted)
 					return
 				}
 				h.handleFailoverExhausted(c, lastFailoverStatus, streamStarted)
@@ -166,7 +271,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			account := selection.Account
 
 			// 检查预热请求拦截（在账号选择后、转发前检查）
-			if account.IsInterceptWarmupEnabled() && isWarmupRequest(body) {
+			if account.IsInterceptWarmupEnabled() && isWarmupRequest(parsedReq.Body) {
 				if selection.Acquired && selection.ReleaseFunc != nil {
 					selection.ReleaseFunc()
 				}
@@ -220,13 +325,16 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					log.Printf("Bind sticky session failed: %v", err)
 				}
 			}
+			// 账号槽位/等待计数需要在超时或断开时安全回收
+			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+			accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
 
 			// 转发请求 - 根据账号平台分流
 			var result *service.ForwardResult
 			if account.Platform == service.PlatformAntigravity {
-				result, err = h.antigravityGatewayService.ForwardGemini(c.Request.Context(), c, account, reqModel, "generateContent", reqStream, body)
+				result, err = h.antigravityGatewayService.ForwardGemini(c.Request.Context(), c, account, reqModel, "generateContent", reqStream, parsedReq.Body)
 			} else {
-				result, err = h.geminiCompatService.Forward(c.Request.Context(), c, account, body)
+				result, err = h.geminiCompatService.Forward(c.Request.Context(), c, account, parsedReq.Body)
 			}
 			if accountReleaseFunc != nil {
 				accountReleaseFunc()
@@ -253,20 +361,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				return
 			}
 
-			// 异步记录使用量（subscription已在函数开头获取）
-			go func(result *service.ForwardResult, usedAccount *service.Account) {
-				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				defer cancel()
-				if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-					Result:       result,
-					ApiKey:       apiKey,
-					User:         apiKey.User,
-					Account:      usedAccount,
-					Subscription: subscription,
-				}); err != nil {
-					log.Printf("Record usage failed: %v", err)
-				}
-			}(result, account)
+			// 同步记录使用量，避免进程崩溃导致计费数据丢失（subscription已在函数开头获取）
+			h.recordUsageSync(apiKey, subscription, result, account)
 			return
 		}
 	}
@@ -280,8 +376,9 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		// 选择支持该模型的账号
 		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs)
 		if err != nil {
+			log.Printf("Select account failed: %v", err)
 			if len(failedAccountIDs) == 0 {
-				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error(), streamStarted)
+				h.handleStreamingAwareError(c, http.StatusServiceUnavailable, "api_error", "No available accounts for requested model", streamStarted)
 				return
 			}
 			h.handleFailoverExhausted(c, lastFailoverStatus, streamStarted)
@@ -290,7 +387,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		account := selection.Account
 
 		// 检查预热请求拦截（在账号选择后、转发前检查）
-		if account.IsInterceptWarmupEnabled() && isWarmupRequest(body) {
+		if account.IsInterceptWarmupEnabled() && isWarmupRequest(parsedReq.Body) {
 			if selection.Acquired && selection.ReleaseFunc != nil {
 				selection.ReleaseFunc()
 			}
@@ -344,11 +441,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				log.Printf("Bind sticky session failed: %v", err)
 			}
 		}
+		// 账号槽位/等待计数需要在超时或断开时安全回收
+		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
+		accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
 
 		// 转发请求 - 根据账号平台分流
 		var result *service.ForwardResult
 		if account.Platform == service.PlatformAntigravity {
-			result, err = h.antigravityGatewayService.Forward(c.Request.Context(), c, account, body)
+			result, err = h.antigravityGatewayService.Forward(c.Request.Context(), c, account, parsedReq.Body)
 		} else {
 			result, err = h.gatewayService.Forward(c.Request.Context(), c, account, parsedReq)
 		}
@@ -373,24 +473,12 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				continue
 			}
 			// 错误响应已在Forward中处理，这里只记录日志
-			log.Printf("Forward request failed: %v", err)
+			log.Printf("Account %d: Forward request failed: %v", account.ID, err)
 			return
 		}
 
-		// 异步记录使用量（subscription已在函数开头获取）
-		go func(result *service.ForwardResult, usedAccount *service.Account) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			if err := h.gatewayService.RecordUsage(ctx, &service.RecordUsageInput{
-				Result:       result,
-				ApiKey:       apiKey,
-				User:         apiKey.User,
-				Account:      usedAccount,
-				Subscription: subscription,
-			}); err != nil {
-				log.Printf("Record usage failed: %v", err)
-			}
-		}(result, account)
+		// 同步记录使用量，避免进程崩溃导致计费数据丢失（subscription已在函数开头获取）
+		h.recordUsageSync(apiKey, subscription, result, account)
 		return
 	}
 }
@@ -400,7 +488,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 // Returns models based on account configurations (model_mapping whitelist)
 // Falls back to default models if no whitelist is configured
 func (h *GatewayHandler) Models(c *gin.Context) {
-	apiKey, _ := middleware2.GetApiKeyFromContext(c)
+	apiKey, _ := middleware2.GetAPIKeyFromContext(c)
 
 	var groupID *int64
 	var platform string
@@ -458,7 +546,7 @@ func (h *GatewayHandler) AntigravityModels(c *gin.Context) {
 // Usage handles getting account balance for CC Switch integration
 // GET /v1/usage
 func (h *GatewayHandler) Usage(c *gin.Context) {
-	apiKey, ok := middleware2.GetApiKeyFromContext(c)
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
@@ -566,32 +654,71 @@ func (h *GatewayHandler) handleFailoverExhausted(c *gin.Context, statusCode int,
 func (h *GatewayHandler) mapUpstreamError(statusCode int) (int, string, string) {
 	switch statusCode {
 	case 401:
-		return http.StatusBadGateway, "upstream_error", "Upstream authentication failed, please contact administrator"
+		return http.StatusBadGateway, "api_error", "Upstream authentication failed, please contact administrator"
 	case 403:
-		return http.StatusBadGateway, "upstream_error", "Upstream access forbidden, please contact administrator"
+		return http.StatusBadGateway, "api_error", "Upstream access forbidden, please contact administrator"
 	case 429:
 		return http.StatusTooManyRequests, "rate_limit_error", "Upstream rate limit exceeded, please retry later"
 	case 529:
 		return http.StatusServiceUnavailable, "overloaded_error", "Upstream service overloaded, please retry later"
 	case 500, 502, 503, 504:
-		return http.StatusBadGateway, "upstream_error", "Upstream service temporarily unavailable"
+		return http.StatusBadGateway, "api_error", "Upstream service temporarily unavailable"
 	default:
-		return http.StatusBadGateway, "upstream_error", "Upstream request failed"
+		return http.StatusBadGateway, "api_error", "Upstream request failed"
 	}
+}
+
+func normalizeAnthropicErrorType(errType string) string {
+	switch errType {
+	case "invalid_request_error",
+		"authentication_error",
+		"permission_error",
+		"not_found_error",
+		"rate_limit_error",
+		"api_error",
+		"overloaded_error":
+		return errType
+	case "billing_error":
+		// Not an Anthropic-standard error type; map to the closest equivalent.
+		return "permission_error"
+	case "subscription_error":
+		// Not an Anthropic-standard error type; map to the closest equivalent.
+		return "permission_error"
+	case "upstream_error":
+		// Not an Anthropic-standard error type; keep clients compatible.
+		return "api_error"
+	default:
+		return "api_error"
+	}
+}
+
+const maxPublicErrorMessageLen = 512
+
+func sanitizePublicErrorMessage(message string) string {
+	cleaned := strings.TrimSpace(message)
+	cleaned = strings.ReplaceAll(cleaned, "\r", " ")
+	cleaned = strings.ReplaceAll(cleaned, "\n", " ")
+	if len(cleaned) > maxPublicErrorMessageLen {
+		cleaned = cleaned[:maxPublicErrorMessageLen] + "..."
+	}
+	return cleaned
 }
 
 // handleStreamingAwareError handles errors that may occur after streaming has started
 func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, errType, message string, streamStarted bool) {
+	normalizedType := normalizeAnthropicErrorType(errType)
+	publicMessage := sanitizePublicErrorMessage(message)
+
 	if streamStarted {
 		// Stream already started, send error as SSE event then close
 		flusher, ok := c.Writer.(http.Flusher)
 		if ok {
-			// Send error event in SSE format with proper JSON marshaling
+			// Anthropic streaming spec: send `event: error` with JSON `data`.
 			errorData := map[string]any{
 				"type": "error",
 				"error": map[string]string{
-					"type":    errType,
-					"message": message,
+					"type":    normalizedType,
+					"message": publicMessage,
 				},
 			}
 			jsonBytes, err := json.Marshal(errorData)
@@ -599,8 +726,11 @@ func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, e
 				_ = c.Error(err)
 				return
 			}
-			errorEvent := fmt.Sprintf("data: %s\n\n", string(jsonBytes))
-			if _, err := fmt.Fprint(c.Writer, errorEvent); err != nil {
+			if _, err := fmt.Fprintf(c.Writer, "event: error\n"); err != nil {
+				_ = c.Error(err)
+				return
+			}
+			if _, err := fmt.Fprintf(c.Writer, "data: %s\n\n", string(jsonBytes)); err != nil {
 				_ = c.Error(err)
 			}
 			flusher.Flush()
@@ -609,16 +739,19 @@ func (h *GatewayHandler) handleStreamingAwareError(c *gin.Context, status int, e
 	}
 
 	// Normal case: return JSON response with proper status code
-	h.errorResponse(c, status, errType, message)
+	h.errorResponse(c, status, normalizedType, publicMessage)
 }
 
 // errorResponse 返回Claude API格式的错误响应
 func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, message string) {
+	normalizedType := normalizeAnthropicErrorType(errType)
+	publicMessage := sanitizePublicErrorMessage(message)
+
 	c.JSON(status, gin.H{
 		"type": "error",
 		"error": gin.H{
-			"type":    errType,
-			"message": message,
+			"type":    normalizedType,
+			"message": publicMessage,
 		},
 	})
 }
@@ -628,7 +761,7 @@ func (h *GatewayHandler) errorResponse(c *gin.Context, status int, errType, mess
 // 特点：校验订阅/余额，但不计算并发、不记录使用量
 func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 从context获取apiKey和user（ApiKeyAuth中间件已设置）
-	apiKey, ok := middleware2.GetApiKeyFromContext(c)
+	apiKey, ok := middleware2.GetAPIKeyFromContext(c)
 	if !ok {
 		h.errorResponse(c, http.StatusUnauthorized, "authentication_error", "Invalid API key")
 		return
@@ -640,25 +773,27 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	// 读取请求体
-	body, err := io.ReadAll(c.Request.Body)
+	parsedReq, err := parseGatewayRequestStream(c.Request.Body, maxGatewayRequestBodyBytes)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
 			return
 		}
+		if errors.Is(err, errEmptyRequestBody) {
+			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
+			return
+		}
+		var syntaxErr *json.SyntaxError
+		var typeErr *json.UnmarshalTypeError
+		if errors.As(err, &syntaxErr) || errors.As(err, &typeErr) || errors.Is(err, io.ErrUnexpectedEOF) {
+			h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
+			return
+		}
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to read request body")
 		return
 	}
-
-	if len(body) == 0 {
+	if len(parsedReq.Body) == 0 {
 		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
-		return
-	}
-
-	parsedReq, err := service.ParseGatewayRequest(body)
-	if err != nil {
-		h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to parse request body")
 		return
 	}
 
@@ -674,7 +809,8 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 校验 billing eligibility（订阅/余额）
 	// 【注意】不计算并发，但需要校验订阅/余额
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
-		h.errorResponse(c, http.StatusForbidden, "billing_error", err.Error())
+		log.Printf("Billing eligibility check failed: %v", err)
+		h.errorResponse(c, http.StatusForbidden, "permission_error", "Insufficient balance or active subscription required")
 		return
 	}
 
@@ -684,7 +820,8 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 	// 选择支持该模型的账号
 	account, err := h.gatewayService.SelectAccountForModel(c.Request.Context(), apiKey.GroupID, sessionHash, parsedReq.Model)
 	if err != nil {
-		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts: "+err.Error())
+		log.Printf("Select account failed: %v", err)
+		h.errorResponse(c, http.StatusServiceUnavailable, "api_error", "No available accounts for requested model")
 		return
 	}
 

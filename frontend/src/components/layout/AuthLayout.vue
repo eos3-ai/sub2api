@@ -1,8 +1,8 @@
 <template>
-  <div class="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+  <div class="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f4f1ea] p-4 dark:bg-dark-950">
     <!-- Background -->
     <div
-      class="absolute inset-0 bg-gradient-to-br from-gray-50 via-primary-50/30 to-gray-100 dark:from-dark-950 dark:via-dark-900 dark:to-dark-950"
+      class="absolute inset-0 bg-mesh-gradient"
     ></div>
 
     <!-- Decorative Elements -->
@@ -27,15 +27,14 @@
     <!-- Content Container -->
     <div class="relative z-10 w-full max-w-md">
       <!-- Logo/Brand -->
-      <div class="mb-8 text-center">
+      <div class="mb-8 animate-fade-in-up text-center" style="animation-delay: 0.1s; animation-fill-mode: both">
         <!-- Custom Logo or Default Logo -->
         <div
-          class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-lg"
-          style="box-shadow: 0 10px 25px rgba(196, 74, 44, 0.3)"
+          class="mb-4 inline-flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl shadow-glow"
         >
           <img :src="siteLogo || '/logo.png'" alt="Logo" class="h-full w-full object-contain" />
         </div>
-        <h1 class="mb-2 text-3xl font-bold" style="color: #c44a2c">
+        <h1 class="mb-2 text-3xl font-bold text-primary-600 dark:text-primary-400">
           {{ siteName }}
         </h1>
         <p class="text-sm text-gray-500 dark:text-dark-400">
@@ -44,17 +43,17 @@
       </div>
 
       <!-- Card Container -->
-      <div class="card-glass rounded-2xl p-8 shadow-glass">
+      <div class="card-glass animate-fade-in-up rounded-2xl p-8 shadow-glass" style="animation-delay: 0.2s; animation-fill-mode: both">
         <slot />
       </div>
 
       <!-- Footer Links -->
-      <div class="mt-6 text-center text-sm">
+      <div class="mt-6 animate-fade-in-up text-center text-sm" style="animation-delay: 0.3s; animation-fill-mode: both">
         <slot name="footer" />
       </div>
 
       <!-- Copyright -->
-      <div class="mt-8 text-center text-xs text-gray-400 dark:text-dark-500">
+      <div class="mt-8 animate-fade-in-up text-center text-xs text-gray-400 dark:text-dark-500" style="animation-delay: 0.4s; animation-fill-mode: both">
         &copy; {{ currentYear }} {{ siteName }}. All rights reserved.
       </div>
     </div>
@@ -64,6 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { getPublicSettings } from '@/api/auth'
+import { sanitizeUrl } from '@/utils/url'
 
 const siteName = ref('Sub2API')
 const siteLogo = ref('')
@@ -75,7 +75,7 @@ onMounted(async () => {
   try {
     const settings = await getPublicSettings()
     siteName.value = settings.site_name || 'Sub2API'
-    siteLogo.value = settings.site_logo || ''
+    siteLogo.value = sanitizeUrl(settings.site_logo || '', { allowRelative: true })
     siteSubtitle.value = settings.site_subtitle || 'Subscription to API Conversion Platform'
   } catch (error) {
     console.error('Failed to load public settings:', error)

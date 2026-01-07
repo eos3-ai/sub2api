@@ -12,7 +12,7 @@
         <!-- Row 1: Core Stats -->
         <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <!-- Balance -->
-          <div v-if="!authStore.isSimpleMode" class="card p-4">
+          <div v-if="!authStore.isSimpleMode" class="card animate-fade-in-up p-4 stagger-1">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-emerald-100 p-2 dark:bg-emerald-900/30">
                 <svg
@@ -42,7 +42,7 @@
           </div>
 
           <!-- API Keys -->
-          <div class="card p-4">
+          <div class="card animate-fade-in-up p-4 stagger-2">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/30">
                 <svg
@@ -74,7 +74,7 @@
           </div>
 
           <!-- Today Requests -->
-          <div class="card p-4">
+          <div class="card animate-fade-in-up p-4 stagger-3">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-green-100 p-2 dark:bg-green-900/30">
                 <svg
@@ -106,7 +106,7 @@
           </div>
 
           <!-- Today Cost -->
-          <div class="card p-4">
+          <div class="card animate-fade-in-up p-4 stagger-4">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-primary-100 p-2 dark:bg-primary-900/30">
                 <svg
@@ -1102,16 +1102,4 @@ watch(isDarkMode, () => {
 </script>
 
 <style scoped>
-/* Compact Select styling for dashboard */
-:deep(.select-trigger) {
-  @apply rounded-lg px-3 py-1.5 text-sm;
-}
-
-:deep(.select-dropdown) {
-  @apply rounded-lg;
-}
-
-:deep(.select-option) {
-  @apply px-3 py-2 text-sm;
-}
 </style>
