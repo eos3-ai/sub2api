@@ -25,7 +25,6 @@ func (s *HTTPUpstreamSuite) SetupTest() {
 	s.cfg = &config.Config{
 		Security: config.SecurityConfig{
 			URLAllowlist: config.URLAllowlistConfig{
-				AllowPrivateHosts: true,
 			},
 		},
 	}

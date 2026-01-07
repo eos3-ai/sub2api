@@ -23,7 +23,6 @@ func (s *PricingServiceSuite) SetupTest() {
 	client, ok := NewPricingRemoteClient(&config.Config{
 		Security: config.SecurityConfig{
 			URLAllowlist: config.URLAllowlistConfig{
-				AllowPrivateHosts: true,
 			},
 		},
 	}).(*pricingRemoteClient)

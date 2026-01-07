@@ -318,13 +318,13 @@ func (h *SettingHandler) TestSmtpConnection(c *gin.Context) {
 	// 如果未提供密码，从数据库获取已保存的密码
 	password := req.SmtpPassword
 	if password == "" {
-		savedConfig, err := h.emailService.GetSmtpConfig(c.Request.Context())
+		savedConfig, err := h.emailService.GetSMTPConfig(c.Request.Context())
 		if err == nil && savedConfig != nil {
 			password = savedConfig.Password
 		}
 	}
 
-	config := &service.SmtpConfig{
+	config := &service.SMTPConfig{
 		Host:     req.SmtpHost,
 		Port:     req.SmtpPort,
 		Username: req.SmtpUsername,
@@ -332,7 +332,7 @@ func (h *SettingHandler) TestSmtpConnection(c *gin.Context) {
 		UseTLS:   req.SmtpUseTLS,
 	}
 
-	err := h.emailService.TestSmtpConnectionWithConfig(config)
+	err := h.emailService.TestSMTPConnectionWithConfig(config)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -369,13 +369,13 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 	// 如果未提供密码，从数据库获取已保存的密码
 	password := req.SmtpPassword
 	if password == "" {
-		savedConfig, err := h.emailService.GetSmtpConfig(c.Request.Context())
+		savedConfig, err := h.emailService.GetSMTPConfig(c.Request.Context())
 		if err == nil && savedConfig != nil {
 			password = savedConfig.Password
 		}
 	}
 
-	config := &service.SmtpConfig{
+	config := &service.SMTPConfig{
 		Host:     req.SmtpHost,
 		Port:     req.SmtpPort,
 		Username: req.SmtpUsername,

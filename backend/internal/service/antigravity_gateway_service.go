@@ -26,6 +26,7 @@ const (
 	antigravityMaxRetries       = 3
 	antigravityRetryBaseDelay   = 1 * time.Second
 	antigravityRetryMaxDelay    = 16 * time.Second
+	defaultMaxLineSize          = 10 * 1024 * 1024 // 10MB
 )
 
 // getSessionID 从 gin.Context 获取 session_id（用于日志追踪）
@@ -557,7 +558,7 @@ func (s *AntigravityGatewayService) Forward(ctx context.Context, c *gin.Context,
 				retryRespBody, _ := io.ReadAll(io.LimitReader(retryResp.Body, 2<<20))
 				_ = retryResp.Body.Close()
 				log.Printf("[Antigravity] Retry also failed with status %d: %s", retryResp.StatusCode, string(retryRespBody))
-				s.handleUpstreamError(ctx, account, retryResp.StatusCode, retryResp.Header, retryRespBody)
+				s.handleUpstreamError(ctx, "Antigravity", account, retryResp.StatusCode, retryResp.Header, retryRespBody)
 
 				if s.shouldFailoverUpstreamError(retryResp.StatusCode) {
 					return nil, &UpstreamFailoverError{StatusCode: retryResp.StatusCode}

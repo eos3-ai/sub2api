@@ -18,16 +18,8 @@ type pricingRemoteClient struct {
 }
 
 func NewPricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
-	allowPrivate := false
-	validateResolvedIP := true
-	if cfg != nil {
-		allowPrivate = cfg.Security.URLAllowlist.AllowPrivateHosts
-		validateResolvedIP = cfg.Security.URLAllowlist.Enabled
-	}
 	sharedClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout:            30 * time.Second,
-		ValidateResolvedIP: validateResolvedIP,
-		AllowPrivateHosts:  allowPrivate,
+		Timeout: 30 * time.Second,
 	})
 	if err != nil {
 		sharedClient = &http.Client{Timeout: 30 * time.Second}

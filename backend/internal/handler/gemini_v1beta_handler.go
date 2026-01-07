@@ -193,8 +193,7 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 
 	// 2) billing eligibility check (after wait)
 	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription); err != nil {
-		status, _, message := billingErrorDetails(err)
-		googleError(c, status, message)
+		googleError(c, http.StatusPaymentRequired, err.Error())
 		return
 	}
 

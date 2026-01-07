@@ -2,7 +2,6 @@
 package admin
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -190,41 +189,18 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// 确定是否跳过混合渠道检查
-	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
-
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:                  req.Name,
-		Notes:                 req.Notes,
-		Platform:              req.Platform,
-		Type:                  req.Type,
-		Credentials:           req.Credentials,
-		Extra:                 req.Extra,
-		ProxyID:               req.ProxyID,
-		Concurrency:           req.Concurrency,
-		Priority:              req.Priority,
-		GroupIDs:              req.GroupIDs,
-		SkipMixedChannelCheck: skipCheck,
+		Name:        req.Name,
+		Platform:    req.Platform,
+		Type:        req.Type,
+		Credentials: req.Credentials,
+		Extra:       req.Extra,
+		ProxyID:     req.ProxyID,
+		Concurrency: req.Concurrency,
+		Priority:    req.Priority,
+		GroupIDs:    req.GroupIDs,
 	})
-	if err != nil {
-		// 检查是否为混合渠道错误
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			// 返回特殊错误码要求确认
-			c.JSON(409, gin.H{
-				"error":   "mixed_channel_warning",
-				"message": mixedErr.Error(),
-				"details": gin.H{
-					"group_id":         mixedErr.GroupID,
-					"group_name":       mixedErr.GroupName,
-					"current_platform": mixedErr.CurrentPlatform,
-					"other_platform":   mixedErr.OtherPlatform,
-				},
-				"require_confirmation": true,
-			})
-			return
-		}
-
+	if err != nil{
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -248,11 +224,9 @@ func (h *AccountHandler) Update(c *gin.Context) {
 	}
 
 	// 确定是否跳过混合渠道检查
-	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
 
 	account, err := h.adminService.UpdateAccount(c.Request.Context(), accountID, &service.UpdateAccountInput{
 		Name:                  req.Name,
-		Notes:                 req.Notes,
 		Type:                  req.Type,
 		Credentials:           req.Credentials,
 		Extra:                 req.Extra,
@@ -261,27 +235,8 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		Priority:              req.Priority,    // 指针类型，nil 表示未提供
 		Status:                req.Status,
 		GroupIDs:              req.GroupIDs,
-		SkipMixedChannelCheck: skipCheck,
 	})
 	if err != nil {
-		// 检查是否为混合渠道错误
-		var mixedErr *service.MixedChannelError
-		if errors.As(err, &mixedErr) {
-			// 返回特殊错误码要求确认
-			c.JSON(409, gin.H{
-				"error":   "mixed_channel_warning",
-				"message": mixedErr.Error(),
-				"details": gin.H{
-					"group_id":         mixedErr.GroupID,
-					"group_name":       mixedErr.GroupName,
-					"current_platform": mixedErr.CurrentPlatform,
-					"other_platform":   mixedErr.OtherPlatform,
-				},
-				"require_confirmation": true,
-			})
-			return
-		}
-
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -640,7 +595,6 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 	}
 
 	// 确定是否跳过混合渠道检查
-	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
 
 	hasUpdates := req.Name != "" ||
 		req.ProxyID != nil ||
@@ -666,7 +620,6 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		GroupIDs:              req.GroupIDs,
 		Credentials:           req.Credentials,
 		Extra:                 req.Extra,
-		SkipMixedChannelCheck: skipCheck,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -1265,7 +1218,6 @@ func (h *AccountHandler) BatchRefreshTier(c *gin.Context) {
 		"total":   len(accounts),
 		"success": successCount,
 		"failed":  failedCount,
-		"errors":  errors,
 	}
 
 	response.Success(c, results)

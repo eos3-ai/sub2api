@@ -680,10 +680,7 @@ func (s *GeminiMessagesCompatService) Forward(ctx context.Context, c *gin.Contex
 }
 
 func isGeminiSignatureRelatedError(respBody []byte) bool {
-	msg := strings.ToLower(strings.TrimSpace(extractAntigravityErrorMessage(respBody)))
-	if msg == "" {
-		msg = strings.ToLower(string(respBody))
-	}
+	msg := strings.ToLower(strings.TrimSpace(string(respBody)))
 	return strings.Contains(msg, "thought_signature") || strings.Contains(msg, "signature")
 }
 
