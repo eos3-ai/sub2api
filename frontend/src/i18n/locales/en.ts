@@ -564,6 +564,8 @@ export default {
   usage: {
     title: 'Usage Records',
     description: 'View and analyze your API usage history',
+    costDetails: 'Cost Breakdown',
+    tokenDetails: 'Token Breakdown',
     totalRequests: 'Total Requests',
     totalTokens: 'Total Tokens',
     totalCost: 'Total Cost',
@@ -1948,6 +1950,7 @@ export default {
       userFilter: 'User',
       searchUserPlaceholder: 'Search user by email...',
       searchApiKeyPlaceholder: 'Search API key by name...',
+      searchAccountPlaceholder: 'Search account by name...',
       selectedUser: 'Selected',
       user: 'User',
       account: 'Account',
