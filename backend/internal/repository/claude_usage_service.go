@@ -27,8 +27,6 @@ func (s *claudeUsageService) FetchUsage(ctx context.Context, accessToken, proxyU
 	client, err := httpclient.GetClient(httpclient.Options{
 		ProxyURL:           proxyURL,
 		Timeout:            30 * time.Second,
-		ValidateResolvedIP: true,
-		AllowPrivateHosts:  s.allowPrivateHosts,
 	})
 	if err != nil {
 		client = &http.Client{Timeout: 30 * time.Second}
