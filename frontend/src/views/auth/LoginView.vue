@@ -293,8 +293,18 @@ async function handleLogin(): Promise<void> {
     // Show success toast
     appStore.showSuccess(t('auth.loginSuccess'))
 
-    // Redirect to dashboard or intended route
-    const redirectTo = (router.currentRoute.value.query.redirect as string) || '/dashboard'
+    // Redirect based on user role and query parameter
+    const queryRedirect = router.currentRoute.value.query.redirect as string
+    let redirectTo: string
+
+    if (queryRedirect) {
+      // If there's a redirect query, use it
+      redirectTo = queryRedirect
+    } else {
+      // Otherwise, redirect based on user role
+      redirectTo = authStore.isAdmin ? '/admin/dashboard' : '/dashboard'
+    }
+
     await router.push(redirectTo)
   } catch (error: unknown) {
     // Reset Turnstile on error
