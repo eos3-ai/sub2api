@@ -86,8 +86,14 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		return "", nil, ErrRegDisabled
 	}
 
-	// 检查是否需要邮件验证
-	if s.settingService != nil && s.settingService.IsEmailVerifyEnabled(ctx) {
+	// 检查是否是配置文件中的 admin 账户
+	isConfigAdmin := false
+	if s.cfg != nil && s.cfg.Default.AdminEmail != "" {
+		isConfigAdmin = (email == s.cfg.Default.AdminEmail)
+	}
+
+	// 检查是否需要邮件验证（配置文件中的 admin 账户跳过验证）
+	if !isConfigAdmin && s.settingService != nil && s.settingService.IsEmailVerifyEnabled(ctx) {
 		if verifyCode == "" {
 			return "", nil, ErrEmailVerifyRequired
 		}
