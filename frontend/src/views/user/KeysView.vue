@@ -104,7 +104,7 @@
 
           <template #cell-status="{ value }">
             <span :class="['badge', value === 'active' ? 'badge-success' : 'badge-gray']">
-              {{ t('admin.accounts.status.' + value) }}
+              {{ t('common.' + value) }}
             </span>
           </template>
 
