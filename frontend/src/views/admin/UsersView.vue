@@ -387,7 +387,7 @@
                 ]"
               ></span>
               <span class="text-sm text-gray-700 dark:text-gray-300">
-                {{ t('admin.accounts.status.' + (value === 'disabled' ? 'inactive' : value)) }}
+                {{ t('common.' + (value === 'disabled' ? 'inactive' : value)) }}
               </span>
             </div>
           </template>
