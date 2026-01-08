@@ -164,7 +164,6 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
-const siteVersion = computed(() => appStore.siteVersion)
 
 // SVG Icon Components
 const DashboardIcon = {
