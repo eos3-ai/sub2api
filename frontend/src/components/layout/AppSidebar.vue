@@ -17,8 +17,6 @@
           <span class="text-lg font-bold text-gray-900 dark:text-white">
             {{ siteName }}
           </span>
-          <!-- Version Badge -->
-          <VersionBadge :version="siteVersion" />
         </div>
       </transition>
     </div>
@@ -150,7 +148,6 @@ import { computed, h, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
-import VersionBadge from '@/components/common/VersionBadge.vue'
 
 const { t } = useI18n()
 
