@@ -31,6 +31,7 @@ export interface PaymentOrder {
   order_no: string
   order_type: string
   provider: PaymentChannel
+  channel?: string  // 实际支付渠道（alipay/wechat）
   remark?: string
   amount_cny: number
   amount_usd: number

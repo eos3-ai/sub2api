@@ -237,7 +237,7 @@
                       {{ o.remark || '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      {{ shouldShowChannel(o.order_type) ? providerLabel(o.provider) : '-' }}
+                      {{ shouldShowChannel(o.order_type) ? channelLabel(o.channel || o.provider) : '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       ${{ o.total_usd.toFixed(2) }}
@@ -410,7 +410,7 @@ import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Modal from '@/components/common/Modal.vue'
 import { useAppStore } from '@/stores'
-import { paymentAPI, type PaymentChannel, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
+import { paymentAPI, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
 import QRCode from 'qrcode'
 
 const { t } = useI18n()
@@ -723,12 +723,13 @@ watch(
   }
 )
 
-function providerLabel(provider: PaymentChannel): string {
-  if (provider === 'zpay') return t('payment.alipay')
-  if (provider === 'stripe') return t('payment.wechat')
-  if (provider === 'admin') return t('payment.adminRecharge')
-  if (provider === 'activity') return t('payment.activityRecharge')
-  return provider
+function channelLabel(channel: string): string {
+  // 根据实际支付渠道返回标签
+  if (channel === 'alipay') return t('payment.alipay')
+  if (channel === 'wechat' || channel === 'wxpay') return t('payment.wechat')
+  if (channel === 'admin') return t('payment.adminRecharge')
+  if (channel === 'activity') return t('payment.activityRecharge')
+  return channel
 }
 
 function shouldShowChannel(orderType?: string): boolean {
