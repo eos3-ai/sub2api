@@ -15,6 +15,7 @@ export interface AdminPaymentOrder {
   user_id: number
   user_email?: string
   provider: AdminPaymentProvider
+  channel?: string  // 实际支付渠道（alipay/wechat）
   status: string
   amount_cny: number
   amount_usd: number

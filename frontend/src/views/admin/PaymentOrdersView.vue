@@ -103,7 +103,7 @@
 
             <template #cell-provider="{ row }">
               <span class="text-sm text-gray-900 dark:text-white">
-                {{ shouldShowChannel(row.order_type) ? providerLabel(row.provider) : '-' }}
+                {{ shouldShowChannel(row.order_type) ? channelLabel(row.channel || row.provider) : '-' }}
               </span>
             </template>
 
@@ -150,7 +150,7 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
 import { adminAPI } from '@/api/admin'
 import type { Column } from '@/components/common/types'
-import type { AdminPaymentOrder, AdminPaymentMethod, AdminPaymentProvider } from '@/api/admin/paymentOrders'
+import type { AdminPaymentOrder, AdminPaymentMethod } from '@/api/admin/paymentOrders'
 
 const { t } = useI18n()
 
@@ -199,11 +199,13 @@ const columns = computed<Column[]>(() => [
   { key: 'created_at', label: t('common.createdAt') }
 ])
 
-function providerLabel(provider: AdminPaymentProvider): string {
-  if (provider === 'zpay') return t('payment.alipay')
-  if (provider === 'stripe') return t('payment.wechat')
-  if (provider === 'admin') return t('payment.adminRecharge')
-  return provider
+function channelLabel(channel: string): string {
+  // 根据实际支付渠道返回标签
+  if (channel === 'alipay') return t('payment.alipay')
+  if (channel === 'wechat' || channel === 'wxpay') return t('payment.wechat')
+  if (channel === 'admin') return t('payment.adminRecharge')
+  if (channel === 'activity') return t('payment.activityRecharge')
+  return channel
 }
 
 function shouldShowChannel(orderType?: string): boolean {
