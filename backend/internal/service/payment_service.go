@@ -23,6 +23,7 @@ type CreatePaymentOrderRequest struct {
 	Username      string
 	AmountCNY     float64
 	Provider      string
+	Channel       string
 	PaymentMethod string
 	ClientIP      string
 	UserAgent     string
@@ -112,6 +113,7 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 		ExchangeRate:  s.cfg.ExchangeRate,
 		DiscountRate:  discount,
 		Provider:      strings.ToLower(req.Provider),
+		Channel:       strings.ToLower(req.Channel),
 		PaymentMethod: req.PaymentMethod,
 		Status:        PaymentStatusPending,
 		ExpireAt:      time.Now().Add(time.Duration(s.cfg.OrderExpireMinutes) * time.Minute),

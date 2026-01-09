@@ -260,6 +260,7 @@ type PaymentOrder struct {
 	UserEmail string     `json:"user_email,omitempty"`
 	Username  string     `json:"username"`
 	Provider  string     `json:"provider"`
+	Channel   string     `json:"channel"`
 	Status    string     `json:"status"`
 	Remark    string     `json:"remark,omitempty"`
 	AmountCNY float64    `json:"amount_cny"`

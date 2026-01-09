@@ -51,13 +51,13 @@ func (r *paymentOrderRepository) Create(ctx context.Context, order *service.Paym
 INSERT INTO payment_orders (
   order_no, trade_no, user_id, username, remark,
   amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
-  provider, payment_method, payment_url,
+  provider, channel, payment_method, payment_url,
   status, paid_at, expire_at,
   promotion_tier, promotion_used,
   callback_data, callback_at,
   client_ip, user_agent
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
 RETURNING id, created_at, updated_at
 `,
 		[]any{
@@ -72,6 +72,7 @@ RETURNING id, created_at, updated_at
 			order.TotalUSD,
 			order.ExchangeRate,
 			order.Provider,
+			nullIfEmpty(order.Channel),
 			nullIfEmpty(order.PaymentMethod),
 			nullIfEmpty(order.PaymentURL),
 			order.Status,
@@ -143,17 +144,18 @@ SET trade_no=$2,
     total_usd=$8,
     exchange_rate=$9,
     provider=$10,
-    payment_method=$11,
-    payment_url=$12,
-    status=$13,
-    paid_at=$14,
-    expire_at=$15,
-    promotion_tier=$16,
-    promotion_used=$17,
-    callback_data=$18,
-    callback_at=$19,
-    client_ip=$20,
-    user_agent=$21,
+    channel=$11,
+    payment_method=$12,
+    payment_url=$13,
+    status=$14,
+    paid_at=$15,
+    expire_at=$16,
+    promotion_tier=$17,
+    promotion_used=$18,
+    callback_data=$19,
+    callback_at=$20,
+    client_ip=$21,
+    user_agent=$22,
     updated_at=NOW()
 WHERE order_no=$1
 RETURNING updated_at
@@ -169,6 +171,7 @@ RETURNING updated_at
 			order.TotalUSD,
 			order.ExchangeRate,
 			order.Provider,
+			nullIfEmpty(order.Channel),
 			nullIfEmpty(order.PaymentMethod),
 			nullIfEmpty(order.PaymentURL),
 			order.Status,
@@ -233,7 +236,7 @@ func (r *paymentOrderRepository) List(ctx context.Context, params pagination.Pag
 		`
 SELECT id, order_no, trade_no, user_id, username, remark,
        amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
-       provider, payment_method, payment_url,
+       provider, channel, payment_method, payment_url,
        status, paid_at, expire_at,
        promotion_tier, promotion_used,
        callback_data, callback_at,
@@ -290,7 +293,7 @@ func (r *paymentOrderRepository) getOne(ctx context.Context, exec sqlExecutor, w
 	query := `
 SELECT id, order_no, trade_no, user_id, username, remark,
        amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
-       provider, payment_method, payment_url,
+       provider, channel, payment_method, payment_url,
        status, paid_at, expire_at,
        promotion_tier, promotion_used,
        callback_data, callback_at,
@@ -325,6 +328,7 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 	var o service.PaymentOrder
 	var tradeNo sql.NullString
 	var username sql.NullString
+	var channel sql.NullString
 	var paymentMethod sql.NullString
 	var paymentURL sql.NullString
 	var paidAt sql.NullTime
@@ -347,6 +351,7 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 		&o.TotalUSD,
 		&o.ExchangeRate,
 		&o.Provider,
+		&channel,
 		&paymentMethod,
 		&paymentURL,
 		&o.Status,
@@ -369,6 +374,7 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 		o.TradeNo = &v
 	}
 	o.Username = username.String
+	o.Channel = channel.String
 	o.PaymentMethod = paymentMethod.String
 	o.PaymentURL = paymentURL.String
 	if paidAt.Valid {

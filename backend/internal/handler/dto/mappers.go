@@ -354,6 +354,7 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 		UserID:    o.UserID,
 		Username:  o.Username,
 		Provider:  o.Provider,
+		Channel:   o.Channel,
 		Status:    o.Status,
 		Remark:    o.Remark,
 		AmountCNY: o.AmountCNY,

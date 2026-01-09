@@ -123,6 +123,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		Username:      "",
 		AmountCNY:     amountCNY,
 		Provider:      provider,
+		Channel:       req.Channel,
 		PaymentMethod: "web",
 		ClientIP:      c.ClientIP(),
 		UserAgent:     c.GetHeader("User-Agent"),

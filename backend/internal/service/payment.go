@@ -27,6 +27,7 @@ type PaymentOrder struct {
 	DiscountRate float64
 
 	Provider      string
+	Channel       string // 支付渠道(alipay/wechat/zpay/stripe)
 	PaymentMethod string
 	PaymentURL    string
 
