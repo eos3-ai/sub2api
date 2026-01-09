@@ -117,12 +117,6 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 
 	provider := normalizePaymentProvider(req.Channel)
-	// Business rule: WeChat Pay (Stripe) minimum payable is ¥100.
-	// Frontend also enforces it, but backend must validate to prevent bypass.
-	if provider == "stripe" && amountCNY > 0 && amountCNY < 100 {
-		response.BadRequest(c, "wechat pay minimum amount is 100 CNY")
-		return
-	}
 
 	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
 		UserID:        subject.UserID,
@@ -262,10 +256,8 @@ func normalizedDiscountRate(discountRate float64) float64 {
 
 func normalizePaymentProvider(channel string) string {
 	switch strings.ToLower(strings.TrimSpace(channel)) {
-	case "alipay":
+	case "alipay", "wechat":
 		return "zpay"
-	case "wechat":
-		return "stripe"
 	default:
 		return strings.ToLower(strings.TrimSpace(channel))
 	}

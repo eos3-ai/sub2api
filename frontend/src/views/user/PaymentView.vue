@@ -92,25 +92,6 @@
                 </p>
               </button>
               </div>
-
-              <div
-                v-if="payMethod === 'wechat'"
-                class="text-sm"
-                :class="
-                  computedPayCNY > 0 && computedPayCNY < wechatMinCNY
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-gray-500 dark:text-dark-400'
-                "
-              >
-                {{
-                  computedPayCNY > 0 && computedPayCNY < wechatMinCNY
-                    ? t('payment.wechatMinRechargeWarn', {
-                        min: wechatMinCNY.toFixed(2),
-                        current: computedPayCNY.toFixed(2)
-                      })
-                    : t('payment.wechatMinRecharge', { amount: wechatMinCNY.toFixed(2) })
-                }}
-              </div>
             </div>
 
             <div class="space-y-3 pt-2">
@@ -458,8 +439,6 @@ const qrImage = ref('')
 const polling = ref(false)
 let pollTimer: number | null = null
 
-const wechatMinCNY = 100
-
 const exchangeRate = computed(() => {
   const rate = selectedPlan.value?.exchange_rate ?? plans.value[0]?.exchange_rate
   return typeof rate === 'number' && rate > 0 ? rate : 7.2
@@ -510,7 +489,6 @@ const canPayNow = computed(() => {
   if (!selectedKind.value) return false
   if (selectedKind.value === 'plan' && !selectedPlan.value) return false
   if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) return false
-  if (payMethod.value === 'wechat' && computedPayCNY.value > 0 && computedPayCNY.value < wechatMinCNY) return false
   return true
 })
 
@@ -690,15 +668,6 @@ async function payNow() {
   }
   if (selectedKind.value === 'plan' && !selectedPlan.value) {
     appStore.showWarning(t('payment.selectAmount'))
-    return
-  }
-  if (payMethod.value === 'wechat' && computedPayCNY.value > 0 && computedPayCNY.value < wechatMinCNY) {
-    appStore.showWarning(
-      t('payment.wechatMinRechargeWarn', {
-        min: wechatMinCNY.toFixed(2),
-        current: computedPayCNY.value.toFixed(2)
-      })
-    )
     return
   }
 

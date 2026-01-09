@@ -298,7 +298,7 @@ export default {
     alipay: 'Alipay',
     wechat: 'WeChat Pay',
     alipayHint: 'Pay with Alipay (ZPay)',
-    wechatHint: 'Pay with WeChat (Stripe)',
+    wechatHint: 'Pay with WeChat (ZPay)',
     rechargeNow: 'Recharge Now',
     calcTitle: 'Recharge Amount Calculation',
     calcSubtitle: 'The system will calculate the payable CNY amount using the formula below.',

@@ -298,7 +298,7 @@ export default {
     alipay: '支付宝',
     wechat: '微信',
     alipayHint: '支付宝支付（ZPay）',
-    wechatHint: '微信支付（Stripe）',
+    wechatHint: '微信支付（ZPay）',
     calcTitle: '充值金额计算',
     calcSubtitle: '系统会根据以下计算公式确定人民币实付金额',
     displayAmount: '显示额度',
