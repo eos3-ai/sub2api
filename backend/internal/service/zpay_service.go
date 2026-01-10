@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log"
 	"net/url"
 	"sort"
 	"strings"
@@ -88,6 +89,10 @@ func (s *ZpayService) CreatePayment(ctx context.Context, order *PaymentOrder, ch
 	channelID := s.selectChannelID(payType)
 	if channelID != "" {
 		params["cid"] = channelID
+		log.Printf("[ZPAY Debug] Adding CID for %s: %s", payType, channelID)
+	} else {
+		log.Printf("[ZPAY Debug] No CID configured for %s (AlipayChannelID: %s, WechatChannelID: %s)",
+			payType, s.cfg.AlipayChannelID, s.cfg.WechatChannelID)
 	}
 
 	sign := zpayMD5Sign(params, s.cfg.Key)
@@ -101,6 +106,15 @@ func (s *ZpayService) CreatePayment(ctx context.Context, order *PaymentOrder, ch
 	payURL = submitURL + "?" + values.Encode()
 	// For ZPay, frontend can generate QR code from pay_url directly.
 	qrURL = payURL
+
+	// Debug log for final URL
+	log.Printf("[ZPAY Debug] Final payment URL: %s", payURL)
+	if cidValue := values.Get("cid"); cidValue != "" {
+		log.Printf("[ZPAY Debug] URL contains cid=%s", cidValue)
+	} else {
+		log.Printf("[ZPAY Debug] URL does NOT contain cid parameter")
+	}
+
 	return payURL, qrURL, nil
 }
 
@@ -208,8 +222,12 @@ func (s *ZpayService) resolvePublicURL(raw string) (string, error) {
 // Returns the channel ID if configured, empty string otherwise.
 func (s *ZpayService) selectChannelID(payType string) string {
 	if s.cfg == nil {
+		log.Printf("[ZPAY Debug] selectChannelID: cfg is nil")
 		return ""
 	}
+
+	log.Printf("[ZPAY Debug] selectChannelID: payType=%s, AlipayChannelID=%s, WechatChannelID=%s",
+		payType, s.cfg.AlipayChannelID, s.cfg.WechatChannelID)
 
 	switch strings.ToLower(payType) {
 	case "alipay":
@@ -217,6 +235,7 @@ func (s *ZpayService) selectChannelID(payType string) string {
 	case "wxpay":
 		return strings.TrimSpace(s.cfg.WechatChannelID)
 	default:
+		log.Printf("[ZPAY Debug] selectChannelID: Unknown payType: %s", payType)
 		return ""
 	}
 }
