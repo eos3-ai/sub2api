@@ -397,6 +397,12 @@ type ZpayConfig struct {
 	NotifyUser     bool   `mapstructure:"notify_user"`
 	IPWhitelist    string `mapstructure:"ip_whitelist"`
 	RequireHTTPS   bool   `mapstructure:"require_https"`
+
+	// Multi-channel support: specify channel ID (cid) for different payment methods
+	// When you have multiple payment channels in ZPAY console (e.g., multiple WeChat channels),
+	// use these to specify which channel to use for each payment type
+	AlipayChannelID string `mapstructure:"alipay_channel_id"` // Alipay channel ID (optional)
+	WechatChannelID string `mapstructure:"wechat_channel_id"` // WeChat channel ID (optional)
 }
 
 type StripeConfig struct {
@@ -656,6 +662,9 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("payment.zpay.notify_user", "PAYMENT_ZPAY_NOTIFY_USER", "ZPAY_NOTIFY_USER")
 	_ = v.BindEnv("payment.zpay.ip_whitelist", "PAYMENT_ZPAY_IP_WHITELIST", "ZPAY_IP_WHITELIST")
 	_ = v.BindEnv("payment.zpay.require_https", "PAYMENT_ZPAY_REQUIRE_HTTPS", "ZPAY_REQUIRE_HTTPS")
+	// ZPay multi-channel support: channel ID (cid) for specific payment types
+	_ = v.BindEnv("payment.zpay.alipay_channel_id", "PAYMENT_ZPAY_ALIPAY_CHANNEL_ID", "ZPAY_ALIPAY_CHANNEL_ID")
+	_ = v.BindEnv("payment.zpay.wechat_channel_id", "PAYMENT_ZPAY_WECHAT_CHANNEL_ID", "ZPAY_WECHAT_CHANNEL_ID")
 
 	// Payment.Stripe (keep deploy/.env.example naming working)
 	_ = v.BindEnv("payment.stripe.enabled", "PAYMENT_STRIPE_ENABLED", "STRIPE_ENABLED")
@@ -707,6 +716,9 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("payment.zpay.notify_user", "ZPAY_NOTIFY_USER")
 	_ = v.BindEnv("payment.zpay.ip_whitelist", "ZPAY_IP_WHITELIST")
 	_ = v.BindEnv("payment.zpay.require_https", "ZPAY_REQUIRE_HTTPS")
+	// ZPay multi-channel support (legacy env vars)
+	_ = v.BindEnv("payment.zpay.alipay_channel_id", "ZPAY_ALIPAY_CHANNEL_ID")
+	_ = v.BindEnv("payment.zpay.wechat_channel_id", "ZPAY_WECHAT_CHANNEL_ID")
 
 	// Stripe
 	_ = v.BindEnv("payment.stripe.enabled", "STRIPE_ENABLED", "PAYMENT_STRIPE_ENABLED")

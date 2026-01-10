@@ -84,6 +84,12 @@ func (s *ZpayService) CreatePayment(ctx context.Context, order *PaymentOrder, ch
 		"money":        fmt.Sprintf("%.2f", order.AmountCNY),
 	}
 
+	// Add channel ID (cid) if configured for specific payment type
+	channelID := s.selectChannelID(payType)
+	if channelID != "" {
+		params["cid"] = channelID
+	}
+
 	sign := zpayMD5Sign(params, s.cfg.Key)
 	values := url.Values{}
 	for k, v := range params {
@@ -196,4 +202,21 @@ func (s *ZpayService) resolvePublicURL(raw string) (string, error) {
 		value = "/" + value
 	}
 	return base + value, nil
+}
+
+// selectChannelID selects the appropriate channel ID (cid) based on payment type.
+// Returns the channel ID if configured, empty string otherwise.
+func (s *ZpayService) selectChannelID(payType string) string {
+	if s.cfg == nil {
+		return ""
+	}
+
+	switch strings.ToLower(payType) {
+	case "alipay":
+		return strings.TrimSpace(s.cfg.AlipayChannelID)
+	case "wxpay":
+		return strings.TrimSpace(s.cfg.WechatChannelID)
+	default:
+		return ""
+	}
 }
