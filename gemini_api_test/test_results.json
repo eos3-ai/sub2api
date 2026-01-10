@@ -1,0 +1,104 @@
+{
+  "test_time": "2026-01-09T23:26:32.193605",
+  "api_base_url": "https://router.aitokencloud.com",
+  "model": "gemini-3-pro-preview",
+  "tests": [
+    {
+      "name": "获取模型列表",
+      "success": true,
+      "result": {
+        "status": "success",
+        "status_code": 200,
+        "elapsed": 2.3023548126220703,
+        "model_count": 50,
+        "target_found": true
+      }
+    },
+    {
+      "name": "获取模型详情",
+      "success": true,
+      "result": {
+        "status": "success",
+        "status_code": 200,
+        "elapsed": 0.28857970237731934,
+        "model_info": {
+          "name": "models/gemini-3-pro-preview",
+          "version": "3-pro-preview-11-2025",
+          "displayName": "Gemini 3 Pro Preview",
+          "description": "Gemini 3 Pro Preview",
+          "inputTokenLimit": 1048576,
+          "outputTokenLimit": 65536,
+          "supportedGenerationMethods": [
+            "generateContent",
+            "countTokens",
+            "createCachedContent",
+            "batchGenerateContent"
+          ],
+          "temperature": 1,
+          "topP": 0.95,
+          "topK": 64,
+          "maxTemperature": 2,
+          "thinking": true
+        }
+      }
+    },
+    {
+      "name": "非流式内容生成",
+      "success": true,
+      "result": {
+        "status": "success",
+        "status_code": 200,
+        "elapsed": 2.228342056274414,
+        "response": {
+          "candidates": [
+            {
+              "content": {},
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 13,
+            "totalTokenCount": 60,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 13
+              }
+            ],
+            "thoughtsTokenCount": 47
+          },
+          "modelVersion": "gemini-3-pro-preview",
+          "responseId": "MR5hadimFPKwqtsPteCmiAo"
+        }
+      }
+    },
+    {
+      "name": "流式内容生成",
+      "success": true,
+      "result": {
+        "status": "success",
+        "status_code": 200,
+        "elapsed": 3.2037529945373535,
+        "event_count": 1,
+        "chunks": 1
+      }
+    },
+    {
+      "name": "Token 计数",
+      "success": true,
+      "result": {
+        "status": "success",
+        "status_code": 200,
+        "elapsed": 1.7096598148345947,
+        "token_count": 8
+      }
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "conclusion": "完全可用"
+  }
+}

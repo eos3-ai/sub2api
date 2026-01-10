@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-01-10T12:47:58.910221",
+  "model": "gemini-3-pro-image-preview",
+  "text_generation_test": true,
+  "image_generation_tests": [
+    {
+      "prompt": "A serene mountain landscape at sunset with a lake reflecting the sky",
+      "success": false,
+      "data": null
+    },
+    {
+      "prompt": "一只可爱的橙色猫咪坐在窗台上看着外面的花园",
+      "success": false,
+      "data": null
+    },
+    {
+      "prompt": "Futuristic city skyline with flying cars and neon lights",
+      "success": false,
+      "data": null
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "success": 0,
+    "failed": 3
+  }
+}

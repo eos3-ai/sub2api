@@ -1,0 +1,28 @@
+{
+  "timestamp": "2026-01-10T11:57:33.166574",
+  "summary": {
+    "total": 3,
+    "available": 3,
+    "unavailable": 0
+  },
+  "results": [
+    {
+      "model": "gemini-3-pro-preview",
+      "available": true,
+      "status_code": 200,
+      "error": null
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "available": true,
+      "status_code": 200,
+      "error": null
+    },
+    {
+      "model": "gemini-3-pro-image-preview",
+      "available": true,
+      "status_code": 200,
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-01-09T23:49:16.927122",
+  "api_base": "https://generativelanguage.googleapis.com",
+  "proxy": "http://127.0.0.1:7897",
+  "results": [
+    {
+      "model": "gemini-3-pro-preview",
+      "info_available": true,
+      "generate_available": true,
+      "info_data": {
+        "name": "models/gemini-3-pro-preview",
+        "version": "3-pro-preview-11-2025",
+        "displayName": "Gemini 3 Pro Preview",
+        "description": "Gemini 3 Pro Preview",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedGenerationMethods": [
+          "generateContent",
+          "countTokens",
+          "createCachedContent",
+          "batchGenerateContent"
+        ],
+        "temperature": 1,
+        "topP": 0.95,
+        "topK": 64,
+        "maxTemperature": 2,
+        "thinking": true
+      },
+      "generate_data": {
+        "status_code": 200,
+        "available": true,
+        "response": {
+          "candidates": [
+            {
+              "content": {},
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 6,
+            "totalTokenCount": 53,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 6
+              }
+            ],
+            "thoughtsTokenCount": 47
+          },
+          "modelVersion": "gemini-3-pro-preview",
+          "responseId": "diNhaYPENfqt2roP0KjH8As"
+        }
+      }
+    },
+    {
+      "model": "gemini-3-flash-preview",
+      "info_available": true,
+      "generate_available": true,
+      "info_data": {
+        "name": "models/gemini-3-flash-preview",
+        "version": "3-flash-preview-12-2025",
+        "displayName": "Gemini 3 Flash Preview",
+        "description": "Gemini 3 Flash Preview",
+        "inputTokenLimit": 1048576,
+        "outputTokenLimit": 65536,
+        "supportedGenerationMethods": [
+          "generateContent",
+          "countTokens",
+          "createCachedContent",
+          "batchGenerateContent"
+        ],
+        "temperature": 1,
+        "topP": 0.95,
+        "topK": 64,
+        "maxTemperature": 2,
+        "thinking": true
+      },
+      "generate_data": {
+        "status_code": 200,
+        "available": true,
+        "response": {
+          "candidates": [
+            {
+              "content": {
+                "parts": [
+                  {
+                    "text": "Hello.",
+                    "thoughtSignature": "Eq4BCqsBAXLI2nz6xYIE7OrXnM+zqJrcpSzUy0JNIs8mRh3lQM5H11f8joRbGj5yfGA877aYFM38JRnnKzyq6CdIIXpQVZBIGb7YIRkppq1IxKr6wKK3rb2nZrf3Udlh/tPkz6zk6fk8qTuHZ3H8e708vpBL+OgzyP0wxyqkTBPQ4Q4DSSK7vIdQmRi37qM0T7gsPUXrnm2YWHxkGPeuBx8g1VJ9rgmnJabp4NKiQQv6"
+                  }
+                ],
+                "role": "model"
+              },
+              "finishReason": "MAX_TOKENS",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 6,
+            "candidatesTokenCount": 2,
+            "totalTokenCount": 52,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 6
+              }
+            ],
+            "thoughtsTokenCount": 44
+          },
+          "modelVersion": "gemini-3-flash-preview",
+          "responseId": "eiNhabflAZOM0-kPtd6awAc"
+        }
+      }
+    },
+    {
+      "model": "gemini-3-pro-image-preview",
+      "info_available": true,
+      "generate_available": true,
+      "info_data": {
+        "name": "models/gemini-3-pro-image-preview",
+        "version": "3.0",
+        "displayName": "Nano Banana Pro",
+        "description": "Gemini 3 Pro Image Preview",
+        "inputTokenLimit": 131072,
+        "outputTokenLimit": 32768,
+        "supportedGenerationMethods": [
+          "generateContent",
+          "countTokens",
+          "batchGenerateContent"
+        ],
+        "temperature": 1,
+        "topP": 0.95,
+        "topK": 64,
+        "maxTemperature": 1,
+        "thinking": true
+      },
+      "generate_data": {
+        "status_code": 200,
+        "available": true,
+        "response": {
+          "candidates": [
+            {
+              "content": {},
+              "finishReason": "STOP",
+              "index": 0
+            }
+          ],
+          "usageMetadata": {
+            "promptTokenCount": 6,
+            "totalTokenCount": 53,
+            "promptTokensDetails": [
+              {
+                "modality": "TEXT",
+                "tokenCount": 6
+              }
+            ],
+            "thoughtsTokenCount": 47
+          },
+          "modelVersion": "gemini-3-pro-image-preview",
+          "responseId": "fiNhaf2PMu7avr0P3MjA6A0"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,141 @@
+{
+  "test_time": "2026-01-10T11:57:42.369094",
+  "api_base_url": "https://router.aitokencloud.com",
+  "models": [
+    {
+      "model_id": "gemini-3-pro-preview",
+      "model_name": "Gemini 3 Pro Preview",
+      "description": "支持推理模式的旗舰模型",
+      "tests": {
+        "basic": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "status_code": 200,
+            "elapsed": 3.427063226699829,
+            "generated_text": "",
+            "prompt_tokens": 10,
+            "output_tokens": 0,
+            "total_tokens": 207,
+            "thinking_tokens": 197
+          }
+        },
+        "reasoning": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 5.876734256744385,
+            "generated_text": "",
+            "thinking_tokens": 497,
+            "has_reasoning": true
+          }
+        },
+        "creative": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 5.019629240036011,
+            "generated_text": ""
+          }
+        },
+        "speed": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 2.1314191818237305
+          }
+        }
+      }
+    },
+    {
+      "model_id": "gemini-3-flash-preview",
+      "model_name": "Gemini 3 Flash Preview",
+      "description": "快速响应的轻量级模型",
+      "tests": {
+        "basic": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "status_code": 200,
+            "elapsed": 2.0216739177703857,
+            "generated_text": "量子计算是利用量子力学中的",
+            "prompt_tokens": 10,
+            "output_tokens": 8,
+            "total_tokens": 206,
+            "thinking_tokens": 188
+          }
+        },
+        "reasoning": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 3.4224660396575928,
+            "generated_text": "为了计算加入6个男生后男生占总人数的百分比，我们可以分步进行计算：\n\n### 第一步：计算原有的学生人数\n\n1.  **原有总人数**：30人\n2.  **原有的女生人数**：\n    $$30 \\times \\frac{2}{3} = 20 \\text{ 人}$$\n3.  **原有的男生人数**：\n    $$30 - 20 = 10 \\text{ 人}$$\n    *（或者计算：$30 \\times \\frac{1}{3}",
+            "thinking_tokens": 370,
+            "has_reasoning": true
+          }
+        },
+        "creative": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 2.7527480125427246,
+            "generated_text": "东风拂过柳丝长， (d"
+          }
+        },
+        "speed": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 1.00655198097229
+          }
+        }
+      }
+    },
+    {
+      "model_id": "gemini-3-pro-image-preview",
+      "model_name": "Nano Banana Pro",
+      "description": "图像生成专用模型",
+      "tests": {
+        "basic": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "status_code": 200,
+            "elapsed": 3.689863920211792,
+            "generated_text": "",
+            "prompt_tokens": 10,
+            "output_tokens": 0,
+            "total_tokens": 207,
+            "thinking_tokens": 197
+          }
+        },
+        "reasoning": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 6.376024961471558,
+            "generated_text": "",
+            "thinking_tokens": 497,
+            "has_reasoning": true
+          }
+        },
+        "creative": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 4.852342128753662,
+            "generated_text": ""
+          }
+        },
+        "speed": {
+          "success": true,
+          "result": {
+            "status": "success",
+            "elapsed": 2.0690228939056396
+          }
+        }
+      }
+    }
+  ]
+}
