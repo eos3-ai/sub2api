@@ -34,6 +34,7 @@ type GatewayHandler struct {
 	userService               *service.UserService
 	billingCacheService       *service.BillingCacheService
 	concurrencyHelper         *ConcurrencyHelper
+	maxRequestBodyBytes       int64 // 请求体大小限制（从配置读取）
 }
 
 func (h *GatewayHandler) recordUsageSync(apiKey *service.APIKey, subscription *service.UserSubscription, result *service.ForwardResult, usedAccount *service.Account) {
@@ -64,9 +65,17 @@ func NewGatewayHandler(
 	cfg *config.Config,
 ) *GatewayHandler {
 	pingInterval := time.Duration(0)
+	maxBodyBytes := maxGatewayRequestBodyBytes // 默认 10MB
+
 	if cfg != nil {
 		pingInterval = time.Duration(cfg.Concurrency.PingInterval) * time.Second
+
+		// 从配置读取请求体大小限制
+		if cfg.Gateway.MaxBodySize > 0 {
+			maxBodyBytes = cfg.Gateway.MaxBodySize
+		}
 	}
+
 	return &GatewayHandler{
 		gatewayService:            gatewayService,
 		geminiCompatService:       geminiCompatService,
@@ -74,6 +83,7 @@ func NewGatewayHandler(
 		userService:               userService,
 		billingCacheService:       billingCacheService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
+		maxRequestBodyBytes:       maxBodyBytes,
 	}
 }
 
@@ -165,7 +175,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		return
 	}
 
-	parsedReq, err := parseGatewayRequestStream(c.Request.Body, maxGatewayRequestBodyBytes)
+	parsedReq, err := parseGatewayRequestStream(c.Request.Body, h.maxRequestBodyBytes)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))
@@ -773,7 +783,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	parsedReq, err := parseGatewayRequestStream(c.Request.Body, maxGatewayRequestBodyBytes)
+	parsedReq, err := parseGatewayRequestStream(c.Request.Body, h.maxRequestBodyBytes)
 	if err != nil {
 		if maxErr, ok := extractMaxBytesError(err); ok {
 			h.errorResponse(c, http.StatusRequestEntityTooLarge, "invalid_request_error", buildBodyTooLargeMessage(maxErr.Limit))

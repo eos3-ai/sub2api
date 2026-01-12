@@ -22,30 +22,59 @@ server:
 run_mode: "standard"
 
 # =============================================================================
-# 网关配置
+# Gateway Configuration (网关配置)
 # =============================================================================
 gateway:
   # 等待上游响应头超时时间（秒）
+  # Wait time (in seconds) for upstream response headers (streaming body not affected)
   response_header_timeout: 300
+
   # 请求体最大字节数（默认 100MB）
+  # Maximum request body size in bytes (default: 100MB)
+  # Common values:
+  #   - 10MB:  10485760   (text-only conversations)
+  #   - 20MB:  20971520   (single image analysis)
+  #   - 50MB:  52428800   (multiple images, 3-5 images)
+  #   - 100MB: 104857600  (default, general use)
+  #   - 200MB: 209715200  (enterprise/internal network)
   max_body_size: 104857600
+
   # 连接池隔离策略：
+  # Connection pool isolation strategy:
   # - proxy: 按代理隔离，同一代理共享连接池（适合代理少、账户多）
   # - account: 按账户隔离，同一账户共享连接池（适合账户少、需严格隔离）
   # - account_proxy: 按账户+代理组合隔离（默认，最细粒度）
   connection_pool_isolation: "account_proxy"
+
   # HTTP 上游连接池配置（HTTP/2 + 多代理场景默认）
+  # HTTP upstream connection pool configuration
   max_idle_conns: 240
   max_idle_conns_per_host: 120
   max_conns_per_host: 240
   idle_conn_timeout_seconds: 300
+
   # 上游连接池客户端缓存配置
+  # Upstream connection pool client cache configuration
   # max_upstream_clients: 最大缓存客户端数量，超出后淘汰最久未使用的
   # client_idle_ttl_seconds: 客户端空闲回收阈值（秒），超时且无活跃请求时回收
   max_upstream_clients: 5000
   client_idle_ttl_seconds: 900
+
   # 并发槽位过期时间（分钟）
+  # Concurrency slot TTL (minutes)
   concurrency_slot_ttl_minutes: 15
+
+  # 日志配置 / Logging options
+  # Log upstream error response body summary (safe/truncated; does not log request content)
+  log_upstream_error_body: false
+  # Max bytes to log from upstream error body
+  log_upstream_error_body_max_bytes: 2048
+
+  # 高级选项 / Advanced options
+  # Auto inject anthropic-beta for API-key accounts when needed (default off)
+  inject_beta_for_apikey: false
+  # Allow failover on selected 400 errors (default off)
+  failover_on_400: false
 
 # =============================================================================
 # Database Configuration (PostgreSQL)
@@ -121,21 +150,6 @@ pricing:
   update_interval_hours: 24
   # Hash check interval in minutes
   hash_check_interval_minutes: 10
-
-# =============================================================================
-# Gateway (Optional)
-# =============================================================================
-gateway:
-  # Wait time (in seconds) for upstream response headers (streaming body not affected)
-  response_header_timeout: 300
-  # Log upstream error response body summary (safe/truncated; does not log request content)
-  log_upstream_error_body: false
-  # Max bytes to log from upstream error body
-  log_upstream_error_body_max_bytes: 2048
-  # Auto inject anthropic-beta for API-key accounts when needed (default off)
-  inject_beta_for_apikey: false
-  # Allow failover on selected 400 errors (default off)
-  failover_on_400: false
 
 # =============================================================================
 # Gemini OAuth (Required for Gemini accounts)
