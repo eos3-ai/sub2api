@@ -81,9 +81,14 @@ func (s *BalanceService) ApplyChange(ctx context.Context, req BalanceChangeReque
 		return nil, fmt.Errorf("create recharge record: %w", err)
 	}
 
-	// 余额变动后失效缓存
+	// 余额变动后失效缓存（同步操作，确保缓存一致性）
 	if s.billingCacheService != nil {
-		_ = s.billingCacheService.InvalidateUserBalance(ctx, req.UserID)
+		if err := s.billingCacheService.InvalidateUserBalance(ctx, req.UserID); err != nil {
+			// 记录错误但不阻断主流程（缓存失效失败不应影响业务）
+			// 后续请求会触发缓存重建，且缓存有 TTL 保护
+			// 注：如需更严格的一致性，可返回错误
+			fmt.Printf("Warning: failed to invalidate balance cache for user %d: %v\n", req.UserID, err)
+		}
 	}
 
 	return record, nil

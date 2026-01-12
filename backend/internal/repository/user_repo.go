@@ -348,19 +348,35 @@ func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount flo
 }
 
 // DeductBalance 扣除用户余额
-// 透支策略：允许余额变为负数，确保当前请求能够完成
-// 中间件会阻止余额 <= 0 的用户发起后续请求
+// 安全策略：禁止透支，余额不足时返回 ErrInsufficientBalance
+// 使用乐观锁确保余额充足性检查与扣费的原子性
 func (r *userRepository) DeductBalance(ctx context.Context, id int64, amount float64) error {
 	client := clientFromContext(ctx, r.client)
+
+	// 使用 WHERE balance >= amount 条件实现原子的余额检查与扣费
+	// 如果余额不足，更新影响行数为 0
 	n, err := client.User.Update().
-		Where(dbuser.IDEQ(id)).
+		Where(
+			dbuser.IDEQ(id),
+			dbuser.BalanceGTE(amount), // 乐观锁：仅在余额充足时才更新
+		).
 		AddBalance(-amount).
 		Save(ctx)
 	if err != nil {
-		return err
+		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
 	if n == 0 {
-		return service.ErrUserNotFound
+		// 区分两种情况：用户不存在 vs 余额不足
+		// 通过再次查询用户来判断
+		_, err := client.User.Get(ctx, id)
+		if err != nil {
+			if dbent.IsNotFound(err) {
+				return service.ErrUserNotFound
+			}
+			return err
+		}
+		// 用户存在但更新失败 → 余额不足
+		return service.ErrInsufficientBalance
 	}
 	return nil
 }

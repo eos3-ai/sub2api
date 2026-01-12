@@ -295,13 +295,11 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 			if err := s.userRepo.UpdateBalance(txCtx, userID, redeemCode.Value); err != nil {
 				return nil, fmt.Errorf("update user balance: %w", err)
 			}
-			// 失效余额缓存
+			// 失效余额缓存（同步操作）
 			if s.billingCacheService != nil {
-				go func() {
-					cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-					defer cancel()
-					_ = s.billingCacheService.InvalidateUserBalance(cacheCtx, userID)
-				}()
+				if err := s.billingCacheService.InvalidateUserBalance(txCtx, userID); err != nil {
+					log.Printf("Warning: failed to invalidate balance cache for user %d: %v", userID, err)
+				}
 			}
 		}
 
@@ -356,19 +354,15 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 
 	switch redeemCode.Type {
 	case RedeemTypeBalance:
-		go func() {
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			_ = s.billingCacheService.InvalidateUserBalance(cacheCtx, userID)
-		}()
+		if err := s.billingCacheService.InvalidateUserBalance(ctx, userID); err != nil {
+			log.Printf("Warning: failed to invalidate balance cache for user %d: %v", userID, err)
+		}
 	case RedeemTypeSubscription:
 		if redeemCode.GroupID != nil {
 			groupID := *redeemCode.GroupID
-			go func() {
-				cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
-			}()
+			if err := s.billingCacheService.InvalidateSubscription(ctx, userID, groupID); err != nil {
+				log.Printf("Warning: failed to invalidate subscription cache for user %d group %d: %v", userID, groupID, err)
+			}
 		}
 	}
 }
