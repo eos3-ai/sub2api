@@ -106,135 +106,16 @@
       </template>
       <template #pagination><Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" /></template>
     </TablePageLayout>
-
-    <!-- Create Account Modal -->
-    <CreateAccountModal
-      :show="showCreateModal"
-      :proxies="proxies"
-      :groups="groups"
-      @close="showCreateModal = false"
-      @created="() => { loadAccounts(); if (onboardingStore.isCurrentStep(`[data-tour='account-form-submit']`)) onboardingStore.nextStep(500) }"
-    />
-
-    <!-- Edit Account Modal -->
-    <EditAccountModal
-      :show="showEditModal"
-      :account="editingAccount"
-      :proxies="proxies"
-      :groups="groups"
-      @close="closeEditModal"
-      @updated="loadAccounts"
-    />
-
-    <!-- Re-Auth Modal -->
-    <ReAuthAccountModal
-      :show="showReAuthModal"
-      :account="reAuthAccount"
-      @close="closeReAuthModal"
-      @reauthorized="loadAccounts"
-    />
-
-    <!-- Test Account Modal -->
-    <AccountTestModal :show="showTestModal" :account="testingAccount" @close="closeTestModal" />
-
-    <!-- Account Stats Modal -->
-    <AccountStatsModal :show="showStatsModal" :account="statsAccount" @close="closeStatsModal" />
-
-    <!-- Temp Unschedulable Status Modal -->
-    <TempUnschedStatusModal
-      :show="showTempUnschedModal"
-      :account="tempUnschedAccount"
-      @close="closeTempUnschedModal"
-      @reset="handleTempUnschedReset"
-    />
-
-    <!-- Delete Confirmation Dialog -->
-    <ConfirmDialog
-      :show="showDeleteDialog"
-      :title="t('admin.accounts.deleteAccount')"
-      :message="t('admin.accounts.deleteConfirm', { name: deletingAccount?.name })"
-      :confirm-text="t('common.delete')"
-      :cancel-text="t('common.cancel')"
-      :danger="true"
-      @confirm="confirmDelete"
-      @cancel="showDeleteDialog = false"
-    />
-    <ConfirmDialog
-      :show="showBulkDeleteDialog"
-      :title="t('admin.accounts.bulkDeleteTitle')"
-      :message="t('admin.accounts.bulkDeleteConfirm', { count: selectedAccountIds.length })"
-      :confirm-text="t('common.delete')"
-      :cancel-text="t('common.cancel')"
-      :danger="true"
-      @confirm="confirmBulkDelete"
-      @cancel="showBulkDeleteDialog = false"
-    />
-
-    <SyncFromCrsModal
-      :show="showCrsSyncModal"
-      @close="showCrsSyncModal = false"
-      @synced="handleCrsSynced"
-    />
-
-    <!-- Bulk Edit Account Modal -->
-    <BulkEditAccountModal
-      :show="showBulkEditModal"
-      :account-ids="selectedAccountIds"
-      :proxies="proxies"
-      :groups="groups"
-      @close="showBulkEditModal = false"
-      @updated="handleBulkUpdated"
-    />
-    <!-- Action Menu (Teleported) -->
-    <Teleport to="body">
-      <div
-        v-if="activeMenuId !== null && menuPosition"
-        class="action-menu-content fixed z-[9999] w-52 overflow-hidden rounded-xl bg-white shadow-lg ring-1 ring-black/5 dark:bg-dark-800 dark:ring-white/10"
-        :style="{ top: menuPosition.top + 'px', left: menuPosition.left + 'px' }"
-      >
-        <div class="py-1">
-          <template v-for="account in accounts" :key="account.id">
-            <template v-if="account.id === activeMenuId">
-              <button
-                @click="handleTest(account); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <svg class="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                {{ t('admin.accounts.testConnection') }}
-              </button>
-              <button
-                @click="handleViewStats(account); closeActionMenu()"
-                class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
-              >
-                <svg class="h-4 w-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                {{ t('admin.accounts.viewStats') }}
-              </button>
-              <template v-if="account.type === 'oauth' || account.type === 'setup-token'">
-                <button @click="handleReAuth(account); closeActionMenu()" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700">
-                  <svg class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
-                  {{ t('admin.accounts.reAuthorize') }}
-                </button>
-                <button @click="handleRefreshToken(account); closeActionMenu()" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700">
-                  <svg class="h-4 w-4 text-primary-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M4 4l16 16" /></svg>
-                  {{ t('admin.accounts.refreshToken') }}
-                </button>
-              </template>
-
-              <div v-if="account.status === 'error' || isRateLimited(account) || isOverloaded(account)" class="my-1 border-t border-gray-100 dark:border-dark-700"></div>
-
-              <button v-if="account.status === 'error'" @click="handleResetStatus(account); closeActionMenu()" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-yellow-600 hover:bg-gray-100 dark:text-yellow-400 dark:hover:bg-dark-700">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                {{ t('admin.accounts.resetStatus') }}
-              </button>
-              <button v-if="isRateLimited(account) || isOverloaded(account)" @click="handleClearRateLimit(account); closeActionMenu()" class="flex w-full items-center gap-2 px-4 py-2 text-sm text-amber-600 hover:bg-gray-100 dark:text-amber-400 dark:hover:bg-dark-700">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                {{ t('admin.accounts.clearRateLimit') }}
-              </button>
-            </template>
-          </template>
-        </div>
-      </div>
-    </Teleport>
+    <CreateAccountModal :show="showCreate" :proxies="proxies" :groups="groups" @close="showCreate = false" @created="reload" />
+    <EditAccountModal :show="showEdit" :account="edAcc" :proxies="proxies" :groups="groups" @close="showEdit = false" @updated="load" />
+    <ReAuthAccountModal :show="showReAuth" :account="reAuthAcc" @close="closeReAuthModal" @reauthorized="load" />
+    <AccountTestModal :show="showTest" :account="testingAcc" @close="closeTestModal" />
+    <AccountStatsModal :show="showStats" :account="statsAcc" @close="closeStatsModal" />
+    <AccountActionMenu :show="menu.show" :account="menu.acc" :position="menu.pos" @close="menu.show = false" @test="handleTest" @stats="handleViewStats" @reauth="handleReAuth" @refresh-token="handleRefresh" @reset-status="handleResetStatus" @clear-rate-limit="handleClearRateLimit" />
+    <SyncFromCrsModal :show="showSync" @close="showSync = false" @synced="reload" />
+    <BulkEditAccountModal :show="showBulkEdit" :account-ids="selIds" :proxies="proxies" :groups="groups" @close="showBulkEdit = false" @updated="handleBulkUpdated" />
+    <TempUnschedStatusModal :show="showTempUnsched" :account="tempUnschedAcc" @close="showTempUnsched = false" @reset="handleTempUnschedReset" />
+    <ConfirmDialog :show="showDeleteDialog" :title="t('admin.accounts.deleteAccount')" :message="t('admin.accounts.deleteConfirm', { name: deletingAcc?.name })" :confirm-text="t('common.delete')" :cancel-text="t('common.cancel')" :danger="true" @confirm="confirmDelete" @cancel="showDeleteDialog = false" />
   </AppLayout>
 </template>
 
@@ -250,23 +131,20 @@ import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-import EmptyState from '@/components/common/EmptyState.vue'
-import Select from '@/components/common/Select.vue'
-import {
-  CreateAccountModal,
-  EditAccountModal,
-  BulkEditAccountModal,
-  ReAuthAccountModal,
-  AccountStatsModal,
-  TempUnschedStatusModal,
-  SyncFromCrsModal
-} from '@/components/account'
+import { CreateAccountModal, EditAccountModal, BulkEditAccountModal, SyncFromCrsModal, TempUnschedStatusModal } from '@/components/account'
+import AccountTableActions from '@/components/admin/account/AccountTableActions.vue'
+import AccountTableFilters from '@/components/admin/account/AccountTableFilters.vue'
+import AccountBulkActionsBar from '@/components/admin/account/AccountBulkActionsBar.vue'
+import AccountActionMenu from '@/components/admin/account/AccountActionMenu.vue'
+import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
+import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
+import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
 import AccountUsageCell from '@/components/account/AccountUsageCell.vue'
 import AccountTodayStatsCell from '@/components/account/AccountTodayStatsCell.vue'
 import AccountGroupsCell from '@/components/account/AccountGroupsCell.vue'
 import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
-import { formatDateTime, formatRelativeTime } from '@/utils/format'
+import { formatDate, formatRelativeTime } from '@/utils/format'
 import type { Account, Proxy, Group } from '@/types'
 
 const { t } = useI18n()
@@ -323,79 +201,15 @@ const cols = computed(() => {
   return c
 })
 
-// Filter options
-const platformOptions = computed(() => [
-  { value: '', label: t('admin.accounts.allPlatforms') },
-  { value: 'anthropic', label: t('admin.accounts.platforms.anthropic') },
-  { value: 'openai', label: t('admin.accounts.platforms.openai') },
-  { value: 'gemini', label: t('admin.accounts.platforms.gemini') },
-  { value: 'antigravity', label: t('admin.accounts.platforms.antigravity') }
-])
-
-const typeOptions = computed(() => [
-  { value: '', label: t('admin.accounts.allTypes') },
-  { value: 'oauth', label: t('admin.accounts.oauthType') },
-  { value: 'setup-token', label: t('admin.accounts.setupToken') },
-  { value: 'apikey', label: t('admin.accounts.apiKey') }
-])
-
-const statusOptions = computed(() => [
-  { value: '', label: t('admin.accounts.allStatus') },
-  { value: 'active', label: t('common.active') },
-  { value: 'inactive', label: t('common.inactive') },
-  { value: 'error', label: t('common.error') }
-])
-
-// State
-const accounts = ref<Account[]>([])
-const proxies = ref<Proxy[]>([])
-const groups = ref<Group[]>([])
-const loading = ref(false)
-const searchQuery = ref('')
-const filters = reactive({
-  platform: '',
-  type: '',
-  status: ''
-})
-const pagination = reactive({
-  page: 1,
-  page_size: 20,
-  total: 0,
-  pages: 0
-})
-let abortController: AbortController | null = null
-
-// Modal states
-const showCreateModal = ref(false)
-const showEditModal = ref(false)
-const showReAuthModal = ref(false)
-const showDeleteDialog = ref(false)
-const showBulkDeleteDialog = ref(false)
-const showTestModal = ref(false)
-const showStatsModal = ref(false)
-const showTempUnschedModal = ref(false)
-const showCrsSyncModal = ref(false)
-const showBulkEditModal = ref(false)
-const editingAccount = ref<Account | null>(null)
-const reAuthAccount = ref<Account | null>(null)
-const deletingAccount = ref<Account | null>(null)
-const testingAccount = ref<Account | null>(null)
-const statsAccount = ref<Account | null>(null)
-const tempUnschedAccount = ref<Account | null>(null)
-const togglingSchedulable = ref<number | null>(null)
-const bulkDeleting = ref(false)
-
-// Action Menu State
-const activeMenuId = ref<number | null>(null)
-const menuPosition = ref<{ top: number; left: number } | null>(null)
-const actionButtonRefs = ref<Map<number, HTMLElement>>(new Map())
-
-const setActionButtonRef = (accountId: number, el: Element | ComponentPublicInstance | null) => {
-  if (el instanceof HTMLElement) {
-    actionButtonRefs.value.set(accountId, el)
-  } else {
-    actionButtonRefs.value.delete(accountId)
-  }
+const handleEdit = (a: Account) => { edAcc.value = a; showEdit.value = true }
+const openMenu = (a: Account, e: MouseEvent) => { menu.acc = a; menu.pos = { top: e.clientY, left: e.clientX - 200 }; menu.show = true }
+const toggleSel = (id: number) => { const i = selIds.value.indexOf(id); if(i === -1) selIds.value.push(id); else selIds.value.splice(i, 1) }
+const selectPage = () => { selIds.value = [...new Set([...selIds.value, ...accounts.value.map(a => a.id)])] }
+const handleBulkDelete = async () => { if(!confirm(t('common.confirm'))) return; try { await Promise.all(selIds.value.map(id => adminAPI.accounts.delete(id))); selIds.value = []; reload() } catch (error) { console.error('Failed to bulk delete accounts:', error) } }
+const updateSchedulableInList = (accountIds: number[], schedulable: boolean) => {
+  if (accountIds.length === 0) return
+  const idSet = new Set(accountIds)
+  accounts.value = accounts.value.map((account) => (idSet.has(account.id) ? { ...account, schedulable } : account))
 }
 const normalizeBulkSchedulableResult = (
   result: {
@@ -473,140 +287,18 @@ const handleBulkToggleSchedulable = async (schedulable: boolean) => {
     if (successIds.length > 0) {
       updateSchedulableInList(successIds, schedulable)
     }
-  }
-}
-
-const loadProxies = async () => {
-  try {
-    proxies.value = await adminAPI.proxies.getAllWithCount()
-  } catch (error) {
-    console.error('Error loading proxies:', error)
-  }
-}
-
-const loadGroups = async () => {
-  try {
-    // Load groups for all platforms to support both Anthropic and OpenAI accounts
-    groups.value = await adminAPI.groups.getAll()
-  } catch (error) {
-    console.error('Error loading groups:', error)
-  }
-}
-
-// Search handling
-let searchTimeout: ReturnType<typeof setTimeout>
-const handleSearch = () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    pagination.page = 1
-    loadAccounts()
-  }, 300)
-}
-
-// Pagination
-const handlePageChange = (page: number) => {
-  pagination.page = page
-  loadAccounts()
-}
-
-const handlePageSizeChange = (pageSize: number) => {
-  pagination.page_size = pageSize
-  pagination.page = 1
-  loadAccounts()
-}
-
-const handleCrsSynced = () => {
-  showCrsSyncModal.value = false
-  loadAccounts()
-}
-
-// Edit modal
-const handleEdit = (account: Account) => {
-  editingAccount.value = account
-  showEditModal.value = true
-}
-
-const closeEditModal = () => {
-  showEditModal.value = false
-  editingAccount.value = null
-}
-
-// Re-Auth modal
-const handleReAuth = (account: Account) => {
-  reAuthAccount.value = account
-  showReAuthModal.value = true
-}
-
-const closeReAuthModal = () => {
-  showReAuthModal.value = false
-  reAuthAccount.value = null
-}
-
-// Temp unschedulable modal
-const handleShowTempUnsched = (account: Account) => {
-  tempUnschedAccount.value = account
-  showTempUnschedModal.value = true
-}
-
-const closeTempUnschedModal = () => {
-  showTempUnschedModal.value = false
-  tempUnschedAccount.value = null
-}
-
-const handleTempUnschedReset = () => {
-  loadAccounts()
-}
-
-// Token refresh
-const handleRefreshToken = async (account: Account) => {
-  try {
-    await adminAPI.accounts.refreshCredentials(account.id)
-    appStore.showSuccess(t('admin.accounts.tokenRefreshed'))
-    loadAccounts()
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.accounts.failedToRefresh'))
-    console.error('Error refreshing token:', error)
-  }
-}
-
-// Delete
-const handleDelete = (account: Account) => {
-  deletingAccount.value = account
-  showDeleteDialog.value = true
-}
-
-const confirmDelete = async () => {
-  if (!deletingAccount.value) return
-
-  try {
-    await adminAPI.accounts.delete(deletingAccount.value.id)
-    appStore.showSuccess(t('admin.accounts.accountDeleted'))
-    showDeleteDialog.value = false
-    deletingAccount.value = null
-    loadAccounts()
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('admin.accounts.failedToDelete'))
-    console.error('Error deleting account:', error)
-  }
-}
-
-const handleBulkDelete = () => {
-  if (selectedAccountIds.value.length === 0) return
-  showBulkDeleteDialog.value = true
-}
-
-const confirmBulkDelete = async () => {
-  if (bulkDeleting.value || selectedAccountIds.value.length === 0) return
-
-  bulkDeleting.value = true
-  const ids = [...selectedAccountIds.value]
-  try {
-    const results = await Promise.allSettled(ids.map((id) => adminAPI.accounts.delete(id)))
-    const success = results.filter((result) => result.status === 'fulfilled').length
-    const failed = results.length - success
-
-    if (failed === 0) {
-      appStore.showSuccess(t('admin.accounts.bulkDeleteSuccess', { count: success }))
+    if (successCount > 0 && failedCount === 0) {
+      const message = schedulable
+        ? t('admin.accounts.bulkSchedulableEnabled', { count: successCount })
+        : t('admin.accounts.bulkSchedulableDisabled', { count: successCount })
+      appStore.showSuccess(message)
+    }
+    if (failedCount > 0) {
+      const message = hasCounts || hasIds
+        ? t('admin.accounts.bulkSchedulablePartial', { success: successCount, failed: failedCount })
+        : t('admin.accounts.bulkSchedulableResultUnknown')
+      appStore.showError(message)
+      selIds.value = failedIds.length > 0 ? failedIds : accountIds
     } else {
       selIds.value = hasIds ? [] : accountIds
     }
@@ -650,18 +342,14 @@ const handleShowTempUnsched = (a: Account) => { tempUnschedAcc.value = a; showTe
 const handleTempUnschedReset = async () => { if(!tempUnschedAcc.value) return; try { await adminAPI.accounts.clearError(tempUnschedAcc.value.id); showTempUnsched.value = false; tempUnschedAcc.value = null; load() } catch (error) { console.error('Failed to reset temp unscheduled:', error) } }
 const formatExpiresAt = (value: number | null) => {
   if (!value) return '-'
-  return formatDateTime(
-    new Date(value * 1000),
-    {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false
-    },
-    'sv-SE'
-  )
+  return formatDate(new Date(value * 1000), {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
 }
 const isExpired = (value: number | null) => {
   if (!value) return false

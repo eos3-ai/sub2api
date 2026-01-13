@@ -259,7 +259,7 @@
                     "
                   />
                   <!-- 订阅类型图标 -->
-                  <Icon
+                  <svg
                     v-else-if="isSubscriptionType(item.type)"
                     class="h-5 w-5 text-primary-600 dark:text-primary-400"
                     fill="none"

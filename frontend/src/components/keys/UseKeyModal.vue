@@ -343,13 +343,6 @@ const platformNote = computed(() => {
 })
 
 // Syntax highlighting helpers
-const keyword = (text: string) => `<span class="text-primary-400">${text}</span>`
-const variable = (text: string) => `<span class="text-cyan-400">${text}</span>`
-const string = (text: string) => `<span class="text-green-400">${text}</span>`
-const operator = (text: string) => `<span class="text-yellow-400">${text}</span>`
-const comment = (text: string) => `<span class="text-gray-500">${text}</span>`
-const key = (text: string) => `<span class="text-blue-400">${text}</span>`
-
 const escapeHtml = (value: string) => value
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')

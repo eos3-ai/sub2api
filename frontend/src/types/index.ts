@@ -592,6 +592,8 @@ export interface CreateAccountRequest {
   concurrency?: number
   priority?: number
   group_ids?: number[]
+  expires_at?: number | null
+  auto_pause_on_expired?: boolean
   confirm_mixed_channel_risk?: boolean
 }
 
@@ -668,6 +670,9 @@ export interface UsageLog {
   image_size: string | null
 
   created_at: string
+
+  user_agent?: string | null
+  ip_address?: string | null
 
   user?: User
   api_key?: ApiKey

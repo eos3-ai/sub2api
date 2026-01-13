@@ -170,7 +170,6 @@ export default {
   // Navigation
   nav: {
     dashboard: 'Dashboard',
-    ops: 'Ops Center',
     apiKeys: 'API Keys',
     usage: 'Usage',
     payment: 'Online Recharge',
@@ -824,124 +823,6 @@ export default {
       recentUsage: 'Recent Usage',
       failedToLoad: 'Failed to load dashboard statistics'
     },
-    ops: {
-      title: 'Ops Monitoring Center 2.0',
-      description: 'Stability metrics, error distribution, and system health',
-      status: {
-        title: 'System Health Snapshot',
-        subtitle: 'Real-time metrics and error visibility',
-        systemNormal: 'System Normal',
-        systemDegraded: 'System Degraded',
-        systemDown: 'System Down',
-        noData: 'No Data',
-        monitoring: 'Monitoring',
-        lastUpdated: 'Last Updated',
-        live: 'Live',
-        waiting: 'Waiting for data',
-        realtime: 'Connected',
-        disconnected: 'Disconnected'
-      },
-      charts: {
-        errorTrend: 'Error Trend',
-        errorDistribution: 'Error Distribution',
-        errorRate: 'Error Rate',
-        requestCount: 'Request Count',
-        rateLimits: 'Rate Limits (429)',
-        serverErrors: 'Server Errors (5xx)',
-        clientErrors: 'Client Errors (4xx)',
-        otherErrors: 'Other',
-        latencyDist: 'Latency Distribution',
-        providerSla: 'Upstream SLA Comparison',
-        errorDist: 'Error Type Distribution',
-        systemStatus: 'System Resources'
-      },
-      metrics: {
-        successRate: 'Success Rate',
-        errorRate: 'Error Rate',
-        p95: 'P95 Latency',
-        p99: 'P99 Latency',
-        http2Errors: 'HTTP/2 Errors',
-        activeAlerts: 'Active Alerts',
-        cpuUsage: 'CPU Usage',
-        queueDepth: 'Queue Depth',
-        healthScore: 'Health Score',
-        sla: 'Availability (SLA)',
-        qps: 'Real-time QPS',
-        tps: 'Real-time TPS',
-        errorCount: 'Error Count'
-      },
-      errors: {
-        title: 'Recent Errors',
-        subtitle: 'Inspect failures across platforms and phases',
-        count: '{n} errors'
-      },
-      filters: {
-        allSeverities: 'All severities',
-        allPlatforms: 'All platforms',
-        allPhases: 'All phases',
-        p0: 'P0 (Critical)',
-        p1: 'P1 (High)',
-        p2: 'P2 (Medium)',
-        p3: 'P3 (Low)'
-      },
-      searchPlaceholder: 'Search by request ID, model, or message',
-      range: {
-        '15m': 'Last 15 minutes',
-        '1h': 'Last 1 hour',
-        '24h': 'Last 24 hours',
-        '7d': 'Last 7 days'
-      },
-      platform: {
-        anthropic: 'Anthropic',
-        openai: 'OpenAI',
-        gemini: 'Gemini',
-        antigravity: 'Antigravity'
-      },
-      phase: {
-        auth: 'Auth',
-        concurrency: 'Concurrency',
-        billing: 'Billing',
-        scheduling: 'Scheduling',
-        network: 'Network',
-        upstream: 'Upstream',
-        response: 'Response',
-        internal: 'Internal'
-      },
-      severity: {
-        p0: 'P0',
-        p1: 'P1',
-        p2: 'P2',
-        p3: 'P3'
-      },
-      table: {
-        time: 'Time',
-        severity: 'Severity',
-        phase: 'Phase',
-        statusCode: 'Status',
-        platform: 'Platform',
-        model: 'Model',
-        latency: 'Latency',
-        requestId: 'Request ID',
-        message: 'Message'
-      },
-      details: {
-        title: 'Error Details',
-        requestId: 'Request ID',
-        errorMessage: 'Error Message',
-        requestPath: 'Request path',
-        clientIp: 'Client IP',
-        userId: 'User ID',
-        apiKeyId: 'API Key ID',
-        groupId: 'Group ID',
-        stream: 'Stream'
-      },
-      empty: {
-        title: 'No ops data yet',
-        subtitle: 'Enable error logging and metrics to populate this view'
-      },
-      failedToLoad: 'Failed to load ops data'
-    },
-
     paymentOrders: {
       title: 'Recharge Records',
       description: 'View all users recharge records (payment orders)',
@@ -1434,61 +1315,6 @@ export default {
       tokenRefreshed: 'Token refreshed successfully',
       accountDeleted: 'Account deleted successfully',
       rateLimitCleared: 'Rate limit cleared successfully',
-      statuses: {
-        active: 'Active',
-        inactive: 'Inactive',
-        error: 'Error',
-        cooldown: 'Cooldown',
-        paused: 'Paused',
-        limited: 'Limited',
-        tempUnschedulable: 'Temporarily Unschedulable',
-        rateLimitedUntil: 'Rate limited until {time}',
-        overloadedUntil: 'Overloaded until {time}',
-        viewTempUnschedDetails: 'View Temp Unschedulable Details'
-      },
-      tempUnschedulable: {
-        title: 'Temporarily Unschedulable',
-        statusTitle: 'Temp Unschedulable Status',
-        hint: 'When error code and keywords match, account will be temporarily disabled for specified duration.',
-        notice: 'Rules are matched in order. Both error code and keyword must match.',
-        addRule: 'Add Rule',
-        ruleOrder: 'Rule Order',
-        ruleIndex: 'Rule #{index}',
-        errorCode: 'Error Code',
-        errorCodePlaceholder: 'e.g. 429',
-        durationMinutes: 'Duration (Minutes)',
-        durationPlaceholder: 'e.g. 30',
-        keywords: 'Keywords',
-        keywordsPlaceholder: 'e.g. overloaded, too many requests',
-        keywordsHint: 'Separate multiple keywords with commas. At least one must match.',
-        description: 'Description',
-        descriptionPlaceholder: 'Optional, helps remember rule purpose',
-        rulesInvalid: 'Please fill in at least one rule with error code, keywords, and duration.',
-        viewDetails: 'View Temp Unschedulable Details',
-        accountName: 'Account',
-        triggeredAt: 'Triggered At',
-        until: 'Until',
-        remaining: 'Remaining',
-        matchedKeyword: 'Matched Keyword',
-        errorMessage: 'Error Details',
-        reset: 'Reset Status',
-        resetSuccess: 'Temp unschedulable reset successfully',
-        resetFailed: 'Failed to reset temp unschedulable',
-        failedToLoad: 'Failed to load temp unschedulable status',
-        notActive: 'Account is not currently in temp unschedulable state.',
-        expired: 'Expired',
-        remainingMinutes: 'About {minutes} minute(s)',
-        remainingHours: 'About {hours} hour(s)',
-        remainingHoursMinutes: 'About {hours} hour(s) {minutes} minute(s)',
-        presets: {
-          overloadLabel: '529 Overload',
-          overloadDesc: 'Service overloaded - pause 60 minutes',
-          rateLimitLabel: '429 Rate Limit',
-          rateLimitDesc: 'Rate limit triggered - pause 10 minutes',
-          unavailableLabel: '503 Maintenance',
-          unavailableDesc: 'Service unavailable - pause 30 minutes'
-        }
-      },
       bulkActions: {
         selected: '{count} account(s) selected',
         selectCurrentPage: 'Select this page',

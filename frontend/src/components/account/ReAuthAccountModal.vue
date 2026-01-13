@@ -215,7 +215,7 @@
             </span>
           </div>
         </div>
-      </div>
+      </fieldset>
 
       <OAuthAuthorizationFlow
         ref="oauthFlowRef"

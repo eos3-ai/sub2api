@@ -818,9 +818,9 @@ const statusOptions = computed(() => [
 ])
 
 const expiresAtInput = computed({
-  get: () => formatDateTimeLocal(form.expires_at),
+  get: () => formatDateTimeLocalInput(form.expires_at),
   set: (value: string) => {
-    form.expires_at = parseDateTimeLocal(value)
+    form.expires_at = parseDateTimeLocalInput(value)
   }
 })
 

@@ -618,47 +618,13 @@
               <option value="aistudio_free">{{ t('admin.accounts.gemini.tier.aiStudio.free') }}</option>
               <option value="aistudio_paid">{{ t('admin.accounts.gemini.tier.aiStudio.paid') }}</option>
             </select>
-          </div>
-          <p class="input-hint">{{ t('admin.accounts.gemini.tier.hint') }}</p>
-        </div>
+	          </div>
+	          <p class="input-hint">{{ t('admin.accounts.gemini.tier.hint') }}</p>
+	        </div>
+	      </div>
 
-        <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs text-blue-900 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-blue-200">
-          <div class="flex items-start gap-3">
-            <svg
-              class="h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <option value="google_one_free">{{ t('admin.accounts.gemini.tier.googleOne.free') }}</option>
-              <option value="google_ai_pro">{{ t('admin.accounts.gemini.tier.googleOne.pro') }}</option>
-              <option value="google_ai_ultra">{{ t('admin.accounts.gemini.tier.googleOne.ultra') }}</option>
-            </select>
-
-            <select
-              v-else-if="geminiOAuthType === 'code_assist'"
-              v-model="geminiTierGcp"
-              class="input"
-            >
-              <option value="gcp_standard">{{ t('admin.accounts.gemini.tier.gcp.standard') }}</option>
-              <option value="gcp_enterprise">{{ t('admin.accounts.gemini.tier.gcp.enterprise') }}</option>
-            </select>
-
-            <select
-              v-else
-              v-model="geminiTierAIStudio"
-              class="input"
-            >
-              <option value="aistudio_free">{{ t('admin.accounts.gemini.tier.aiStudio.free') }}</option>
-              <option value="aistudio_paid">{{ t('admin.accounts.gemini.tier.aiStudio.paid') }}</option>
-            </select>
-          </div>
-          <p class="input-hint">{{ t('admin.accounts.gemini.tier.hint') }}</p>
-        </div>
-      </div>
-
-      <!-- Account Type Selection (Antigravity - OAuth only) -->
-      <div v-if="form.platform === 'antigravity'">
+	      <!-- Account Type Selection (Antigravity - OAuth only) -->
+	      <div v-if="form.platform === 'antigravity'">
         <label class="input-label">{{ t('admin.accounts.accountType') }}</label>
         <div class="mt-2">
           <div
@@ -2000,24 +1966,6 @@ const geminiSelectedTier = computed(() => {
   }
 })
 
-// Gemini tier selection (used as fallback when auto-detection is unavailable/fails)
-const geminiTierGoogleOne = ref<'google_one_free' | 'google_ai_pro' | 'google_ai_ultra'>('google_one_free')
-const geminiTierGcp = ref<'gcp_standard' | 'gcp_enterprise'>('gcp_standard')
-const geminiTierAIStudio = ref<'aistudio_free' | 'aistudio_paid'>('aistudio_free')
-
-const geminiSelectedTier = computed(() => {
-  if (form.platform !== 'gemini') return ''
-  if (accountCategory.value === 'apikey') return geminiTierAIStudio.value
-  switch (geminiOAuthType.value) {
-    case 'google_one':
-      return geminiTierGoogleOne.value
-    case 'code_assist':
-      return geminiTierGcp.value
-    default:
-      return geminiTierAIStudio.value
-  }
-})
-
 const geminiQuotaDocs = {
   codeAssist: 'https://developers.google.com/gemini-code-assist/resources/quotas',
   aiStudio: 'https://ai.google.dev/pricing',
@@ -2441,10 +2389,6 @@ const handleSubmit = async () => {
   if (interceptWarmupRequests.value) {
     credentials.intercept_warmup_requests = true
   }
-  if (!applyTempUnschedConfig(credentials)) {
-    return
-  }
-
   if (!applyTempUnschedConfig(credentials)) {
     return
   }

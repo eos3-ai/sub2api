@@ -850,19 +850,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { adminAPI } from '@/api'
-import type { SystemSettings, UpdateSettingsRequest } from '@/api/admin/settings'
-import AppLayout from '@/components/layout/AppLayout.vue'
-import Icon from '@/components/icons/Icon.vue'
-import Toggle from '@/components/common/Toggle.vue'
-import { useClipboard } from '@/composables/useClipboard'
-import { useAppStore } from '@/stores'
+	import { ref, reactive, onMounted } from 'vue'
+	import { useI18n } from 'vue-i18n'
+	import { adminAPI } from '@/api'
+	import type { SystemSettings, UpdateSettingsRequest } from '@/api/admin/settings'
+	import AppLayout from '@/components/layout/AppLayout.vue'
+	import Icon from '@/components/icons/Icon.vue'
+	import Toggle from '@/components/common/Toggle.vue'
+	import { useAppStore } from '@/stores'
 
-const { t } = useI18n()
-const appStore = useAppStore()
-const { copyToClipboard } = useClipboard()
+	const { t } = useI18n()
+	const appStore = useAppStore()
 
 const loading = ref(true)
 const saving = ref(false)
@@ -871,12 +869,32 @@ const sendingTestEmail = ref(false)
 const testEmailAddress = ref('')
 const logoError = ref('')
 
-// Admin API Key 状态
-const adminApiKeyLoading = ref(true)
-const adminApiKeyExists = ref(false)
-const adminApiKeyMasked = ref('')
-const adminApiKeyOperating = ref(false)
-const newAdminApiKey = ref('')
+	// Admin API Key 状态
+	const adminApiKeyLoading = ref(true)
+	const adminApiKeyExists = ref(false)
+	const adminApiKeyMasked = ref('')
+	const adminApiKeyOperating = ref(false)
+	const newAdminApiKey = ref('')
+
+	// Stream Timeout 状态
+	type StreamTimeoutAction = 'temp_unsched' | 'error' | 'none'
+	type StreamTimeoutSettings = {
+	  enabled: boolean
+	  action: StreamTimeoutAction
+	  temp_unsched_minutes: number
+	  threshold_count: number
+	  threshold_window_minutes: number
+	}
+
+	const streamTimeoutLoading = ref(true)
+	const streamTimeoutSaving = ref(false)
+	const streamTimeoutForm = reactive<StreamTimeoutSettings>({
+	  enabled: false,
+	  action: 'temp_unsched',
+	  temp_unsched_minutes: 10,
+	  threshold_count: 3,
+	  threshold_window_minutes: 10
+	})
 
 type SettingsForm = SystemSettings & {
   smtp_password: string
@@ -909,22 +927,6 @@ const form = reactive<SettingsForm>({
   turnstile_secret_key: '',
   turnstile_secret_key_configured: false
 })
-
-// LinuxDo OAuth redirect URL suggestion
-const linuxdoRedirectUrlSuggestion = computed(() => {
-  if (typeof window === 'undefined') return ''
-  const origin =
-    window.location.origin || `${window.location.protocol}//${window.location.host}`
-  return `${origin}/api/v1/auth/oauth/linuxdo/callback`
-})
-
-async function setAndCopyLinuxdoRedirectUrl() {
-  const url = linuxdoRedirectUrlSuggestion.value
-  if (!url) return
-
-  form.linuxdo_connect_redirect_url = url
-  await copyToClipboard(url, t('admin.settings.linuxdo.redirectUrlSetAndCopied'))
-}
 
 function handleLogoUpload(event: Event) {
   const input = event.target as HTMLInputElement

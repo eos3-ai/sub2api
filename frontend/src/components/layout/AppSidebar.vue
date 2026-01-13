@@ -144,10 +144,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
+	import { computed, h, onMounted, ref, watch } from 'vue'
+	import { useRoute } from 'vue-router'
+	import { useI18n } from 'vue-i18n'
+	import { useAppStore, useAuthStore, useOnboardingStore, useAdminSettingsStore } from '@/stores'
 
 const { t } = useI18n()
 

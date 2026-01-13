@@ -199,12 +199,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
-import { AuthLayout } from '@/components/layout'
-import Icon from '@/components/icons/Icon.vue'
-import TurnstileWidget from '@/components/TurnstileWidget.vue'
+	import { ref, reactive, onMounted } from 'vue'
+	import { useRoute, useRouter } from 'vue-router'
+	import { useI18n } from 'vue-i18n'
+	import { AuthLayout } from '@/components/layout'
+	import Icon from '@/components/icons/Icon.vue'
+	import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import { getPublicSettings, validatePromoCode } from '@/api/auth'
 
@@ -212,11 +212,10 @@ const { t } = useI18n()
 
 // ==================== Router & Stores ====================
 
-const route = useRoute()
-const router = useRouter()
-const route = useRoute()
-const authStore = useAuthStore()
-const appStore = useAppStore()
+	const route = useRoute()
+	const router = useRouter()
+	const authStore = useAuthStore()
+	const appStore = useAppStore()
 
 // ==================== State ====================
 
@@ -245,13 +244,12 @@ const promoValidation = reactive({
   bonusAmount: null as number | null,
   message: ''
 })
-let promoValidateTimeout: ReturnType<typeof setTimeout> | null = null
-
-const formData = reactive({
-  email: '',
-  password: '',
-  invite_code: ''
-})
+	const formData = reactive({
+	  email: '',
+	  password: '',
+	  invite_code: '',
+	  promo_code: ''
+	})
 
 const errors = reactive({
   email: '',
@@ -289,37 +287,7 @@ onMounted(async () => {
   }
 })
 
-onUnmounted(() => {
-  if (promoValidateTimeout) {
-    clearTimeout(promoValidateTimeout)
-  }
-})
-
-// ==================== Promo Code Validation ====================
-
-function handlePromoCodeInput(): void {
-  const code = formData.promo_code.trim()
-
-  // Clear previous validation
-  promoValidation.valid = false
-  promoValidation.invalid = false
-  promoValidation.bonusAmount = null
-  promoValidation.message = ''
-
-  if (!code) {
-    promoValidating.value = false
-    return
-  }
-
-  // Debounce validation
-  if (promoValidateTimeout) {
-    clearTimeout(promoValidateTimeout)
-  }
-
-  promoValidateTimeout = setTimeout(() => {
-    validatePromoCodeDebounced(code)
-  }, 500)
-}
+	// ==================== Promo Code Validation ====================
 
 async function validatePromoCodeDebounced(code: string): Promise<void> {
   if (!code.trim()) return

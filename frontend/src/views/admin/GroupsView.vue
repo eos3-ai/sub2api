@@ -774,35 +774,6 @@ const subscriptionTypeOptions = computed(() => [
   { value: 'subscription', label: t('admin.groups.subscription.subscription') }
 ])
 
-// 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
-const fallbackGroupOptions = computed(() => {
-  const options: { value: number | null; label: string }[] = [
-    { value: null, label: t('admin.groups.claudeCode.noFallback') }
-  ]
-  const eligibleGroups = groups.value.filter(
-    (g) => g.platform === 'anthropic' && !g.claude_code_only && g.status === 'active'
-  )
-  eligibleGroups.forEach((g) => {
-    options.push({ value: g.id, label: g.name })
-  })
-  return options
-})
-
-// 降级分组选项（编辑时）- 排除自身
-const fallbackGroupOptionsForEdit = computed(() => {
-  const options: { value: number | null; label: string }[] = [
-    { value: null, label: t('admin.groups.claudeCode.noFallback') }
-  ]
-  const currentId = editingGroup.value?.id
-  const eligibleGroups = groups.value.filter(
-    (g) => g.platform === 'anthropic' && !g.claude_code_only && g.status === 'active' && g.id !== currentId
-  )
-  eligibleGroups.forEach((g) => {
-    options.push({ value: g.id, label: g.name })
-  })
-  return options
-})
-
 const groups = ref<Group[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
@@ -913,15 +884,6 @@ const loadGroups = async () => {
   }
 }
 
-let searchTimeout: ReturnType<typeof setTimeout>
-const handleSearch = () => {
-  clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    pagination.page = 1
-    loadGroups()
-  }, 300)
-}
-
 const handlePageChange = (page: number) => {
   pagination.page = page
   loadGroups()
@@ -1005,12 +967,7 @@ const handleUpdateGroup = async () => {
 
   submitting.value = true
   try {
-    // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
-    const payload = {
-      ...editForm,
-      fallback_group_id: editForm.fallback_group_id === null ? 0 : editForm.fallback_group_id
-    }
-    await adminAPI.groups.update(editingGroup.value.id, payload)
+    await adminAPI.groups.update(editingGroup.value.id, editForm)
     appStore.showSuccess(t('admin.groups.groupUpdated'))
     closeEditModal()
     loadGroups()

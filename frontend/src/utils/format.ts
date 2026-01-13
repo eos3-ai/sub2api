@@ -142,6 +142,31 @@ export function formatDateTime(date: string | Date | null | undefined): string {
 }
 
 /**
+ * 格式化为 datetime-local 控件值（YYYY-MM-DDTHH:mm，使用本地时间）
+ */
+export function formatDateTimeLocalInput(timestampSeconds: number | null): string {
+  if (!timestampSeconds) return ''
+  const date = new Date(timestampSeconds * 1000)
+  if (isNaN(date.getTime())) return ''
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+/**
+ * 解析 datetime-local 控件值为时间戳（秒，使用本地时间）
+ */
+export function parseDateTimeLocalInput(value: string): number | null {
+  if (!value) return null
+  const date = new Date(value)
+  if (isNaN(date.getTime())) return null
+  return Math.floor(date.getTime() / 1000)
+}
+
+/**
  * 格式化时间（只显示时分）
  * @param date 日期字符串或 Date 对象
  * @returns 格式化后的时间字符串

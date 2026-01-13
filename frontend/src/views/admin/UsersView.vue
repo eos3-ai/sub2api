@@ -563,7 +563,6 @@ import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsMod
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 
 const appStore = useAppStore()
-const { copyToClipboard: clipboardCopy } = useClipboard()
 const exporting = ref(false)
 
 // Generate dynamic attribute columns from enabled definitions

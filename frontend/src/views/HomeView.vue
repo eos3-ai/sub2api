@@ -442,11 +442,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAuthStore, useAppStore } from '@/stores'
-import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
-import { sanitizeUrl } from '@/utils/url'
+	import { ref, computed, onMounted } from 'vue'
+	import { useI18n } from 'vue-i18n'
+	import { useAuthStore, useAppStore } from '@/stores'
+	import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 
 const { t } = useI18n()
 
@@ -454,17 +453,10 @@ const authStore = useAuthStore()
 const appStore = useAppStore()
 
 // Site settings - directly from appStore (already initialized from injected config)
-const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
-const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
-const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
-const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
-const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
-
-// Check if homeContent is a URL (for iframe display)
-const isHomeContentUrl = computed(() => {
-  const content = homeContent.value.trim()
-  return content.startsWith('http://') || content.startsWith('https://')
-})
+	const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+	const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
+	const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
+	const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
@@ -497,20 +489,10 @@ function initTheme() {
   }
 }
 
-onMounted(() => {
-  initTheme()
-  authStore.checkAuth()
-
-  try {
-    const settings = await getPublicSettings()
-    siteName.value = settings.site_name || 'Sub2API'
-    siteLogo.value = sanitizeUrl(settings.site_logo || '', { allowRelative: true })
-    siteSubtitle.value = settings.site_subtitle || 'AI API Gateway Platform'
-    docUrl.value = sanitizeUrl(settings.doc_url || '', { allowRelative: true })
-  } catch (error) {
-    console.error('Failed to load public settings:', error)
-  }
-})
+	onMounted(() => {
+	  initTheme()
+	  authStore.checkAuth()
+	})
 </script>
 
 <style scoped>

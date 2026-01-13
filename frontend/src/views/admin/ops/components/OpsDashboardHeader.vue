@@ -977,7 +977,7 @@ function handleToolbarRefresh() {
             >
               <div class="rounded-xl bg-white p-4 shadow-xl ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10">
                 <h4 class="mb-3 border-b border-gray-100 pb-2 text-sm font-bold text-gray-900 dark:border-gray-700 dark:text-white flex items-center gap-2">
-                  <Icon name="brain" size="sm" class="text-blue-500" />
+                  <Icon name="beaker" size="sm" class="text-blue-500" />
                   {{ t('admin.ops.diagnosis.title') }}
                 </h4>
 

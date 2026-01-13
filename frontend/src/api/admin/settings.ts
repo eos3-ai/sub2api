@@ -35,6 +35,11 @@ export interface SystemSettings {
   turnstile_enabled: boolean
   turnstile_site_key: string
   turnstile_secret_key_configured: boolean
+
+  // Ops monitoring settings (optional; may not exist on older backends)
+  ops_monitoring_enabled?: boolean
+  ops_realtime_monitoring_enabled?: boolean
+  ops_query_mode_default?: string
 }
 
 export interface UpdateSettingsRequest {

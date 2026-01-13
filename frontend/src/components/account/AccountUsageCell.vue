@@ -290,7 +290,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
+import type { Account, AccountUsageInfo, GeminiCredentials } from '@/types'
 import UsageProgressBar from './UsageProgressBar.vue'
 import AccountQuotaInfo from './AccountQuotaInfo.vue'
 
@@ -676,7 +676,8 @@ const geminiTierClass = computed(() => {
       GOOGLE_ONE_UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
       GOOGLE_ONE_UNLIMITED: 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300'
     }
-    return colorMap[geminiTier.value] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+    const tierKey = (geminiTier.value || '').toString()
+    return colorMap[tierKey] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
   }
 
   // Code Assist tier 颜色
@@ -742,72 +743,6 @@ const geminiQuotaPolicyDocsUrl = computed(() => {
     return 'https://developers.google.com/gemini-code-assist/resources/quotas'
   }
   return 'https://ai.google.dev/pricing'
-})
-
-const geminiUsesSharedDaily = computed(() => {
-  if (props.account.platform !== 'gemini') return false
-  // Per requirement: Google One & GCP are shared RPD pools (no per-model breakdown).
-  return (
-    !!usageInfo.value?.gemini_shared_daily ||
-    !!usageInfo.value?.gemini_shared_minute ||
-    geminiOAuthType.value === 'google_one' ||
-    isGeminiCodeAssist.value
-  )
-})
-
-const geminiUsageBars = computed(() => {
-  if (props.account.platform !== 'gemini') return []
-  if (!usageInfo.value) return []
-
-  const bars: Array<{
-    key: string
-    label: string
-    utilization: number
-    resetsAt: string | null
-    windowStats?: WindowStats | null
-    color: 'indigo' | 'emerald'
-  }> = []
-
-  if (geminiUsesSharedDaily.value) {
-    const sharedDaily = usageInfo.value.gemini_shared_daily
-    if (sharedDaily) {
-      bars.push({
-        key: 'shared_daily',
-        label: '1d',
-        utilization: sharedDaily.utilization,
-        resetsAt: sharedDaily.resets_at,
-        windowStats: sharedDaily.window_stats,
-        color: 'indigo'
-      })
-    }
-    return bars
-  }
-
-  const pro = usageInfo.value.gemini_pro_daily
-  if (pro) {
-    bars.push({
-      key: 'pro_daily',
-      label: 'pro',
-      utilization: pro.utilization,
-      resetsAt: pro.resets_at,
-      windowStats: pro.window_stats,
-      color: 'indigo'
-      })
-  }
-
-  const flash = usageInfo.value.gemini_flash_daily
-  if (flash) {
-    bars.push({
-      key: 'flash_daily',
-      label: 'flash',
-      utilization: flash.utilization,
-      resetsAt: flash.resets_at,
-      windowStats: flash.window_stats,
-      color: 'emerald'
-    })
-  }
-
-  return bars
 })
 
 // 账户类型显示标签
