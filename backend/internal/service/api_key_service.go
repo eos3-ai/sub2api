@@ -9,8 +9,11 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
+	"github.com/dgraph-io/ristretto"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -43,6 +46,8 @@ type APIKeyRepository interface {
 	SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error)
 	ClearGroupIDByGroupID(ctx context.Context, groupID int64) (int64, error)
 	CountByGroupID(ctx context.Context, groupID int64) (int64, error)
+	ListKeysByUserID(ctx context.Context, userID int64) ([]string, error)
+	ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error)
 }
 
 // APIKeyCache defines cache operations for API key service
@@ -53,6 +58,10 @@ type APIKeyCache interface {
 
 	IncrementDailyUsage(ctx context.Context, apiKey string) error
 	SetDailyUsageExpiry(ctx context.Context, apiKey string, ttl time.Duration) error
+
+	GetAuthCache(ctx context.Context, key string) (*APIKeyAuthCacheEntry, error)
+	SetAuthCache(ctx context.Context, key string, entry *APIKeyAuthCacheEntry, ttl time.Duration) error
+	DeleteAuthCache(ctx context.Context, key string) error
 }
 
 // CreateAPIKeyRequest 创建API Key请求
@@ -77,6 +86,9 @@ type APIKeyService struct {
 	userSubRepo UserSubscriptionRepository
 	cache       APIKeyCache
 	cfg         *config.Config
+	authCacheL1 *ristretto.Cache
+	authCfg     apiKeyAuthCacheConfig
+	authGroup   singleflight.Group
 }
 
 // NewAPIKeyService 创建API Key服务实例
@@ -96,6 +108,8 @@ func NewAPIKeyService(
 		cache:       cache,
 		cfg:         cfg,
 	}
+	svc.initAuthCache(cfg)
+	return svc
 }
 
 // GenerateKey 生成随机API Key
@@ -186,6 +200,20 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 
+	// 验证 IP 白名单格式
+	if len(req.IPWhitelist) > 0 {
+		if invalid := ip.ValidateIPPatterns(req.IPWhitelist); len(invalid) > 0 {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
+		}
+	}
+
+	// 验证 IP 黑名单格式
+	if len(req.IPBlacklist) > 0 {
+		if invalid := ip.ValidateIPPatterns(req.IPBlacklist); len(invalid) > 0 {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
+		}
+	}
+
 	// 验证分组权限（如果指定了分组）
 	if req.GroupID != nil {
 		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
@@ -247,6 +275,8 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		return nil, fmt.Errorf("create api key: %w", err)
 	}
 
+	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+
 	return apiKey, nil
 }
 
@@ -285,18 +315,47 @@ func (s *APIKeyService) GetByKey(ctx context.Context, key string) (*APIKey, erro
 	// 尝试从Redis缓存获取
 	cacheKey := fmt.Sprintf("apikey:%s", key)
 
-	// 这里可以添加Redis缓存逻辑，暂时直接查询数据库
-	apiKey, err := s.apiKeyRepo.GetByKey(ctx, key)
+	if entry, ok := s.getAuthCacheEntry(ctx, cacheKey); ok {
+		if apiKey, used, err := s.applyAuthCacheEntry(key, entry); used {
+			if err != nil {
+				return nil, fmt.Errorf("get api key: %w", err)
+			}
+			return apiKey, nil
+		}
+	}
+
+	if s.authCfg.singleflight {
+		value, err, _ := s.authGroup.Do(cacheKey, func() (any, error) {
+			return s.loadAuthCacheEntry(ctx, key, cacheKey)
+		})
+		if err != nil {
+			return nil, err
+		}
+		entry, _ := value.(*APIKeyAuthCacheEntry)
+		if apiKey, used, err := s.applyAuthCacheEntry(key, entry); used {
+			if err != nil {
+				return nil, fmt.Errorf("get api key: %w", err)
+			}
+			return apiKey, nil
+		}
+	} else {
+		entry, err := s.loadAuthCacheEntry(ctx, key, cacheKey)
+		if err != nil {
+			return nil, err
+		}
+		if apiKey, used, err := s.applyAuthCacheEntry(key, entry); used {
+			if err != nil {
+				return nil, fmt.Errorf("get api key: %w", err)
+			}
+			return apiKey, nil
+		}
+	}
+
+	apiKey, err := s.apiKeyRepo.GetByKeyForAuth(ctx, key)
 	if err != nil {
 		return nil, fmt.Errorf("get api key: %w", err)
 	}
-
-	// 缓存到Redis（可选，TTL设置为5分钟）
-	if s.cache != nil {
-		// 这里可以序列化并缓存API Key
-		_ = cacheKey // 使用变量避免未使用错误
-	}
-
+	apiKey.Key = key
 	return apiKey, nil
 }
 
@@ -310,6 +369,20 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	// 验证所有权
 	if apiKey.UserID != userID {
 		return nil, ErrInsufficientPerms
+	}
+
+	// 验证 IP 白名单格式
+	if len(req.IPWhitelist) > 0 {
+		if invalid := ip.ValidateIPPatterns(req.IPWhitelist); len(invalid) > 0 {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
+		}
+	}
+
+	// 验证 IP 黑名单格式
+	if len(req.IPBlacklist) > 0 {
+		if invalid := ip.ValidateIPPatterns(req.IPBlacklist); len(invalid) > 0 {
+			return nil, fmt.Errorf("%w: %v", ErrInvalidIPPattern, invalid)
+		}
 	}
 
 	// 更新字段
@@ -344,9 +417,15 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		}
 	}
 
+	// 更新 IP 限制（空数组会清空设置）
+	apiKey.IPWhitelist = req.IPWhitelist
+	apiKey.IPBlacklist = req.IPBlacklist
+
 	if err := s.apiKeyRepo.Update(ctx, apiKey); err != nil {
 		return nil, fmt.Errorf("update api key: %w", err)
 	}
+
+	s.InvalidateAuthCacheByKey(ctx, apiKey.Key)
 
 	return apiKey, nil
 }
@@ -366,10 +445,11 @@ func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) erro
 		return ErrInsufficientPerms
 	}
 
-	// 清除Redis缓存（使用 ownerID 而非 apiKey.UserID）
+	// 清除Redis缓存（使用 userID 而非 apiKey.UserID）
 	if s.cache != nil {
-		_ = s.cache.DeleteCreateAttemptCount(ctx, ownerID)
+		_ = s.cache.DeleteCreateAttemptCount(ctx, userID)
 	}
+	s.InvalidateAuthCacheByKey(ctx, key)
 
 	if err := s.apiKeyRepo.Delete(ctx, id); err != nil {
 		return fmt.Errorf("delete api key: %w", err)

@@ -122,6 +122,13 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 		if err := s.userRepo.UpdateBalance(txCtx, req.UserID, -req.ActualCost); err != nil {
 			return nil, fmt.Errorf("update user balance: %w", err)
 		}
+		balanceUpdated = true
+	}
+
+	if tx != nil {
+		if err := tx.Commit(); err != nil {
+			return nil, fmt.Errorf("commit transaction: %w", err)
+		}
 	}
 
 	if tx != nil {
@@ -131,6 +138,13 @@ func (s *UsageService) Create(ctx context.Context, req CreateUsageLogRequest) (*
 	}
 
 	return usageLog, nil
+}
+
+func (s *UsageService) invalidateUsageCaches(ctx context.Context, userID int64, balanceUpdated bool) {
+	if !balanceUpdated || s.authCacheInvalidator == nil {
+		return
+	}
+	s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 }
 
 // GetByID 根据ID获取使用日志

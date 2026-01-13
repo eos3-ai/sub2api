@@ -87,6 +87,7 @@ func NewRedeemService(
 	cache RedeemCache,
 	billingCacheService *BillingCacheService,
 	entClient *dbent.Client,
+	authCacheInvalidator APIKeyAuthCacheInvalidator,
 ) *RedeemService {
 	return &RedeemService{
 		redeemRepo:          redeemRepo,
@@ -349,16 +350,18 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 
 // invalidateRedeemCaches 失效兑换相关的缓存
 func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64, redeemCode *RedeemCode) {
-	if s.billingCacheService == nil {
-		return
-	}
-
 	switch redeemCode.Type {
 	case RedeemTypeBalance:
 		if err := s.billingCacheService.InvalidateUserBalance(ctx, userID); err != nil {
 			log.Printf("Warning: failed to invalidate balance cache for user %d: %v", userID, err)
 		}
 	case RedeemTypeSubscription:
+		if s.authCacheInvalidator != nil {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+		}
+		if s.billingCacheService == nil {
+			return
+		}
 		if redeemCode.GroupID != nil {
 			groupID := *redeemCode.GroupID
 			if err := s.billingCacheService.InvalidateSubscription(ctx, userID, groupID); err != nil {

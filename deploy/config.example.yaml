@@ -1,30 +1,46 @@
 # Sub2API Configuration File
+# Sub2API 配置文件
+#
 # Copy this file to /etc/sub2api/config.yaml and modify as needed
-# Documentation: https://github.com/Wei-Shaw/sub2api
+# 复制此文件到 /etc/sub2api/config.yaml 并根据需要修改
+#
+# Documentation / 文档: https://github.com/Wei-Shaw/sub2api
 
 # =============================================================================
 # Server Configuration
+# 服务器配置
 # =============================================================================
 server:
   # Bind address (0.0.0.0 for all interfaces)
+  # 绑定地址（0.0.0.0 表示监听所有网络接口）
   host: "0.0.0.0"
   # Port to listen on
+  # 监听端口
   port: 8080
   # Mode: "debug" for development, "release" for production
+  # 运行模式："debug" 用于开发，"release" 用于生产环境
   mode: "release"
+  # Trusted proxies for X-Forwarded-For parsing (CIDR/IP). Empty disables trusted proxies.
+  # 信任的代理地址（CIDR/IP 格式），用于解析 X-Forwarded-For 头。留空则禁用代理信任。
+  trusted_proxies: []
 
 # =============================================================================
 # Run Mode Configuration
+# 运行模式配置
 # =============================================================================
 # Run mode: "standard" (default) or "simple" (for internal use)
+# 运行模式："standard"（默认）或 "simple"（内部使用）
 # - standard: Full SaaS features with billing/balance checks
+# - standard: 完整 SaaS 功能，包含计费和余额校验
 # - simple: Hides SaaS features and skips billing/balance checks
+# - simple: 隐藏 SaaS 功能，跳过计费和余额校验
 run_mode: "standard"
 
 # =============================================================================
 # Gateway Configuration (网关配置)
 # =============================================================================
 gateway:
+  # Timeout for waiting upstream response headers (seconds)
   # 等待上游响应头超时时间（秒）
   # Wait time (in seconds) for upstream response headers (streaming body not affected)
   response_header_timeout: 300
@@ -42,22 +58,29 @@ gateway:
   # 连接池隔离策略：
   # Connection pool isolation strategy:
   # - proxy: 按代理隔离，同一代理共享连接池（适合代理少、账户多）
+  # - account: Isolate by account, same account shares connection pool (suitable for few accounts, strict isolation)
   # - account: 按账户隔离，同一账户共享连接池（适合账户少、需严格隔离）
+  # - account_proxy: Isolate by account+proxy combination (default, finest granularity)
   # - account_proxy: 按账户+代理组合隔离（默认，最细粒度）
   connection_pool_isolation: "account_proxy"
 
   # HTTP 上游连接池配置（HTTP/2 + 多代理场景默认）
   # HTTP upstream connection pool configuration
   max_idle_conns: 240
+  # Max idle connections per host
+  # 每个主机的最大空闲连接数
   max_idle_conns_per_host: 120
+  # Max connections per host
+  # 每个主机的最大连接数
   max_conns_per_host: 240
   idle_conn_timeout_seconds: 300
 
   # 上游连接池客户端缓存配置
   # Upstream connection pool client cache configuration
   # max_upstream_clients: 最大缓存客户端数量，超出后淘汰最久未使用的
-  # client_idle_ttl_seconds: 客户端空闲回收阈值（秒），超时且无活跃请求时回收
   max_upstream_clients: 5000
+  # client_idle_ttl_seconds: Client idle reclaim threshold (seconds), reclaimed when idle and no active requests
+  # client_idle_ttl_seconds: 客户端空闲回收阈值（秒），超时且无活跃请求时回收
   client_idle_ttl_seconds: 900
 
   # 并发槽位过期时间（分钟）
@@ -78,113 +101,222 @@ gateway:
 
 # =============================================================================
 # Database Configuration (PostgreSQL)
+# 数据库配置 (PostgreSQL)
 # =============================================================================
 database:
+  # Database host address
+  # 数据库主机地址
   host: "localhost"
+  # Database port
+  # 数据库端口
   port: 5432
+  # Database username
+  # 数据库用户名
   user: "postgres"
+  # Database password
+  # 数据库密码
   password: "your_secure_password_here"
+  # Database name
+  # 数据库名称
   dbname: "sub2api"
   # SSL mode: disable, require, verify-ca, verify-full
+  # SSL 模式：disable（禁用）, require（要求）, verify-ca（验证CA）, verify-full（完全验证）
   sslmode: "disable"
 
 # =============================================================================
 # Redis Configuration
+# Redis 配置
 # =============================================================================
 redis:
+  # Redis host address
+  # Redis 主机地址
   host: "localhost"
+  # Redis port
+  # Redis 端口
   port: 6379
-  # Leave empty if no password is set
+  # Redis password (leave empty if no password is set)
+  # Redis 密码（如果未设置密码则留空）
   password: ""
   # Database number (0-15)
+  # 数据库编号（0-15）
   db: 0
 
 # =============================================================================
+# Ops Monitoring (Optional)
+# 运维监控 (可选)
+# =============================================================================
+ops:
+  # Enable ops monitoring features (background jobs and APIs)
+  # 是否启用运维监控功能（后台任务和接口）
+  # Set to false to hide ops menu in sidebar and disable all ops features
+  # 设置为 false 可在左侧栏隐藏运维监控菜单并禁用所有运维监控功能
+  # Other detailed settings (cleanup, aggregation, etc.) are configured in ops settings dialog
+  # 其他详细设置（数据清理、预聚合等）在运维监控设置对话框中配置
+  enabled: true
+
+# =============================================================================
 # JWT Configuration
+# JWT 配置
 # =============================================================================
 jwt:
   # IMPORTANT: Change this to a random string in production!
-  # Generate with: openssl rand -hex 32
+  # 重要：生产环境中请更改为随机字符串！
+  # Generate with / 生成命令: openssl rand -hex 32
   secret: "change-this-to-a-secure-random-string"
-  # Token expiration time in hours
+  # Token expiration time in hours (max 24)
+  # 令牌过期时间（小时，最大 24）
   expire_hour: 24
 
 # =============================================================================
+# LinuxDo Connect OAuth Login (SSO)
+# LinuxDo Connect OAuth 登录（用于 Sub2API 用户登录）
+# =============================================================================
+linuxdo_connect:
+  enabled: false
+  client_id: ""
+  client_secret: ""
+  authorize_url: "https://connect.linux.do/oauth2/authorize"
+  token_url: "https://connect.linux.do/oauth2/token"
+  userinfo_url: "https://connect.linux.do/api/user"
+  scopes: "user"
+  # 示例: "https://your-domain.com/api/v1/auth/oauth/linuxdo/callback"
+  redirect_url: ""
+  # 安全提示：
+  # - 建议使用同源相对路径（以 / 开头），避免把 token 重定向到意外的第三方域名
+  # - 该地址不应包含 #fragment（本实现使用 URL fragment 传递 access_token）
+  frontend_redirect_url: "/auth/linuxdo/callback"
+  token_auth_method: "client_secret_post" # client_secret_post | client_secret_basic | none
+  # 注意：当 token_auth_method=none（public client）时，必须启用 PKCE
+  use_pkce: false
+  userinfo_email_path: ""
+  userinfo_id_path: ""
+  userinfo_username_path: ""
+
+# =============================================================================
 # Default Settings
+# 默认设置
 # =============================================================================
 default:
   # Initial admin account (created on first run)
+  # 初始管理员账户（首次运行时创建）
   admin_email: "admin@example.com"
   admin_password: "admin123"
 
   # Default settings for new users
-  user_concurrency: 5        # Max concurrent requests per user
-  user_balance: 0            # Initial balance for new users
+  # 新用户默认设置
+  # Max concurrent requests per user
+  # 每用户最大并发请求数
+  user_concurrency: 5
+  # Initial balance for new users
+  # 新用户初始余额
+  user_balance: 0
 
   # API key settings
-  api_key_prefix: "sk-"      # Prefix for generated API keys
+  # API 密钥设置
+  # Prefix for generated API keys
+  # 生成的 API 密钥前缀
+  api_key_prefix: "sk-"
 
   # Rate multiplier (affects billing calculation)
+  # 费率倍数（影响计费计算）
   rate_multiplier: 1.0
 
 # =============================================================================
 # Rate Limiting
+# 速率限制
 # =============================================================================
 rate_limit:
   # Cooldown time (in minutes) when upstream returns 529 (overloaded)
+  # 上游返回 529（过载）时的冷却时间（分钟）
   overload_cooldown_minutes: 10
 
 # =============================================================================
 # Pricing Data Source (Optional)
+# 定价数据源（可选）
 # =============================================================================
 pricing:
   # URL to fetch model pricing data (default: LiteLLM)
+  # 获取模型定价数据的 URL（默认：LiteLLM）
   remote_url: "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
   # Hash verification URL (optional)
+  # 哈希校验 URL（可选）
   hash_url: ""
   # Local data directory for caching
+  # 本地数据缓存目录
   data_dir: "./data"
   # Fallback pricing file
+  # 备用定价文件
   fallback_file: "./resources/model-pricing/model_prices_and_context_window.json"
   # Update interval in hours
+  # 更新间隔（小时）
   update_interval_hours: 24
   # Hash check interval in minutes
+  # 哈希检查间隔（分钟）
   hash_check_interval_minutes: 10
 
 # =============================================================================
 # Gemini OAuth (Required for Gemini accounts)
+# Gemini OAuth 配置（Gemini 账户必需）
 # =============================================================================
 # Sub2API supports TWO Gemini OAuth modes:
+# Sub2API 支持两种 Gemini OAuth 模式：
 #
-# 1. Code Assist OAuth (需要 GCP project_id)
+# 1. Code Assist OAuth (requires GCP project_id)
+# 1. Code Assist OAuth（需要 GCP project_id）
 #    - Uses: cloudcode-pa.googleapis.com (Code Assist API)
+#    - 使用：cloudcode-pa.googleapis.com（Code Assist API）
 #
-# 2. AI Studio OAuth (不需要 project_id)
+# 2. AI Studio OAuth (no project_id needed)
+# 2. AI Studio OAuth（不需要 project_id）
 #    - Uses: generativelanguage.googleapis.com (AI Studio API)
+#    - 使用：generativelanguage.googleapis.com（AI Studio API）
 #
 # Default: Uses Gemini CLI's public OAuth credentials (same as Google's official CLI tool)
+# 默认：使用 Gemini CLI 的公开 OAuth 凭证（与 Google 官方 CLI 工具相同）
 gemini:
   oauth:
     # Gemini CLI public OAuth credentials (works for both Code Assist and AI Studio)
+    # Gemini CLI 公开 OAuth 凭证（适用于 Code Assist 和 AI Studio）
     client_id: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com"
     client_secret: "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"
     # Optional scopes (space-separated). Leave empty to auto-select based on oauth_type.
+    # 可选的权限范围（空格分隔）。留空则根据 oauth_type 自动选择。
     scopes: ""
   quota:
     # Optional: local quota simulation for Gemini Code Assist (local billing).
+    # 可选：Gemini Code Assist 本地配额模拟（本地计费）。
     # These values are used for UI progress + precheck scheduling, not official Google quotas.
+    # 这些值用于 UI 进度显示和预检调度，并非 Google 官方配额。
     tiers:
       LEGACY:
+        # Pro model requests per day
+        # Pro 模型每日请求数
         pro_rpd: 50
+        # Flash model requests per day
+        # Flash 模型每日请求数
         flash_rpd: 1500
+        # Cooldown time (minutes) after hitting quota
+        # 达到配额后的冷却时间（分钟）
         cooldown_minutes: 30
       PRO:
+        # Pro model requests per day
+        # Pro 模型每日请求数
         pro_rpd: 1500
+        # Flash model requests per day
+        # Flash 模型每日请求数
         flash_rpd: 4000
+        # Cooldown time (minutes) after hitting quota
+        # 达到配额后的冷却时间（分钟）
         cooldown_minutes: 5
       ULTRA:
+        # Pro model requests per day
+        # Pro 模型每日请求数
         pro_rpd: 2000
+        # Flash model requests per day (0 = unlimited)
+        # Flash 模型每日请求数（0 = 无限制）
         flash_rpd: 0
+        # Cooldown time (minutes) after hitting quota
+        # 达到配额后的冷却时间（分钟）
         cooldown_minutes: 5
 
 # =============================================================================

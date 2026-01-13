@@ -25,6 +25,18 @@ func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.Conc
 	return NewConcurrencyCache(rdb, cfg.Gateway.ConcurrencySlotTTLMinutes, waitTTLSeconds)
 }
 
+// ProvideGitHubReleaseClient 创建 GitHub Release 客户端
+// 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub
+func ProvideGitHubReleaseClient(cfg *config.Config) service.GitHubReleaseClient {
+	return NewGitHubReleaseClient(cfg.Update.ProxyURL)
+}
+
+// ProvidePricingRemoteClient 创建定价数据远程客户端
+// 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub 上的定价数据
+func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
+	return NewPricingRemoteClient(cfg.Update.ProxyURL)
+}
+
 // ProviderSet is the Wire provider set for all repositories
 var ProviderSet = wire.NewSet(
 	NewUserRepository,
@@ -38,7 +50,9 @@ var ProviderSet = wire.NewSet(
 	NewReferralRepository,
 	NewPaymentOrderRepository,
 	NewUsageLogRepository,
+	NewDashboardAggregationRepository,
 	NewSettingRepository,
+	NewOpsRepository,
 	NewUserSubscriptionRepository,
 	NewUserAttributeDefinitionRepository,
 	NewUserAttributeValueRepository,
@@ -49,6 +63,7 @@ var ProviderSet = wire.NewSet(
 	NewAPIKeyCache,
 	NewTempUnschedCache,
 	ProvideConcurrencyCache,
+	NewDashboardCache,
 	NewEmailCache,
 	NewIdentityCache,
 	NewRedeemCache,
@@ -57,11 +72,13 @@ var ProviderSet = wire.NewSet(
 	NewPaymentCache,
 	NewUpdateCache,
 	NewGeminiTokenCache,
+	NewSchedulerCache,
+	NewSchedulerOutboxRepository,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,
-	NewPricingRemoteClient,
-	NewGitHubReleaseClient,
+	ProvidePricingRemoteClient,
+	ProvideGitHubReleaseClient,
 	NewProxyExitInfoProber,
 	NewClaudeUsageFetcher,
 	NewClaudeOAuthClient,

@@ -161,6 +161,14 @@ func AccountFromService(a *service.Account) *Account {
 	return out
 }
 
+func timeToUnixSeconds(value *time.Time) *int64 {
+	if value == nil {
+		return nil
+	}
+	ts := value.Unix()
+	return &ts
+}
+
 func AccountGroupFromService(ag *service.AccountGroup) *AccountGroup {
 	if ag == nil {
 		return nil
@@ -224,11 +232,26 @@ func RedeemCodeFromService(rc *service.RedeemCode) *RedeemCode {
 	}
 }
 
-func UsageLogFromService(l *service.UsageLog) *UsageLog {
+// AccountSummaryFromService returns a minimal AccountSummary for usage log display.
+// Only includes ID and Name - no sensitive fields like Credentials, Proxy, etc.
+func AccountSummaryFromService(a *service.Account) *AccountSummary {
+	if a == nil {
+		return nil
+	}
+	return &AccountSummary{
+		ID:   a.ID,
+		Name: a.Name,
+	}
+}
+
+// usageLogFromServiceBase is a helper that converts service UsageLog to DTO.
+// The account parameter allows caller to control what Account info is included.
+// The includeIPAddress parameter controls whether to include the IP address (admin-only).
+func usageLogFromServiceBase(l *service.UsageLog, account *AccountSummary, includeIPAddress bool) *UsageLog {
 	if l == nil {
 		return nil
 	}
-	return &UsageLog{
+	result := &UsageLog{
 		ID:                    l.ID,
 		UserID:                l.UserID,
 		APIKeyID:              l.APIKeyID,
@@ -263,6 +286,26 @@ func UsageLogFromService(l *service.UsageLog) *UsageLog {
 		Group:                 GroupFromServiceShallow(l.Group),
 		Subscription:          UserSubscriptionFromService(l.Subscription),
 	}
+	// IP 地址仅对管理员可见
+	if includeIPAddress {
+		result.IPAddress = l.IPAddress
+	}
+	return result
+}
+
+// UsageLogFromService converts a service UsageLog to DTO for regular users.
+// It excludes Account details and IP address - users should not see these.
+func UsageLogFromService(l *service.UsageLog) *UsageLog {
+	return usageLogFromServiceBase(l, nil, false)
+}
+
+// UsageLogFromServiceAdmin converts a service UsageLog to DTO for admin users.
+// It includes minimal Account info (ID, Name only) and IP address.
+func UsageLogFromServiceAdmin(l *service.UsageLog) *UsageLog {
+	if l == nil {
+		return nil
+	}
+	return usageLogFromServiceBase(l, AccountSummaryFromService(l.Account), true)
 }
 
 func SettingFromService(s *service.Setting) *Setting {

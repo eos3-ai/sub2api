@@ -6,7 +6,9 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
+	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -31,8 +33,16 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 		SetKey(key.Key).
 		SetName(key.Name).
 		SetStatus(key.Status).
-		SetNillableGroupID(key.GroupID).
-		Save(ctx)
+		SetNillableGroupID(key.GroupID)
+
+	if len(key.IPWhitelist) > 0 {
+		builder.SetIPWhitelist(key.IPWhitelist)
+	}
+	if len(key.IPBlacklist) > 0 {
+		builder.SetIPBlacklist(key.IPBlacklist)
+	}
+
+	created, err := builder.Save(ctx)
 	if err == nil {
 		key.ID = created.ID
 		key.CreatedAt = created.CreatedAt
@@ -56,7 +66,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 	return apiKeyEntityToService(m), nil
 }
 
-// GetOwnerID 根据 API Key ID 获取其所有者（用户）的 ID。
+// GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
 // 相比 GetByID，此方法性能更优，因为：
 //   - 使用 Select() 只查询 user_id 字段，减少数据传输量
 //   - 不加载完整的 API Key 实体及其关联数据（User、Group 等）
@@ -64,15 +74,15 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 func (r *apiKeyRepository) GetOwnerID(ctx context.Context, id int64) (int64, error) {
 	m, err := r.activeQuery().
 		Where(apikey.IDEQ(id)).
-		Select(apikey.FieldUserID).
+		Select(apikey.FieldKey, apikey.FieldUserID).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
 			return 0, service.ErrAPIKeyNotFound
 		}
-		return 0, err
+		return "", 0, err
 	}
-	return m.UserID, nil
+	return m.Key, m.UserID, nil
 }
 
 func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
@@ -106,6 +116,18 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 		builder.SetGroupID(*key.GroupID)
 	} else {
 		builder.ClearGroupID()
+	}
+
+	// IP 限制字段
+	if len(key.IPWhitelist) > 0 {
+		builder.SetIPWhitelist(key.IPWhitelist)
+	} else {
+		builder.ClearIPWhitelist()
+	}
+	if len(key.IPBlacklist) > 0 {
+		builder.SetIPBlacklist(key.IPBlacklist)
+	} else {
+		builder.ClearIPBlacklist()
 	}
 
 	affected, err := builder.Save(ctx)
@@ -317,6 +339,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		RateMultiplier:      g.RateMultiplier,
 		IsExclusive:         g.IsExclusive,
 		Status:              g.Status,
+		Hydrated:            true,
 		SubscriptionType:    g.SubscriptionType,
 		DailyLimitUSD:       g.DailyLimitUsd,
 		WeeklyLimitUSD:      g.WeeklyLimitUsd,
@@ -325,6 +348,8 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		ImagePrice2K:        g.ImagePrice2k,
 		ImagePrice4K:        g.ImagePrice4k,
 		DefaultValidityDays: g.DefaultValidityDays,
+		ClaudeCodeOnly:      g.ClaudeCodeOnly,
+		FallbackGroupID:     g.FallbackGroupID,
 		CreatedAt:           g.CreatedAt,
 		UpdatedAt:           g.UpdatedAt,
 	}

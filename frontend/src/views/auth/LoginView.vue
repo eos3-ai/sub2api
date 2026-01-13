@@ -11,6 +11,9 @@
         </p>
       </div>
 
+      <!-- LinuxDo Connect OAuth 登录 -->
+      <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled" :disabled="isLoading" />
+
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
         <!-- Email Input -->
@@ -179,6 +182,7 @@ const showPassword = ref<boolean>(false)
 // Public settings
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
+const linuxdoOAuthEnabled = ref<boolean>(false)
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
@@ -210,6 +214,7 @@ onMounted(async () => {
     const settings = await getPublicSettings()
     turnstileEnabled.value = settings.turnstile_enabled
     turnstileSiteKey.value = settings.turnstile_site_key || ''
+    linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
   } catch (error) {
     console.error('Failed to load public settings:', error)
   }

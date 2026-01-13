@@ -38,6 +38,7 @@ type AccountRepository interface {
 	BatchUpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error
 	SetError(ctx context.Context, id int64, errorMsg string) error
 	SetSchedulable(ctx context.Context, id int64, schedulable bool) error
+	AutoPauseExpiredAccounts(ctx context.Context, now time.Time) (int64, error)
 	BindGroups(ctx context.Context, accountID int64, groupIDs []int64) error
 
 	ListSchedulable(ctx context.Context) ([]Account, error)
@@ -48,10 +49,12 @@ type AccountRepository interface {
 	ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]Account, error)
 
 	SetRateLimited(ctx context.Context, id int64, resetAt time.Time) error
+	SetAntigravityQuotaScopeLimit(ctx context.Context, id int64, scope AntigravityQuotaScope, resetAt time.Time) error
 	SetOverloaded(ctx context.Context, id int64, until time.Time) error
 	SetTempUnschedulable(ctx context.Context, id int64, until time.Time, reason string) error
 	ClearTempUnschedulable(ctx context.Context, id int64) error
 	ClearRateLimit(ctx context.Context, id int64) error
+	ClearAntigravityQuotaScopes(ctx context.Context, id int64) error
 	UpdateSessionWindow(ctx context.Context, id int64, start, end *time.Time, status string) error
 	UpdateExtra(ctx context.Context, id int64, updates map[string]any) error
 	BulkUpdate(ctx context.Context, ids []int64, updates AccountBulkUpdate) (int64, error)
@@ -65,6 +68,7 @@ type AccountBulkUpdate struct {
 	Concurrency *int
 	Priority    *int
 	Status      *string
+	Schedulable *bool
 	Credentials map[string]any
 	Extra       map[string]any
 }
@@ -134,6 +138,12 @@ func (s *AccountService) Create(ctx context.Context, req CreateAccountRequest) (
 		Concurrency: req.Concurrency,
 		Priority:    req.Priority,
 		Status:      StatusActive,
+		ExpiresAt:   req.ExpiresAt,
+	}
+	if req.AutoPauseOnExpired != nil {
+		account.AutoPauseOnExpired = *req.AutoPauseOnExpired
+	} else {
+		account.AutoPauseOnExpired = true
 	}
 
 	if err := s.accountRepo.Create(ctx, account); err != nil {
@@ -223,6 +233,12 @@ func (s *AccountService) Update(ctx context.Context, id int64, req UpdateAccount
 
 	if req.Status != nil {
 		account.Status = *req.Status
+	}
+	if req.ExpiresAt != nil {
+		account.ExpiresAt = req.ExpiresAt
+	}
+	if req.AutoPauseOnExpired != nil {
+		account.AutoPauseOnExpired = *req.AutoPauseOnExpired
 	}
 
 	// 先验证分组是否存在（在任何写操作之前）

@@ -25,7 +25,7 @@ type AdminService interface {
 	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
 
 	// Group management
-	ListGroups(ctx context.Context, page, pageSize int, platform, status string, isExclusive *bool) ([]Group, int64, error)
+	ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool) ([]Group, int64, error)
 	GetAllGroups(ctx context.Context) ([]Group, error)
 	GetAllGroupsByPlatform(ctx context.Context, platform string) ([]Group, error)
 	GetGroup(ctx context.Context, id int64) (*Group, error)
@@ -48,6 +48,7 @@ type AdminService interface {
 
 	// Proxy management
 	ListProxies(ctx context.Context, page, pageSize int, protocol, status, search string) ([]Proxy, int64, error)
+	ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, protocol, status, search string) ([]ProxyWithAccountCount, int64, error)
 	GetAllProxies(ctx context.Context) ([]Proxy, error)
 	GetAllProxiesWithAccountCount(ctx context.Context) ([]ProxyWithAccountCount, error)
 	GetProxy(ctx context.Context, id int64) (*Proxy, error)
@@ -67,7 +68,7 @@ type AdminService interface {
 	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 }
 
-// Input types for admin operations
+// CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
 	Email         string
 	Password      string
@@ -123,27 +124,37 @@ type UpdateGroupInput struct {
 }
 
 type CreateAccountInput struct {
-	Name        string
-	Platform    string
-	Type        string
-	Credentials map[string]any
-	Extra       map[string]any
-	ProxyID     *int64
-	Concurrency int
-	Priority    int
-	GroupIDs    []int64
+	Name               string
+	Notes              *string
+	Platform           string
+	Type               string
+	Credentials        map[string]any
+	Extra              map[string]any
+	ProxyID            *int64
+	Concurrency        int
+	Priority           int
+	GroupIDs           []int64
+	ExpiresAt          *int64
+	AutoPauseOnExpired *bool
+	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
+	// This should only be set when the caller has explicitly confirmed the risk.
+	SkipMixedChannelCheck bool
 }
 
 type UpdateAccountInput struct {
-	Name        string
-	Type        string // Account type: oauth, setup-token, apikey
-	Credentials map[string]any
-	Extra       map[string]any
-	ProxyID     *int64
-	Concurrency *int // 使用指针区分"未提供"和"设置为0"
-	Priority    *int // 使用指针区分"未提供"和"设置为0"
-	Status      string
-	GroupIDs    *[]int64
+	Name                  string
+	Notes                 *string
+	Type                  string // Account type: oauth, setup-token, apikey
+	Credentials           map[string]any
+	Extra                 map[string]any
+	ProxyID               *int64
+	Concurrency           *int // 使用指针区分"未提供"和"设置为0"
+	Priority              *int // 使用指针区分"未提供"和"设置为0"
+	Status                string
+	GroupIDs              *[]int64
+	ExpiresAt             *int64
+	AutoPauseOnExpired    *bool
+	SkipMixedChannelCheck bool // 跳过混合渠道检查（用户已确认风险）
 }
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.
@@ -154,9 +165,13 @@ type BulkUpdateAccountsInput struct {
 	Concurrency *int
 	Priority    *int
 	Status      string
+	Schedulable *bool
 	GroupIDs    *[]int64
 	Credentials map[string]any
 	Extra       map[string]any
+	// SkipMixedChannelCheck skips the mixed channel risk check when binding groups.
+	// This should only be set when the caller has explicitly confirmed the risk.
+	SkipMixedChannelCheck bool
 }
 
 // BulkUpdateAccountResult captures the result for a single account update.
@@ -168,9 +183,11 @@ type BulkUpdateAccountResult struct {
 
 // BulkUpdateAccountsResult is the aggregated response for bulk updates.
 type BulkUpdateAccountsResult struct {
-	Success int                       `json:"success"`
-	Failed  int                       `json:"failed"`
-	Results []BulkUpdateAccountResult `json:"results"`
+	Success    int                       `json:"success"`
+	Failed     int                       `json:"failed"`
+	SuccessIDs []int64                   `json:"success_ids"`
+	FailedIDs  []int64                   `json:"failed_ids"`
+	Results    []BulkUpdateAccountResult `json:"results"`
 }
 
 type CreateProxyInput struct {
@@ -314,6 +331,8 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	oldConcurrency := user.Concurrency
+	oldStatus := user.Status
+	oldRole := user.Role
 
 	if input.Email != "" {
 		user.Email = input.Email
@@ -345,6 +364,11 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
+	}
+	if s.authCacheInvalidator != nil {
+		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
+		}
 	}
 
 	concurrencyDiff := user.Concurrency - oldConcurrency
@@ -384,6 +408,9 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		log.Printf("delete user failed: user_id=%d err=%v", id, err)
 		return err
 	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, id)
+	}
 	return nil
 }
 
@@ -422,6 +449,10 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 	newBalance := oldBalance + delta
 	if newBalance < 0 {
 		return nil, fmt.Errorf("balance cannot be negative, current balance: %.2f, requested operation would result in: %.2f", oldBalance, newBalance)
+	}
+	balanceDiff := user.Balance - oldBalance
+	if s.authCacheInvalidator != nil && balanceDiff != 0 {
+		s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
 	}
 
 	// Prefer BalanceService to keep a consistent ledger (recharge_records) + cache invalidation.
@@ -546,9 +577,9 @@ func (s *adminServiceImpl) GetUserUsageStats(ctx context.Context, userID int64, 
 }
 
 // Group management implementations
-func (s *adminServiceImpl) ListGroups(ctx context.Context, page, pageSize int, platform, status string, isExclusive *bool) ([]Group, int64, error) {
+func (s *adminServiceImpl) ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool) ([]Group, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	groups, result, err := s.groupRepo.ListWithFilters(ctx, params, platform, status, isExclusive)
+	groups, result, err := s.groupRepo.ListWithFilters(ctx, params, platform, status, search, isExclusive)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -678,10 +709,21 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err
 	}
+	if s.authCacheInvalidator != nil {
+		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
+	}
 	return group, nil
 }
 
 func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
+	var groupKeys []string
+	if s.authCacheInvalidator != nil {
+		keys, err := s.apiKeyRepo.ListKeysByGroupID(ctx, id)
+		if err == nil {
+			groupKeys = keys
+		}
+	}
+
 	affectedUserIDs, err := s.groupRepo.DeleteCascade(ctx, id)
 	if err != nil {
 		return err
@@ -699,6 +741,11 @@ func (s *adminServiceImpl) DeleteGroup(ctx context.Context, id int64) error {
 				}
 			}
 		}()
+	}
+	if s.authCacheInvalidator != nil {
+		for _, key := range groupKeys {
+			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
+		}
 	}
 
 	return nil
@@ -741,22 +788,6 @@ func (s *adminServiceImpl) GetAccountsByIDs(ctx context.Context, ids []int64) ([
 }
 
 func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccountInput) (*Account, error) {
-	account := &Account{
-		Name:        input.Name,
-		Platform:    input.Platform,
-		Type:        input.Type,
-		Credentials: input.Credentials,
-		Extra:       input.Extra,
-		ProxyID:     input.ProxyID,
-		Concurrency: input.Concurrency,
-		Priority:    input.Priority,
-		Status:      StatusActive,
-		Schedulable: true,
-	}
-	if err := s.accountRepo.Create(ctx, account); err != nil {
-		return nil, err
-	}
-
 	// 绑定分组
 	groupIDs := input.GroupIDs
 	// 如果没有指定分组,自动绑定对应平台的默认分组
@@ -767,13 +798,46 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 			for _, g := range groups {
 				if g.Name == defaultGroupName {
 					groupIDs = []int64{g.ID}
-					log.Printf("[CreateAccount] Auto-binding account %d to default group %s (ID: %d)", account.ID, defaultGroupName, g.ID)
 					break
 				}
 			}
 		}
 	}
 
+	// 检查混合渠道风险（除非用户已确认）
+	if len(groupIDs) > 0 && !input.SkipMixedChannelCheck {
+		if err := s.checkMixedChannelRisk(ctx, 0, input.Platform, groupIDs); err != nil {
+			return nil, err
+		}
+	}
+
+	account := &Account{
+		Name:        input.Name,
+		Notes:       normalizeAccountNotes(input.Notes),
+		Platform:    input.Platform,
+		Type:        input.Type,
+		Credentials: input.Credentials,
+		Extra:       input.Extra,
+		ProxyID:     input.ProxyID,
+		Concurrency: input.Concurrency,
+		Priority:    input.Priority,
+		Status:      StatusActive,
+		Schedulable: true,
+	}
+	if input.ExpiresAt != nil && *input.ExpiresAt > 0 {
+		expiresAt := time.Unix(*input.ExpiresAt, 0)
+		account.ExpiresAt = &expiresAt
+	}
+	if input.AutoPauseOnExpired != nil {
+		account.AutoPauseOnExpired = *input.AutoPauseOnExpired
+	} else {
+		account.AutoPauseOnExpired = true
+	}
+	if err := s.accountRepo.Create(ctx, account); err != nil {
+		return nil, err
+	}
+
+	// 绑定分组
 	if len(groupIDs) > 0 {
 		if err := s.accountRepo.BindGroups(ctx, account.ID, groupIDs); err != nil {
 			return nil, err
@@ -794,6 +858,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	}
 	if input.Type != "" {
 		account.Type = input.Type
+	}
+	if input.Notes != nil {
+		account.Notes = normalizeAccountNotes(input.Notes)
 	}
 	if len(input.Credentials) > 0 {
 		account.Credentials = input.Credentials
@@ -821,12 +888,30 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	if input.Status != "" {
 		account.Status = input.Status
 	}
+	if input.ExpiresAt != nil {
+		if *input.ExpiresAt <= 0 {
+			account.ExpiresAt = nil
+		} else {
+			expiresAt := time.Unix(*input.ExpiresAt, 0)
+			account.ExpiresAt = &expiresAt
+		}
+	}
+	if input.AutoPauseOnExpired != nil {
+		account.AutoPauseOnExpired = *input.AutoPauseOnExpired
+	}
 
 	// 先验证分组是否存在（在任何写操作之前）
 	if input.GroupIDs != nil {
 		for _, groupID := range *input.GroupIDs {
 			if _, err := s.groupRepo.GetByID(ctx, groupID); err != nil {
 				return nil, fmt.Errorf("get group: %w", err)
+			}
+		}
+
+		// 检查混合渠道风险（除非用户已确认）
+		if !input.SkipMixedChannelCheck {
+			if err := s.checkMixedChannelRisk(ctx, account.ID, account.Platform, *input.GroupIDs); err != nil {
+				return nil, err
 			}
 		}
 	}
@@ -850,11 +935,27 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 // It merges credentials/extra keys instead of overwriting the whole object.
 func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error) {
 	result := &BulkUpdateAccountsResult{
-		Results: make([]BulkUpdateAccountResult, 0, len(input.AccountIDs)),
+		SuccessIDs: make([]int64, 0, len(input.AccountIDs)),
+		FailedIDs:  make([]int64, 0, len(input.AccountIDs)),
+		Results:    make([]BulkUpdateAccountResult, 0, len(input.AccountIDs)),
 	}
 
 	if len(input.AccountIDs) == 0 {
 		return result, nil
+	}
+
+	// Preload account platforms for mixed channel risk checks if group bindings are requested.
+	platformByID := map[int64]string{}
+	if input.GroupIDs != nil && !input.SkipMixedChannelCheck {
+		accounts, err := s.accountRepo.GetByIDs(ctx, input.AccountIDs)
+		if err != nil {
+			return nil, err
+		}
+		for _, account := range accounts {
+			if account != nil {
+				platformByID[account.ID] = account.Platform
+			}
+		}
 	}
 
 	// Prepare bulk updates for columns and JSONB fields.
@@ -877,6 +978,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if input.Status != "" {
 		repoUpdates.Status = &input.Status
 	}
+	if input.Schedulable != nil {
+		repoUpdates.Schedulable = input.Schedulable
+	}
 
 	// Run bulk update for column/jsonb fields first.
 	if _, err := s.accountRepo.BulkUpdate(ctx, input.AccountIDs, repoUpdates); err != nil {
@@ -888,10 +992,36 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 		entry := BulkUpdateAccountResult{AccountID: accountID}
 
 		if input.GroupIDs != nil {
+			// 检查混合渠道风险（除非用户已确认）
+			if !input.SkipMixedChannelCheck {
+				platform := platformByID[accountID]
+				if platform == "" {
+					account, err := s.accountRepo.GetByID(ctx, accountID)
+					if err != nil {
+						entry.Success = false
+						entry.Error = err.Error()
+						result.Failed++
+						result.FailedIDs = append(result.FailedIDs, accountID)
+						result.Results = append(result.Results, entry)
+						continue
+					}
+					platform = account.Platform
+				}
+				if err := s.checkMixedChannelRisk(ctx, accountID, platform, *input.GroupIDs); err != nil {
+					entry.Success = false
+					entry.Error = err.Error()
+					result.Failed++
+					result.FailedIDs = append(result.FailedIDs, accountID)
+					result.Results = append(result.Results, entry)
+					continue
+				}
+			}
+
 			if err := s.accountRepo.BindGroups(ctx, accountID, *input.GroupIDs); err != nil {
 				entry.Success = false
 				entry.Error = err.Error()
 				result.Failed++
+				result.FailedIDs = append(result.FailedIDs, accountID)
 				result.Results = append(result.Results, entry)
 				continue
 			}
@@ -899,6 +1029,7 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 
 		entry.Success = true
 		result.Success++
+		result.SuccessIDs = append(result.SuccessIDs, accountID)
 		result.Results = append(result.Results, entry)
 	}
 
@@ -942,6 +1073,15 @@ func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, 
 func (s *adminServiceImpl) ListProxies(ctx context.Context, page, pageSize int, protocol, status, search string) ([]Proxy, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
 	proxies, result, err := s.proxyRepo.ListWithFilters(ctx, params, protocol, status, search)
+	if err != nil {
+		return nil, 0, err
+	}
+	return proxies, result.Total, nil
+}
+
+func (s *adminServiceImpl) ListProxiesWithAccountCount(ctx context.Context, page, pageSize int, protocol, status, search string) ([]ProxyWithAccountCount, int64, error) {
+	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
+	proxies, result, err := s.proxyRepo.ListWithFiltersAndAccountCount(ctx, params, protocol, status, search)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1131,4 +1271,78 @@ func (s *adminServiceImpl) TestProxy(ctx context.Context, id int64) (*ProxyTestR
 		Region:    exitInfo.Region,
 		Country:   exitInfo.Country,
 	}, nil
+}
+
+// checkMixedChannelRisk 检查分组中是否存在混合渠道（Antigravity + Anthropic）
+// 如果存在混合，返回错误提示用户确认
+func (s *adminServiceImpl) checkMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error {
+	// 判断当前账号的渠道类型（基于 platform 字段，而不是 type 字段）
+	currentPlatform := getAccountPlatform(currentAccountPlatform)
+	if currentPlatform == "" {
+		// 不是 Antigravity 或 Anthropic，无需检查
+		return nil
+	}
+
+	// 检查每个分组中的其他账号
+	for _, groupID := range groupIDs {
+		accounts, err := s.accountRepo.ListByGroup(ctx, groupID)
+		if err != nil {
+			return fmt.Errorf("get accounts in group %d: %w", groupID, err)
+		}
+
+		// 检查是否存在不同渠道的账号
+		for _, account := range accounts {
+			if currentAccountID > 0 && account.ID == currentAccountID {
+				continue // 跳过当前账号
+			}
+
+			otherPlatform := getAccountPlatform(account.Platform)
+			if otherPlatform == "" {
+				continue // 不是 Antigravity 或 Anthropic，跳过
+			}
+
+			// 检测混合渠道
+			if currentPlatform != otherPlatform {
+				group, _ := s.groupRepo.GetByID(ctx, groupID)
+				groupName := fmt.Sprintf("Group %d", groupID)
+				if group != nil {
+					groupName = group.Name
+				}
+
+				return &MixedChannelError{
+					GroupID:         groupID,
+					GroupName:       groupName,
+					CurrentPlatform: currentPlatform,
+					OtherPlatform:   otherPlatform,
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// getAccountPlatform 根据账号 platform 判断混合渠道检查用的平台标识
+func getAccountPlatform(accountPlatform string) string {
+	switch strings.ToLower(strings.TrimSpace(accountPlatform)) {
+	case PlatformAntigravity:
+		return "Antigravity"
+	case PlatformAnthropic, "claude":
+		return "Anthropic"
+	default:
+		return ""
+	}
+}
+
+// MixedChannelError 混合渠道错误
+type MixedChannelError struct {
+	GroupID         int64
+	GroupName       string
+	CurrentPlatform string
+	OtherPlatform   string
+}
+
+func (e *MixedChannelError) Error() string {
+	return fmt.Sprintf("mixed_channel_warning: Group '%s' contains both %s and %s accounts. Using mixed channels in the same context may cause thinking block signature validation issues, which will fallback to non-thinking mode for historical messages.",
+		e.GroupName, e.CurrentPlatform, e.OtherPlatform)
 }

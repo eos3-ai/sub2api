@@ -44,11 +44,22 @@ func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogReposi
 	}
 }
 
+// SetTimeoutCounterCache 设置超时计数器缓存（可选依赖）
+func (s *RateLimitService) SetTimeoutCounterCache(cache TimeoutCounterCache) {
+	s.timeoutCounterCache = cache
+}
+
+// SetSettingService 设置系统设置服务（可选依赖）
+func (s *RateLimitService) SetSettingService(settingService *SettingService) {
+	s.settingService = settingService
+}
+
 // HandleUpstreamError 处理上游错误响应，标记账号状态
 // 返回是否应该停止该账号的调度
 func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Account, statusCode int, headers http.Header, responseBody []byte) (shouldDisable bool) {
 	// apikey 类型账号：检查自定义错误码配置
 	// 如果启用且错误码不在列表中，则不处理（不停止调度、不标记限流/过载）
+	customErrorCodesEnabled := account.IsCustomErrorCodesEnabled()
 	if !account.ShouldHandleErrorCode(statusCode) {
 		log.Printf("Account %d: error %d skipped (not in custom error codes)", account.ID, statusCode)
 		return false
@@ -76,9 +87,18 @@ func (s *RateLimitService) HandleUpstreamError(ctx context.Context, account *Acc
 		s.handle529(ctx, account)
 		shouldDisable = false
 	default:
-		// 其他5xx错误：记录但不停止调度
-		if statusCode >= 500 {
+		// 自定义错误码启用时：在列表中的错误码都应该停止调度
+		if customErrorCodesEnabled {
+			msg := "Custom error code triggered"
+			if upstreamMsg != "" {
+				msg = upstreamMsg
+			}
+			s.handleCustomErrorCode(ctx, account, statusCode, msg)
+			shouldDisable = true
+		} else if statusCode >= 500 {
+			// 未启用自定义错误码时：仅记录5xx错误
 			log.Printf("Account %d received upstream error %d", account.ID, statusCode)
+			shouldDisable = false
 		}
 		shouldDisable = false
 	}
@@ -256,6 +276,16 @@ func (s *RateLimitService) handleAuthError(ctx context.Context, account *Account
 	log.Printf("Account %d disabled due to auth error: %s", account.ID, errorMsg)
 }
 
+// handleCustomErrorCode 处理自定义错误码，停止账号调度
+func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *Account, statusCode int, errorMsg string) {
+	msg := "Custom error code " + strconv.Itoa(statusCode) + ": " + errorMsg
+	if err := s.accountRepo.SetError(ctx, account.ID, msg); err != nil {
+		log.Printf("SetError failed for account %d: %v", account.ID, err)
+		return
+	}
+	log.Printf("Account %d disabled due to custom error code %d: %s", account.ID, statusCode, errorMsg)
+}
+
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header) {
@@ -345,7 +375,7 @@ func (s *RateLimitService) UpdateSessionWindow(ctx context.Context, account *Acc
 
 	// 如果状态为allowed且之前有限流，说明窗口已重置，清除限流状态
 	if status == "allowed" && account.IsRateLimited() {
-		if err := s.accountRepo.ClearRateLimit(ctx, account.ID); err != nil {
+		if err := s.ClearRateLimit(ctx, account.ID); err != nil {
 			log.Printf("ClearRateLimit failed for account %d: %v", account.ID, err)
 		}
 	}
@@ -353,7 +383,312 @@ func (s *RateLimitService) UpdateSessionWindow(ctx context.Context, account *Acc
 
 // ClearRateLimit 清除账号的限流状态
 func (s *RateLimitService) ClearRateLimit(ctx context.Context, accountID int64) error {
-	return s.accountRepo.ClearRateLimit(ctx, accountID)
+	if err := s.accountRepo.ClearRateLimit(ctx, accountID); err != nil {
+		return err
+	}
+	return s.accountRepo.ClearAntigravityQuotaScopes(ctx, accountID)
+}
+
+func (s *RateLimitService) ClearTempUnschedulable(ctx context.Context, accountID int64) error {
+	if err := s.accountRepo.ClearTempUnschedulable(ctx, accountID); err != nil {
+		return err
+	}
+	if s.tempUnschedCache != nil {
+		if err := s.tempUnschedCache.DeleteTempUnsched(ctx, accountID); err != nil {
+			log.Printf("DeleteTempUnsched failed for account %d: %v", accountID, err)
+		}
+	}
+	return nil
+}
+
+func (s *RateLimitService) GetTempUnschedStatus(ctx context.Context, accountID int64) (*TempUnschedState, error) {
+	now := time.Now().Unix()
+	if s.tempUnschedCache != nil {
+		state, err := s.tempUnschedCache.GetTempUnsched(ctx, accountID)
+		if err != nil {
+			return nil, err
+		}
+		if state != nil && state.UntilUnix > now {
+			return state, nil
+		}
+	}
+
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return nil, err
+	}
+	if account.TempUnschedulableUntil == nil {
+		return nil, nil
+	}
+	if account.TempUnschedulableUntil.Unix() <= now {
+		return nil, nil
+	}
+
+	state := &TempUnschedState{
+		UntilUnix: account.TempUnschedulableUntil.Unix(),
+	}
+
+	if account.TempUnschedulableReason != "" {
+		var parsed TempUnschedState
+		if err := json.Unmarshal([]byte(account.TempUnschedulableReason), &parsed); err == nil {
+			if parsed.UntilUnix == 0 {
+				parsed.UntilUnix = state.UntilUnix
+			}
+			state = &parsed
+		} else {
+			state.ErrorMessage = account.TempUnschedulableReason
+		}
+	}
+
+	if s.tempUnschedCache != nil {
+		if err := s.tempUnschedCache.SetTempUnsched(ctx, accountID, state); err != nil {
+			log.Printf("SetTempUnsched failed for account %d: %v", accountID, err)
+		}
+	}
+
+	return state, nil
+}
+
+func (s *RateLimitService) HandleTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
+	if account == nil {
+		return false
+	}
+	if !account.ShouldHandleErrorCode(statusCode) {
+		return false
+	}
+	return s.tryTempUnschedulable(ctx, account, statusCode, responseBody)
+}
+
+const tempUnschedBodyMaxBytes = 64 << 10
+const tempUnschedMessageMaxBytes = 2048
+
+func (s *RateLimitService) tryTempUnschedulable(ctx context.Context, account *Account, statusCode int, responseBody []byte) bool {
+	if account == nil {
+		return false
+	}
+	if !account.IsTempUnschedulableEnabled() {
+		return false
+	}
+	rules := account.GetTempUnschedulableRules()
+	if len(rules) == 0 {
+		return false
+	}
+	if statusCode <= 0 || len(responseBody) == 0 {
+		return false
+	}
+
+	body := responseBody
+	if len(body) > tempUnschedBodyMaxBytes {
+		body = body[:tempUnschedBodyMaxBytes]
+	}
+	bodyLower := strings.ToLower(string(body))
+
+	for idx, rule := range rules {
+		if rule.ErrorCode != statusCode || len(rule.Keywords) == 0 {
+			continue
+		}
+		matchedKeyword := matchTempUnschedKeyword(bodyLower, rule.Keywords)
+		if matchedKeyword == "" {
+			continue
+		}
+
+		if s.triggerTempUnschedulable(ctx, account, rule, idx, statusCode, matchedKeyword, responseBody) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchTempUnschedKeyword(bodyLower string, keywords []string) string {
+	if bodyLower == "" {
+		return ""
+	}
+	for _, keyword := range keywords {
+		k := strings.TrimSpace(keyword)
+		if k == "" {
+			continue
+		}
+		if strings.Contains(bodyLower, strings.ToLower(k)) {
+			return k
+		}
+	}
+	return ""
+}
+
+func (s *RateLimitService) triggerTempUnschedulable(ctx context.Context, account *Account, rule TempUnschedulableRule, ruleIndex int, statusCode int, matchedKeyword string, responseBody []byte) bool {
+	if account == nil {
+		return false
+	}
+	if rule.DurationMinutes <= 0 {
+		return false
+	}
+
+	now := time.Now()
+	until := now.Add(time.Duration(rule.DurationMinutes) * time.Minute)
+
+	state := &TempUnschedState{
+		UntilUnix:       until.Unix(),
+		TriggeredAtUnix: now.Unix(),
+		StatusCode:      statusCode,
+		MatchedKeyword:  matchedKeyword,
+		RuleIndex:       ruleIndex,
+		ErrorMessage:    truncateTempUnschedMessage(responseBody, tempUnschedMessageMaxBytes),
+	}
+
+	reason := ""
+	if raw, err := json.Marshal(state); err == nil {
+		reason = string(raw)
+	}
+	if reason == "" {
+		reason = strings.TrimSpace(state.ErrorMessage)
+	}
+
+	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
+		log.Printf("SetTempUnschedulable failed for account %d: %v", account.ID, err)
+		return false
+	}
+
+	if s.tempUnschedCache != nil {
+		if err := s.tempUnschedCache.SetTempUnsched(ctx, account.ID, state); err != nil {
+			log.Printf("SetTempUnsched cache failed for account %d: %v", account.ID, err)
+		}
+	}
+
+	log.Printf("Account %d temp unschedulable until %v (rule %d, code %d)", account.ID, until, ruleIndex, statusCode)
+	return true
+}
+
+func truncateTempUnschedMessage(body []byte, maxBytes int) string {
+	if maxBytes <= 0 || len(body) == 0 {
+		return ""
+	}
+	if len(body) > maxBytes {
+		body = body[:maxBytes]
+	}
+	return strings.TrimSpace(string(body))
+}
+
+// HandleStreamTimeout 处理流数据超时
+// 根据系统设置决定是否标记账户为临时不可调度或错误状态
+// 返回是否应该停止该账号的调度
+func (s *RateLimitService) HandleStreamTimeout(ctx context.Context, account *Account, model string) bool {
+	if account == nil {
+		return false
+	}
+
+	// 获取系统设置
+	if s.settingService == nil {
+		log.Printf("[StreamTimeout] settingService not configured, skipping timeout handling for account %d", account.ID)
+		return false
+	}
+
+	settings, err := s.settingService.GetStreamTimeoutSettings(ctx)
+	if err != nil {
+		log.Printf("[StreamTimeout] Failed to get settings: %v", err)
+		return false
+	}
+
+	if !settings.Enabled {
+		return false
+	}
+
+	if settings.Action == StreamTimeoutActionNone {
+		return false
+	}
+
+	// 增加超时计数
+	var count int64 = 1
+	if s.timeoutCounterCache != nil {
+		count, err = s.timeoutCounterCache.IncrementTimeoutCount(ctx, account.ID, settings.ThresholdWindowMinutes)
+		if err != nil {
+			log.Printf("[StreamTimeout] Failed to increment timeout count for account %d: %v", account.ID, err)
+			// 继续处理，使用 count=1
+			count = 1
+		}
+	}
+
+	log.Printf("[StreamTimeout] Account %d timeout count: %d/%d (window: %d min, model: %s)",
+		account.ID, count, settings.ThresholdCount, settings.ThresholdWindowMinutes, model)
+
+	// 检查是否达到阈值
+	if count < int64(settings.ThresholdCount) {
+		return false
+	}
+
+	// 达到阈值，执行相应操作
+	switch settings.Action {
+	case StreamTimeoutActionTempUnsched:
+		return s.triggerStreamTimeoutTempUnsched(ctx, account, settings, model)
+	case StreamTimeoutActionError:
+		return s.triggerStreamTimeoutError(ctx, account, model)
+	default:
+		return false
+	}
+}
+
+// triggerStreamTimeoutTempUnsched 触发流超时临时不可调度
+func (s *RateLimitService) triggerStreamTimeoutTempUnsched(ctx context.Context, account *Account, settings *StreamTimeoutSettings, model string) bool {
+	now := time.Now()
+	until := now.Add(time.Duration(settings.TempUnschedMinutes) * time.Minute)
+
+	state := &TempUnschedState{
+		UntilUnix:       until.Unix(),
+		TriggeredAtUnix: now.Unix(),
+		StatusCode:      0, // 超时没有状态码
+		MatchedKeyword:  "stream_timeout",
+		RuleIndex:       -1, // 表示系统级规则
+		ErrorMessage:    "Stream data interval timeout for model: " + model,
+	}
+
+	reason := ""
+	if raw, err := json.Marshal(state); err == nil {
+		reason = string(raw)
+	}
+	if reason == "" {
+		reason = state.ErrorMessage
+	}
+
+	if err := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); err != nil {
+		log.Printf("[StreamTimeout] SetTempUnschedulable failed for account %d: %v", account.ID, err)
+		return false
+	}
+
+	if s.tempUnschedCache != nil {
+		if err := s.tempUnschedCache.SetTempUnsched(ctx, account.ID, state); err != nil {
+			log.Printf("[StreamTimeout] SetTempUnsched cache failed for account %d: %v", account.ID, err)
+		}
+	}
+
+	// 重置超时计数
+	if s.timeoutCounterCache != nil {
+		if err := s.timeoutCounterCache.ResetTimeoutCount(ctx, account.ID); err != nil {
+			log.Printf("[StreamTimeout] ResetTimeoutCount failed for account %d: %v", account.ID, err)
+		}
+	}
+
+	log.Printf("[StreamTimeout] Account %d marked as temp unschedulable until %v (model: %s)", account.ID, until, model)
+	return true
+}
+
+// triggerStreamTimeoutError 触发流超时错误状态
+func (s *RateLimitService) triggerStreamTimeoutError(ctx context.Context, account *Account, model string) bool {
+	errorMsg := "Stream data interval timeout (repeated failures) for model: " + model
+
+	if err := s.accountRepo.SetError(ctx, account.ID, errorMsg); err != nil {
+		log.Printf("[StreamTimeout] SetError failed for account %d: %v", account.ID, err)
+		return false
+	}
+
+	// 重置超时计数
+	if s.timeoutCounterCache != nil {
+		if err := s.timeoutCounterCache.ResetTimeoutCount(ctx, account.ID); err != nil {
+			log.Printf("[StreamTimeout] ResetTimeoutCount failed for account %d: %v", account.ID, err)
+		}
+	}
+
+	log.Printf("[StreamTimeout] Account %d marked as error (model: %s)", account.ID, model)
+	return true
 }
 
 func (s *RateLimitService) ClearTempUnschedulable(ctx context.Context, accountID int64) error {

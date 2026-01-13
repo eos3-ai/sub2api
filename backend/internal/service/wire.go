@@ -1,10 +1,12 @@
 package service
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/google/wire"
+	"github.com/redis/go-redis/v9"
 )
 
 // BuildInfo contains build information
@@ -43,6 +45,20 @@ func ProvideTokenRefreshService(
 	cfg *config.Config,
 ) *TokenRefreshService {
 	svc := NewTokenRefreshService(accountRepo, oauthService, openaiOAuthService, geminiOAuthService, antigravityOAuthService, cfg)
+	svc.Start()
+	return svc
+}
+
+// ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
+func ProvideDashboardAggregationService(repo DashboardAggregationRepository, timingWheel *TimingWheelService, cfg *config.Config) *DashboardAggregationService {
+	svc := NewDashboardAggregationService(repo, timingWheel, cfg)
+	svc.Start()
+	return svc
+}
+
+// ProvideAccountExpiryService creates and starts AccountExpiryService.
+func ProvideAccountExpiryService(accountRepo AccountRepository) *AccountExpiryService {
+	svc := NewAccountExpiryService(accountRepo, time.Minute)
 	svc.Start()
 	return svc
 }
@@ -103,6 +119,7 @@ var ProviderSet = wire.NewSet(
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,
+	NewPromoService,
 	NewUsageService,
 	NewBalanceService,
 	NewPromotionService,
@@ -128,20 +145,29 @@ var ProviderSet = wire.NewSet(
 	NewGeminiMessagesCompatService,
 	NewAntigravityTokenProvider,
 	NewAntigravityGatewayService,
-	NewRateLimitService,
+	ProvideRateLimitService,
 	NewAccountUsageService,
 	NewAccountTestService,
 	NewSettingService,
+	NewOpsService,
+	ProvideOpsMetricsCollector,
+	ProvideOpsAggregationService,
+	ProvideOpsAlertEvaluatorService,
+	ProvideOpsCleanupService,
+	ProvideOpsScheduledReportService,
 	NewEmailService,
 	ProvideEmailQueueService,
 	NewTurnstileService,
 	NewSubscriptionService,
 	ProvideConcurrencyService,
+	ProvideSchedulerSnapshotService,
 	NewIdentityService,
 	NewCRSSyncService,
 	ProvideUpdateService,
 	ProvideTokenRefreshService,
+	ProvideAccountExpiryService,
 	ProvideTimingWheelService,
+	ProvideDashboardAggregationService,
 	ProvideDeferredService,
 	NewAntigravityQuotaFetcher,
 	NewUserAttributeService,

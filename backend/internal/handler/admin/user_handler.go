@@ -68,10 +68,17 @@ type UpdateBalanceRequest struct {
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
+	search := c.Query("search")
+	// 标准化和验证 search 参数
+	search = strings.TrimSpace(search)
+	if len(search) > 100 {
+		search = search[:100]
+	}
+
 	filters := service.UserListFilters{
 		Status:     c.Query("status"),
 		Role:       c.Query("role"),
-		Search:     c.Query("search"),
+		Search:     search,
 		Attributes: parseAttributeFilters(c),
 	}
 

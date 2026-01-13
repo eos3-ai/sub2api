@@ -1,6 +1,8 @@
 package antigravity
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -67,8 +69,15 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 
 	// 5. 构建内部请求
 	innerRequest := GeminiRequest{
-		Contents:       contents,
-		SafetySettings: DefaultSafetySettings,
+		Contents: contents,
+		// 总是设置 toolConfig，与官方客户端一致
+		ToolConfig: &GeminiToolConfig{
+			FunctionCallingConfig: &GeminiFunctionCallingConfig{
+				Mode: "VALIDATED",
+			},
+		},
+		// 总是生成 sessionId，基于用户消息内容
+		SessionID: generateStableSessionID(contents),
 	}
 
 	if systemInstruction != nil {
@@ -79,14 +88,9 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 	}
 	if len(tools) > 0 {
 		innerRequest.Tools = tools
-		innerRequest.ToolConfig = &GeminiToolConfig{
-			FunctionCallingConfig: &GeminiFunctionCallingConfig{
-				Mode: "VALIDATED",
-			},
-		}
 	}
 
-	// 如果提供了 metadata.user_id，复用为 sessionId
+	// 如果提供了 metadata.user_id，优先使用
 	if claudeReq.Metadata != nil && claudeReq.Metadata.UserID != "" {
 		innerRequest.SessionID = claudeReq.Metadata.UserID
 	}
@@ -95,7 +99,7 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 	v1Req := V1InternalRequest{
 		Project:     projectID,
 		RequestID:   "agent-" + uuid.New().String(),
-		UserAgent:   "sub2api",
+		UserAgent:   "antigravity", // 固定值，与官方客户端一致
 		RequestType: "agent",
 		Model:       mappedModel,
 		Request:     innerRequest,
@@ -128,13 +132,15 @@ func buildSystemInstruction(system json.RawMessage, modelName string, opts Trans
 		parts = append(parts, GeminiPart{Text: identityPatch})
 	}
 
-	// 解析 system prompt
 	if len(system) > 0 {
 		// 尝试解析为字符串
 		var sysStr string
 		if err := json.Unmarshal(system, &sysStr); err == nil {
 			if strings.TrimSpace(sysStr) != "" {
-				parts = append(parts, GeminiPart{Text: sysStr})
+				userSystemParts = append(userSystemParts, GeminiPart{Text: sysStr})
+				if strings.Contains(sysStr, "You are Antigravity") {
+					userHasAntigravityIdentity = true
+				}
 			}
 		} else {
 			// 尝试解析为数组
@@ -142,7 +148,10 @@ func buildSystemInstruction(system json.RawMessage, modelName string, opts Trans
 			if err := json.Unmarshal(system, &sysBlocks); err == nil {
 				for _, block := range sysBlocks {
 					if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
-						parts = append(parts, GeminiPart{Text: block.Text})
+						userSystemParts = append(userSystemParts, GeminiPart{Text: block.Text})
+						if strings.Contains(block.Text, "You are Antigravity") {
+							userHasAntigravityIdentity = true
+						}
 					}
 				}
 			}

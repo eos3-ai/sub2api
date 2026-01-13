@@ -12,6 +12,9 @@ backend/server
 backend/sub2api
 backend/main
 
+# Go 测试二进制
+*.test
+
 # 测试覆盖率
 *.out
 coverage.html

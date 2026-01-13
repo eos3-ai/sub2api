@@ -60,6 +60,9 @@ func (a *Account) IsSchedulable() bool {
 		return false
 	}
 	now := time.Now()
+	if a.AutoPauseOnExpired && a.ExpiresAt != nil && !now.Before(*a.ExpiresAt) {
+		return false
+	}
 	if a.OverloadUntil != nil && now.Before(*a.OverloadUntil) {
 		return false
 	}

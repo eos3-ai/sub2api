@@ -44,8 +44,14 @@ func RegisterAdminRoutes(
 		// 卡密管理
 		registerRedeemCodeRoutes(admin, h)
 
+		// 优惠码管理
+		registerPromoCodeRoutes(admin, h)
+
 		// 系统设置
 		registerSettingsRoutes(admin, h)
+
+		// 运维监控（Ops）
+		registerOpsRoutes(admin, h)
 
 		// 系统管理
 		registerSystemRoutes(admin, h)
@@ -61,6 +67,66 @@ func RegisterAdminRoutes(
 
 		// 充值记录（支付订单）
 		registerPaymentOrderRoutes(admin, h)
+	}
+}
+
+func registerOpsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	ops := admin.Group("/ops")
+	{
+		// Realtime ops signals
+		ops.GET("/concurrency", h.Admin.Ops.GetConcurrencyStats)
+		ops.GET("/account-availability", h.Admin.Ops.GetAccountAvailability)
+		ops.GET("/realtime-traffic", h.Admin.Ops.GetRealtimeTrafficSummary)
+
+		// Alerts (rules + events)
+		ops.GET("/alert-rules", h.Admin.Ops.ListAlertRules)
+		ops.POST("/alert-rules", h.Admin.Ops.CreateAlertRule)
+		ops.PUT("/alert-rules/:id", h.Admin.Ops.UpdateAlertRule)
+		ops.DELETE("/alert-rules/:id", h.Admin.Ops.DeleteAlertRule)
+		ops.GET("/alert-events", h.Admin.Ops.ListAlertEvents)
+
+		// Email notification config (DB-backed)
+		ops.GET("/email-notification/config", h.Admin.Ops.GetEmailNotificationConfig)
+		ops.PUT("/email-notification/config", h.Admin.Ops.UpdateEmailNotificationConfig)
+
+		// Runtime settings (DB-backed)
+		runtime := ops.Group("/runtime")
+		{
+			runtime.GET("/alert", h.Admin.Ops.GetAlertRuntimeSettings)
+			runtime.PUT("/alert", h.Admin.Ops.UpdateAlertRuntimeSettings)
+		}
+
+		// Advanced settings (DB-backed)
+		ops.GET("/advanced-settings", h.Admin.Ops.GetAdvancedSettings)
+		ops.PUT("/advanced-settings", h.Admin.Ops.UpdateAdvancedSettings)
+
+		// Settings group (DB-backed)
+		settings := ops.Group("/settings")
+		{
+			settings.GET("/metric-thresholds", h.Admin.Ops.GetMetricThresholds)
+			settings.PUT("/metric-thresholds", h.Admin.Ops.UpdateMetricThresholds)
+		}
+
+		// WebSocket realtime (QPS/TPS)
+		ws := ops.Group("/ws")
+		{
+			ws.GET("/qps", h.Admin.Ops.QPSWSHandler)
+		}
+
+		// Error logs (MVP-1)
+		ops.GET("/errors", h.Admin.Ops.GetErrorLogs)
+		ops.GET("/errors/:id", h.Admin.Ops.GetErrorLogByID)
+		ops.POST("/errors/:id/retry", h.Admin.Ops.RetryErrorRequest)
+
+		// Request drilldown (success + error)
+		ops.GET("/requests", h.Admin.Ops.ListRequestDetails)
+
+		// Dashboard (vNext - raw path for MVP)
+		ops.GET("/dashboard/overview", h.Admin.Ops.GetDashboardOverview)
+		ops.GET("/dashboard/throughput-trend", h.Admin.Ops.GetDashboardThroughputTrend)
+		ops.GET("/dashboard/latency-histogram", h.Admin.Ops.GetDashboardLatencyHistogram)
+		ops.GET("/dashboard/error-trend", h.Admin.Ops.GetDashboardErrorTrend)
+		ops.GET("/dashboard/error-distribution", h.Admin.Ops.GetDashboardErrorDistribution)
 	}
 }
 
@@ -205,17 +271,32 @@ func registerRedeemCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
+func registerPromoCodeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	promoCodes := admin.Group("/promo-codes")
+	{
+		promoCodes.GET("", h.Admin.Promo.List)
+		promoCodes.GET("/:id", h.Admin.Promo.GetByID)
+		promoCodes.POST("", h.Admin.Promo.Create)
+		promoCodes.PUT("/:id", h.Admin.Promo.Update)
+		promoCodes.DELETE("/:id", h.Admin.Promo.Delete)
+		promoCodes.GET("/:id/usages", h.Admin.Promo.GetUsages)
+	}
+}
+
 func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	adminSettings := admin.Group("/settings")
 	{
 		adminSettings.GET("", h.Admin.Setting.GetSettings)
 		adminSettings.PUT("", h.Admin.Setting.UpdateSettings)
-		adminSettings.POST("/test-smtp", h.Admin.Setting.TestSmtpConnection)
+		adminSettings.POST("/test-smtp", h.Admin.Setting.TestSMTPConnection)
 		adminSettings.POST("/send-test-email", h.Admin.Setting.SendTestEmail)
 		// Admin API Key 管理
-		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminApiKey)
-		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminApiKey)
-		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminApiKey)
+		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
+		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
+		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
+		// 流超时处理配置
+		adminSettings.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
+		adminSettings.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)
 	}
 }
 

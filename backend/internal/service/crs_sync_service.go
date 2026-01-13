@@ -213,7 +213,9 @@ func (s *CRSSyncService) SyncFromCRS(ctx context.Context, input SyncFromCRSInput
 	}
 
 	client, err := httpclient.GetClient(httpclient.Options{
-		Timeout: 20 * time.Second,
+		Timeout:            20 * time.Second,
+		ValidateResolvedIP: s.cfg.Security.URLAllowlist.Enabled,
+		AllowPrivateHosts:  s.cfg.Security.URLAllowlist.AllowPrivateHosts,
 	})
 	if err != nil {
 		client = &http.Client{Timeout: 20 * time.Second}

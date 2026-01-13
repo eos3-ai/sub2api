@@ -196,6 +196,8 @@ var (
 	SubscriptionTypeValidator func(string) error
 	// DefaultDefaultValidityDays holds the default value on creation for the "default_validity_days" field.
 	DefaultDefaultValidityDays int
+	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
+	DefaultClaudeCodeOnly bool
 )
 
 // OrderOption defines the ordering options for the Group queries.

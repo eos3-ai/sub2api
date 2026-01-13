@@ -444,20 +444,27 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { getPublicSettings } from '@/api/auth'
-import { useAuthStore } from '@/stores'
+import { useAuthStore, useAppStore } from '@/stores'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import { sanitizeUrl } from '@/utils/url'
 
 const { t } = useI18n()
 
 const authStore = useAuthStore()
+const appStore = useAppStore()
 
-// Site settings
-const siteName = ref('Sub2API')
-const siteLogo = ref('')
-const siteSubtitle = ref('AI API Gateway Platform')
-const docUrl = ref('')
+// Site settings - directly from appStore (already initialized from injected config)
+const siteName = computed(() => appStore.cachedPublicSettings?.site_name || appStore.siteName || 'Sub2API')
+const siteLogo = computed(() => appStore.cachedPublicSettings?.site_logo || appStore.siteLogo || '')
+const siteSubtitle = computed(() => appStore.cachedPublicSettings?.site_subtitle || 'AI API Gateway Platform')
+const docUrl = computed(() => appStore.cachedPublicSettings?.doc_url || appStore.docUrl || '')
+const homeContent = computed(() => appStore.cachedPublicSettings?.home_content || '')
+
+// Check if homeContent is a URL (for iframe display)
+const isHomeContentUrl = computed(() => {
+  const content = homeContent.value.trim()
+  return content.startsWith('http://') || content.startsWith('https://')
+})
 
 // Theme
 const isDark = ref(document.documentElement.classList.contains('dark'))
@@ -490,7 +497,7 @@ function initTheme() {
   }
 }
 
-onMounted(async () => {
+onMounted(() => {
   initTheme()
   authStore.checkAuth()
 

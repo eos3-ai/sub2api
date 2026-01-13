@@ -144,7 +144,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, ref } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
@@ -155,6 +155,7 @@ const route = useRoute()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
+const adminSettingsStore = useAdminSettingsStore()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
@@ -399,6 +400,9 @@ const userNavItems = computed(() => {
 const adminNavItems = computed(() => {
   const baseItems = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+    ...(adminSettingsStore.opsMonitoringEnabled
+      ? [{ path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon }]
+      : []),
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -466,6 +470,23 @@ if (
   isDark.value = true
   document.documentElement.classList.add('dark')
 }
+
+// Fetch admin settings (for feature-gated nav items like Ops).
+watch(
+  isAdmin,
+  (v) => {
+    if (v) {
+      adminSettingsStore.fetch()
+    }
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (isAdmin.value) {
+    adminSettingsStore.fetch()
+  }
+})
 </script>
 
 <style scoped>

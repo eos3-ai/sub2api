@@ -22,9 +22,43 @@ import (
 
 // Config paths
 const (
-	ConfigFile = "config.yaml"
-	EnvFile    = ".env"
+	ConfigFileName  = "config.yaml"
+	InstallLockFile = ".installed"
 )
+
+// GetDataDir returns the data directory for storing config and lock files.
+// Priority: DATA_DIR env > /app/data (if exists and writable) > current directory
+func GetDataDir() string {
+	// Check DATA_DIR environment variable first
+	if dir := os.Getenv("DATA_DIR"); dir != "" {
+		return dir
+	}
+
+	// Check if /app/data exists and is writable (Docker environment)
+	dockerDataDir := "/app/data"
+	if info, err := os.Stat(dockerDataDir); err == nil && info.IsDir() {
+		// Try to check if writable by creating a temp file
+		testFile := dockerDataDir + "/.write_test"
+		if f, err := os.Create(testFile); err == nil {
+			_ = f.Close()
+			_ = os.Remove(testFile)
+			return dockerDataDir
+		}
+	}
+
+	// Default to current directory
+	return "."
+}
+
+// GetConfigFilePath returns the full path to config.yaml
+func GetConfigFilePath() string {
+	return GetDataDir() + "/" + ConfigFileName
+}
+
+// GetInstallLockPath returns the full path to .installed lock file
+func GetInstallLockPath() string {
+	return GetDataDir() + "/" + InstallLockFile
+}
 
 // SetupConfig holds the setup configuration
 type SetupConfig struct {
@@ -87,8 +121,7 @@ func NeedsSetup() bool {
 	}
 
 	// Check 2: Installation lock file (harder to bypass)
-	lockFile := ".installed"
-	if _, err := os.Stat(lockFile); !os.IsNotExist(err) {
+	if _, err := os.Stat(GetInstallLockPath()); !os.IsNotExist(err) {
 		return false // Lock file exists, already installed
 	}
 
@@ -260,9 +293,8 @@ func Install(cfg *SetupConfig) error {
 
 // createInstallLock creates a lock file to prevent re-installation attacks
 func createInstallLock() error {
-	lockFile := ".installed"
 	content := fmt.Sprintf("installed_at=%s\n", time.Now().UTC().Format(time.RFC3339))
-	return os.WriteFile(lockFile, []byte(content), 0400) // Read-only for owner
+	return os.WriteFile(GetInstallLockPath(), []byte(content), 0400) // Read-only for owner
 }
 
 func initializeDatabase(cfg *SetupConfig) error {
@@ -413,7 +445,7 @@ func writeConfigFile(cfg *SetupConfig) error {
 		return err
 	}
 
-	return os.WriteFile(ConfigFile, data, 0600)
+	return os.WriteFile(GetConfigFilePath(), data, 0600)
 }
 
 func generateSecret(length int) (string, error) {
@@ -456,6 +488,7 @@ func getEnvIntOrDefault(key string, defaultValue int) int {
 // This is designed for Docker deployment where all config is passed via env vars
 func AutoSetupFromEnv() error {
 	log.Println("Auto setup enabled, configuring from environment variables...")
+	log.Printf("Data directory: %s", GetDataDir())
 
 	// Get timezone from TZ or TIMEZONE env var (TZ is standard for Docker)
 	tz := getEnvOrDefault("TZ", "")

@@ -16,7 +16,6 @@
 package httpclient
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
+	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
 
 // Transport 连接池默认配置
@@ -39,7 +39,10 @@ type Options struct {
 	ProxyURL              string        // 代理 URL（支持 http/https/socks5/socks5h）
 	Timeout               time.Duration // 请求总超时时间
 	ResponseHeaderTimeout time.Duration // 等待响应头超时时间
-	InsecureSkipVerify    bool          // 是否跳过 TLS 证书验证
+	InsecureSkipVerify    bool          // 是否跳过 TLS 证书验证（已禁用，不允许设置为 true）
+	ProxyStrict           bool          // 严格代理模式：代理失败时返回错误而非回退
+	ValidateResolvedIP    bool          // 是否校验解析后的 IP（防止 DNS Rebinding）
+	AllowPrivateHosts     bool          // 允许私有地址解析（与 ValidateResolvedIP 一起使用）
 
 	// 可选的连接池参数（不设置则使用默认值）
 	MaxIdleConns        int // 最大空闲连接总数（默认 100）
@@ -79,8 +82,12 @@ func buildClient(opts Options) (*http.Client, error) {
 		return nil, err
 	}
 
+	var rt http.RoundTripper = transport
+	if opts.ValidateResolvedIP && !opts.AllowPrivateHosts {
+		rt = &validatedTransport{base: transport}
+	}
 	return &http.Client{
-		Transport: transport,
+		Transport: rt,
 		Timeout:   opts.Timeout,
 	}, nil
 }
@@ -105,7 +112,8 @@ func buildTransport(opts Options) (*http.Transport, error) {
 	}
 
 	if opts.InsecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		// 安全要求：禁止跳过证书验证，避免中间人攻击。
+		return nil, fmt.Errorf("insecure_skip_verify is not allowed; install a trusted certificate instead")
 	}
 
 	proxyURL := strings.TrimSpace(opts.ProxyURL)
@@ -126,13 +134,32 @@ func buildTransport(opts Options) (*http.Transport, error) {
 }
 
 func buildClientKey(opts Options) string {
-	return fmt.Sprintf("%s|%s|%s|%t|%d|%d|%d",
+	return fmt.Sprintf("%s|%s|%s|%t|%t|%t|%t|%d|%d|%d",
 		strings.TrimSpace(opts.ProxyURL),
 		opts.Timeout.String(),
 		opts.ResponseHeaderTimeout.String(),
 		opts.InsecureSkipVerify,
+		opts.ProxyStrict,
+		opts.ValidateResolvedIP,
+		opts.AllowPrivateHosts,
 		opts.MaxIdleConns,
 		opts.MaxIdleConnsPerHost,
 		opts.MaxConnsPerHost,
 	)
+}
+
+type validatedTransport struct {
+	base http.RoundTripper
+}
+
+func (t *validatedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req != nil && req.URL != nil {
+		host := strings.TrimSpace(req.URL.Hostname())
+		if host != "" {
+			if err := urlvalidator.ValidateResolvedIP(host); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return t.base.RoundTrip(req)
 }

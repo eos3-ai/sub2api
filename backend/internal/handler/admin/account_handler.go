@@ -2,6 +2,7 @@
 package admin
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -131,6 +132,11 @@ func (h *AccountHandler) List(c *gin.Context) {
 	accountType := c.Query("type")
 	status := c.Query("status")
 	search := c.Query("search")
+	// 标准化和验证 search 参数
+	search = strings.TrimSpace(search)
+	if len(search) > 100 {
+		search = search[:100]
+	}
 
 	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search)
 	if err != nil {
@@ -189,16 +195,23 @@ func (h *AccountHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// 确定是否跳过混合渠道检查
+	skipCheck := req.ConfirmMixedChannelRisk != nil && *req.ConfirmMixedChannelRisk
+
 	account, err := h.adminService.CreateAccount(c.Request.Context(), &service.CreateAccountInput{
-		Name:        req.Name,
-		Platform:    req.Platform,
-		Type:        req.Type,
-		Credentials: req.Credentials,
-		Extra:       req.Extra,
-		ProxyID:     req.ProxyID,
-		Concurrency: req.Concurrency,
-		Priority:    req.Priority,
-		GroupIDs:    req.GroupIDs,
+		Name:                  req.Name,
+		Notes:                 req.Notes,
+		Platform:              req.Platform,
+		Type:                  req.Type,
+		Credentials:           req.Credentials,
+		Extra:                 req.Extra,
+		ProxyID:               req.ProxyID,
+		Concurrency:           req.Concurrency,
+		Priority:              req.Priority,
+		GroupIDs:              req.GroupIDs,
+		ExpiresAt:             req.ExpiresAt,
+		AutoPauseOnExpired:    req.AutoPauseOnExpired,
+		SkipMixedChannelCheck: skipCheck,
 	})
 	if err != nil{
 		response.ErrorFrom(c, err)
@@ -237,6 +250,24 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		GroupIDs:              req.GroupIDs,
 	})
 	if err != nil {
+		// 检查是否为混合渠道错误
+		var mixedErr *service.MixedChannelError
+		if errors.As(err, &mixedErr) {
+			// 返回特殊错误码要求确认
+			c.JSON(409, gin.H{
+				"error":   "mixed_channel_warning",
+				"message": mixedErr.Error(),
+				"details": gin.H{
+					"group_id":         mixedErr.GroupID,
+					"group_name":       mixedErr.GroupName,
+					"current_platform": mixedErr.CurrentPlatform,
+					"other_platform":   mixedErr.OtherPlatform,
+				},
+				"require_confirmation": true,
+			})
+			return
+		}
+
 		response.ErrorFrom(c, err)
 		return
 	}
@@ -601,6 +632,7 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		req.Concurrency != nil ||
 		req.Priority != nil ||
 		req.Status != "" ||
+		req.Schedulable != nil ||
 		req.GroupIDs != nil ||
 		len(req.Credentials) > 0 ||
 		len(req.Extra) > 0

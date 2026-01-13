@@ -1,7 +1,6 @@
 <template>
   <AppLayout>
     <div class="mx-auto max-w-4xl space-y-6">
-      <!-- Account Stats Summary -->
       <div class="grid grid-cols-1 gap-6 sm:grid-cols-3">
         <StatCard
           class="animate-fade-in-up stagger-1"
@@ -235,158 +234,29 @@
           </form>
         </div>
       </div>
+      <ProfileEditForm :initial-username="user?.username || ''" />
+      <ProfilePasswordForm />
     </div>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { useAuthStore } from '@/stores/auth'
-import { useAppStore } from '@/stores/app'
-import { formatDate } from '@/utils/format'
-
-const { t } = useI18n()
-import { userAPI, authAPI } from '@/api'
-import AppLayout from '@/components/layout/AppLayout.vue'
+import { ref, computed, h, onMounted } from 'vue'; import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/auth'; import { formatDate } from '@/utils/format'
+import { authAPI } from '@/api'; import AppLayout from '@/components/layout/AppLayout.vue'
 import StatCard from '@/components/common/StatCard.vue'
+import ProfileInfoCard from '@/components/user/profile/ProfileInfoCard.vue'
+import ProfileEditForm from '@/components/user/profile/ProfileEditForm.vue'
+import ProfilePasswordForm from '@/components/user/profile/ProfilePasswordForm.vue'
+import { Icon } from '@/components/icons'
 
-// SVG Icon Components
-const WalletIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3'
-        })
-      ]
-    )
-}
-
-const BoltIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'm3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'
-        })
-      ]
-    )
-}
-
-const CalendarIcon = {
-  render: () =>
-    h(
-      'svg',
-      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
-      [
-        h('path', {
-          'stroke-linecap': 'round',
-          'stroke-linejoin': 'round',
-          d: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5'
-        })
-      ]
-    )
-}
-
-const authStore = useAuthStore()
-const appStore = useAppStore()
-
-const user = computed(() => authStore.user)
-
-const passwordForm = ref({
-  old_password: '',
-  new_password: '',
-  confirm_password: ''
-})
-
-const profileForm = ref({
-  username: ''
-})
-
-const changingPassword = ref(false)
-const updatingProfile = ref(false)
+const { t } = useI18n(); const authStore = useAuthStore(); const user = computed(() => authStore.user)
 const contactInfo = ref('')
 
-onMounted(async () => {
-  try {
-    const settings = await authAPI.getPublicSettings()
-    contactInfo.value = settings.contact_info || ''
+const WalletIcon = { render: () => h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' }, [h('path', { d: 'M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12' })]) }
+const BoltIcon = { render: () => h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' }, [h('path', { d: 'm3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z' })]) }
+const CalendarIcon = { render: () => h('svg', { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' }, [h('path', { d: 'M6.75 3v2.25M17.25 3v2.25' })]) }
 
-    // Initialize profile form with current user data
-    if (user.value) {
-      profileForm.value.username = user.value.username || ''
-    }
-  } catch (error) {
-    console.error('Failed to load contact info:', error)
-  }
-})
-
-const formatCurrency = (value: number): string => {
-  return `$${value.toFixed(2)}`
-}
-
-const handleChangePassword = async () => {
-  // Validate password match
-  if (passwordForm.value.new_password !== passwordForm.value.confirm_password) {
-    appStore.showError(t('profile.passwordsNotMatch'))
-    return
-  }
-
-  // Validate password length
-  if (passwordForm.value.new_password.length < 8) {
-    appStore.showError(t('profile.passwordTooShort'))
-    return
-  }
-
-  changingPassword.value = true
-  try {
-    await userAPI.changePassword(passwordForm.value.old_password, passwordForm.value.new_password)
-
-    // Clear form
-    passwordForm.value = {
-      old_password: '',
-      new_password: '',
-      confirm_password: ''
-    }
-
-    appStore.showSuccess(t('profile.passwordChangeSuccess'))
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('profile.passwordChangeFailed'))
-  } finally {
-    changingPassword.value = false
-  }
-}
-
-const handleUpdateProfile = async () => {
-  // Basic validation
-  if (!profileForm.value.username.trim()) {
-    appStore.showError(t('profile.usernameRequired'))
-    return
-  }
-
-  updatingProfile.value = true
-  try {
-    const updatedUser = await userAPI.updateProfile({
-      username: profileForm.value.username
-    })
-
-    // Update auth store with new user data
-    authStore.user = updatedUser
-
-    appStore.showSuccess(t('profile.updateSuccess'))
-  } catch (error: any) {
-    appStore.showError(error.response?.data?.detail || t('profile.updateFailed'))
-  } finally {
-    updatingProfile.value = false
-  }
-}
+onMounted(async () => { try { const s = await authAPI.getPublicSettings(); contactInfo.value = s.contact_info || '' } catch (error) { console.error('Failed to load contact info:', error) } })
+const formatCurrency = (v: number) => `$${v.toFixed(2)}`
 </script>

@@ -38,6 +38,12 @@ const (
 	RedeemTypeSubscription = "subscription"
 )
 
+// PromoCode status constants
+const (
+	PromoCodeStatusActive   = "active"
+	PromoCodeStatusDisabled = "disabled"
+)
+
 // Admin adjustment type constants
 const (
 	AdjustmentTypeAdminBalance     = "admin_balance"     // 管理员调整余额
@@ -56,6 +62,9 @@ const (
 	SubscriptionStatusExpired   = "expired"
 	SubscriptionStatusSuspended = "suspended"
 )
+
+// LinuxDoConnectSyntheticEmailDomain 是 LinuxDo Connect 用户的合成邮箱后缀（RFC 保留域名）。
+const LinuxDoConnectSyntheticEmailDomain = "@linuxdo-connect.invalid"
 
 // Setting keys
 const (
@@ -76,6 +85,12 @@ const (
 	SettingKeyTurnstileEnabled   = "turnstile_enabled"    // 是否启用 Turnstile 验证
 	SettingKeyTurnstileSiteKey   = "turnstile_site_key"   // Turnstile Site Key
 	SettingKeyTurnstileSecretKey = "turnstile_secret_key" // Turnstile Secret Key
+
+	// LinuxDo Connect OAuth 登录设置
+	SettingKeyLinuxDoConnectEnabled      = "linuxdo_connect_enabled"
+	SettingKeyLinuxDoConnectClientID     = "linuxdo_connect_client_id"
+	SettingKeyLinuxDoConnectClientSecret = "linuxdo_connect_client_secret"
+	SettingKeyLinuxDoConnectRedirectURL  = "linuxdo_connect_redirect_url"
 
 	// OEM设置
 	SettingKeySiteName     = "site_name"     // 网站名称

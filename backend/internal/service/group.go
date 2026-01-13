@@ -10,6 +10,7 @@ type Group struct {
 	RateMultiplier float64
 	IsExclusive    bool
 	Status         string
+	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
 	SubscriptionType    string
 	DailyLimitUSD       *float64

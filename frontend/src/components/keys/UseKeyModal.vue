@@ -28,8 +28,8 @@
           {{ platformDescription }}
         </p>
 
-        <!-- Client Tabs (only for Antigravity platform) -->
-        <div v-if="platform === 'antigravity'" class="border-b border-gray-200 dark:border-dark-700">
+        <!-- Client Tabs -->
+        <div v-if="clientTabs.length" class="border-b border-gray-200 dark:border-dark-700">
           <nav class="-mb-px flex space-x-6" aria-label="Client">
             <button
               v-for="tab in clientTabs"
@@ -51,7 +51,7 @@
         </div>
 
         <!-- OS/Shell Tabs -->
-        <div class="border-b border-gray-200 dark:border-dark-700">
+        <div v-if="showShellTabs" class="border-b border-gray-200 dark:border-dark-700">
           <nav class="-mb-px flex space-x-4" aria-label="Tabs">
             <button
               v-for="tab in currentTabs"
@@ -105,7 +105,7 @@
                 </button>
               </div>
               <!-- Code Content -->
-              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-html="file.highlighted"></code></pre>
+              <pre class="p-4 text-sm font-mono text-gray-100 overflow-x-auto"><code v-if="file.highlighted" v-html="file.highlighted"></code><code v-else v-text="file.content"></code></pre>
             </div>
           </div>
         </div>
@@ -161,8 +161,8 @@ interface TabConfig {
 interface FileConfig {
   path: string
   content: string
-  highlighted: string
   hint?: string  // Optional hint message for this file
+  highlighted?: string
 }
 
 const props = defineProps<Props>()
@@ -173,17 +173,28 @@ const { copyToClipboard: clipboardCopy } = useClipboard()
 
 const copiedIndex = ref<number | null>(null)
 const activeTab = ref<string>('unix')
-const activeClientTab = ref<string>('claude')  // Level 1 tab for antigravity platform
+const activeClientTab = ref<string>('claude')
 
 // Reset tabs when platform changes
-watch(() => props.platform, (newPlatform) => {
-  activeTab.value = 'unix'
-  if (newPlatform === 'antigravity') {
-    activeClientTab.value = 'claude'
+const defaultClientTab = computed(() => {
+  switch (props.platform) {
+    case 'openai':
+      return 'codex'
+    case 'gemini':
+      return 'gemini'
+    case 'antigravity':
+      return 'claude'
+    default:
+      return 'claude'
   }
 })
 
-// Reset shell tab when client changes (for antigravity)
+watch(() => props.platform, () => {
+  activeTab.value = 'unix'
+  activeClientTab.value = defaultClientTab.value
+}, { immediate: true })
+
+// Reset shell tab when client changes
 watch(activeClientTab, () => {
   activeTab.value = 'unix'
 })
@@ -251,11 +262,32 @@ const SparkleIcon = {
   }
 }
 
-// Client tabs for Antigravity platform (Level 1)
-const clientTabs = computed((): TabConfig[] => [
-  { id: 'claude', label: t('keys.useKeyModal.antigravity.claudeCode'), icon: TerminalIcon },
-  { id: 'gemini', label: t('keys.useKeyModal.antigravity.geminiCli'), icon: SparkleIcon }
-])
+const clientTabs = computed((): TabConfig[] => {
+  if (!props.platform) return []
+  switch (props.platform) {
+    case 'openai':
+      return [
+        { id: 'codex', label: t('keys.useKeyModal.cliTabs.codexCli'), icon: TerminalIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+      ]
+    case 'gemini':
+      return [
+        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+      ]
+    case 'antigravity':
+      return [
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
+        { id: 'gemini', label: t('keys.useKeyModal.cliTabs.geminiCli'), icon: SparkleIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+      ]
+    default:
+      return [
+        { id: 'claude', label: t('keys.useKeyModal.cliTabs.claudeCode'), icon: TerminalIcon },
+        { id: 'opencode', label: t('keys.useKeyModal.cliTabs.opencode'), icon: TerminalIcon }
+      ]
+  }
+})
 
 // Shell tabs (3 types for environment variable based configs)
 const shellTabs: TabConfig[] = [
@@ -270,11 +302,13 @@ const openaiTabs: TabConfig[] = [
   { id: 'windows', label: 'Windows', icon: WindowsIcon }
 ]
 
+const showShellTabs = computed(() => activeClientTab.value !== 'opencode')
+
 const currentTabs = computed(() => {
+  if (!showShellTabs.value) return []
   if (props.platform === 'openai') {
-    return openaiTabs  // 2 tabs: unix, windows
+    return openaiTabs
   }
-  // All other platforms (anthropic, gemini, antigravity) use shell tabs
   return shellTabs
 })
 
@@ -316,10 +350,60 @@ const operator = (text: string) => `<span class="text-yellow-400">${text}</span>
 const comment = (text: string) => `<span class="text-gray-500">${text}</span>`
 const key = (text: string) => `<span class="text-blue-400">${text}</span>`
 
+const escapeHtml = (value: string) => value
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#39;')
+
+const wrapToken = (className: string, value: string) =>
+  `<span class="${className}">${escapeHtml(value)}</span>`
+
+const keyword = (value: string) => wrapToken('text-emerald-300', value)
+const variable = (value: string) => wrapToken('text-sky-200', value)
+const operator = (value: string) => wrapToken('text-slate-400', value)
+const string = (value: string) => wrapToken('text-amber-200', value)
+const comment = (value: string) => wrapToken('text-slate-500', value)
+
+// Syntax highlighting helpers
 // Generate file configs based on platform and active tab
 const currentFiles = computed((): FileConfig[] => {
   const baseUrl = props.baseUrl || window.location.origin
   const apiKey = props.apiKey
+  const baseRoot = baseUrl.replace(/\/v1\/?$/, '').replace(/\/+$/, '')
+  const ensureV1 = (value: string) => {
+    const trimmed = value.replace(/\/+$/, '')
+    return trimmed.endsWith('/v1') ? trimmed : `${trimmed}/v1`
+  }
+  const apiBase = ensureV1(baseRoot)
+  const antigravityBase = ensureV1(`${baseRoot}/antigravity`)
+  const antigravityGeminiBase = (() => {
+    const trimmed = `${baseRoot}/antigravity`.replace(/\/+$/, '')
+    return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
+  })()
+  const geminiBase = (() => {
+    const trimmed = baseRoot.replace(/\/+$/, '')
+    return trimmed.endsWith('/v1beta') ? trimmed : `${trimmed}/v1beta`
+  })()
+
+  if (activeClientTab.value === 'opencode') {
+    switch (props.platform) {
+      case 'anthropic':
+        return [generateOpenCodeConfig('anthropic', apiBase, apiKey)]
+      case 'openai':
+        return [generateOpenCodeConfig('openai', apiBase, apiKey)]
+      case 'gemini':
+        return [generateOpenCodeConfig('gemini', geminiBase, apiKey)]
+      case 'antigravity':
+        return [
+          generateOpenCodeConfig('antigravity-claude', antigravityBase, apiKey, 'opencode.json (Claude)'),
+          generateOpenCodeConfig('antigravity-gemini', antigravityGeminiBase, apiKey, 'opencode.json (Gemini)')
+        ]
+      default:
+        return [generateOpenCodeConfig('openai', apiBase, apiKey)]
+    }
+  }
 
   switch (props.platform) {
     case 'openai':
@@ -327,12 +411,11 @@ const currentFiles = computed((): FileConfig[] => {
     case 'gemini':
       return [generateGeminiCliContent(baseUrl, apiKey)]
     case 'antigravity':
-      // Both Claude Code and Gemini CLI need /antigravity suffix for antigravity platform
-      if (activeClientTab.value === 'claude') {
-        return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
+      if (activeClientTab.value === 'gemini') {
+        return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
       }
-      return [generateGeminiCliContent(`${baseUrl}/antigravity`, apiKey)]
-    default: // anthropic
+      return generateAnthropicFiles(`${baseUrl}/antigravity`, apiKey)
+    default:
       return generateAnthropicFiles(baseUrl, apiKey)
   }
 })
@@ -340,37 +423,29 @@ const currentFiles = computed((): FileConfig[] => {
 function generateAnthropicFiles(baseUrl: string, apiKey: string): FileConfig[] {
   let path: string
   let content: string
-  let highlighted: string
 
   switch (activeTab.value) {
     case 'unix':
       path = 'Terminal'
       content = `export ANTHROPIC_BASE_URL="${baseUrl}"
 export ANTHROPIC_AUTH_TOKEN="${apiKey}"`
-      highlighted = `${keyword('export')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
-${keyword('export')} ${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${string(`"${apiKey}"`)}`
       break
     case 'cmd':
       path = 'Command Prompt'
       content = `set ANTHROPIC_BASE_URL=${baseUrl}
 set ANTHROPIC_AUTH_TOKEN=${apiKey}`
-      highlighted = `${keyword('set')} ${variable('ANTHROPIC_BASE_URL')}${operator('=')}${baseUrl}
-${keyword('set')} ${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${apiKey}`
       break
     case 'powershell':
       path = 'PowerShell'
       content = `$env:ANTHROPIC_BASE_URL="${baseUrl}"
 $env:ANTHROPIC_AUTH_TOKEN="${apiKey}"`
-      highlighted = `${keyword('$env:')}${variable('ANTHROPIC_BASE_URL')}${operator('=')}${string(`"${baseUrl}"`)}
-${keyword('$env:')}${variable('ANTHROPIC_AUTH_TOKEN')}${operator('=')}${string(`"${apiKey}"`)}`
       break
     default:
       path = 'Terminal'
       content = ''
-      highlighted = ''
   }
 
-  return [{ path, content, highlighted }]
+  return [{ path, content }]
 }
 
 function generateGeminiCliContent(baseUrl: string, apiKey: string): FileConfig {
@@ -395,9 +470,9 @@ ${keyword('export')} ${variable('GEMINI_MODEL')}${operator('=')}${string(`"${mod
       content = `set GOOGLE_GEMINI_BASE_URL=${baseUrl}
 set GEMINI_API_KEY=${apiKey}
 set GEMINI_MODEL=${model}`
-      highlighted = `${keyword('set')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${baseUrl}
-${keyword('set')} ${variable('GEMINI_API_KEY')}${operator('=')}${apiKey}
-${keyword('set')} ${variable('GEMINI_MODEL')}${operator('=')}${model}
+      highlighted = `${keyword('set')} ${variable('GOOGLE_GEMINI_BASE_URL')}${operator('=')}${string(baseUrl)}
+${keyword('set')} ${variable('GEMINI_API_KEY')}${operator('=')}${string(apiKey)}
+${keyword('set')} ${variable('GEMINI_MODEL')}${operator('=')}${string(model)}
 ${comment(`REM ${modelComment}`)}`
       break
     case 'powershell':
@@ -437,42 +512,111 @@ base_url = "${baseUrl}"
 wire_api = "responses"
 requires_openai_auth = true`
 
-  const configHighlighted = `${key('model_provider')} ${operator('=')} ${string('"sub2api"')}
-${key('model')} ${operator('=')} ${string('"gpt-5.2-codex"')}
-${key('model_reasoning_effort')} ${operator('=')} ${string('"high"')}
-${key('network_access')} ${operator('=')} ${string('"enabled"')}
-${key('disable_response_storage')} ${operator('=')} ${keyword('true')}
-${key('windows_wsl_setup_acknowledged')} ${operator('=')} ${keyword('true')}
-${key('model_verbosity')} ${operator('=')} ${string('"high"')}
-
-${comment('[model_providers.sub2api]')}
-${key('name')} ${operator('=')} ${string('"sub2api"')}
-${key('base_url')} ${operator('=')} ${string(`"${baseUrl}"`)}
-${key('wire_api')} ${operator('=')} ${string('"responses"')}
-${key('requires_openai_auth')} ${operator('=')} ${keyword('true')}`
-
   // auth.json content
   const authContent = `{
   "OPENAI_API_KEY": "${apiKey}"
-}`
-
-  const authHighlighted = `{
-  ${key('"OPENAI_API_KEY"')}: ${string(`"${apiKey}"`)}
 }`
 
   return [
     {
       path: `${configDir}/config.toml`,
       content: configContent,
-      highlighted: configHighlighted,
       hint: t('keys.useKeyModal.openai.configTomlHint')
     },
     {
       path: `${configDir}/auth.json`,
-      content: authContent,
-      highlighted: authHighlighted
+      content: authContent
     }
   ]
+}
+
+function generateOpenCodeConfig(platform: string, baseUrl: string, apiKey: string, pathLabel?: string): FileConfig {
+  const provider: Record<string, any> = {
+    [platform]: {
+      options: {
+        baseURL: baseUrl,
+        apiKey
+      }
+    }
+  }
+  const openaiModels = {
+    'gpt-5.2-codex': {
+      name: 'GPT-5.2 Codex',
+      options: {
+        store: false
+      },
+      variants: {
+        low: {},
+        medium: {},
+        high: {},
+        xhigh: {}
+      }
+    }
+  }
+  const geminiModels = {
+    'gemini-3-pro-high': { name: 'Gemini 3 Pro High' },
+    'gemini-3-pro-low': { name: 'Gemini 3 Pro Low' },
+    'gemini-3-pro-preview': { name: 'Gemini 3 Pro Preview' },
+    'gemini-3-pro-image': { name: 'Gemini 3 Pro Image' },
+    'gemini-3-flash': { name: 'Gemini 3 Flash' },
+    'gemini-2.5-flash-thinking': { name: 'Gemini 2.5 Flash Thinking' },
+    'gemini-2.5-flash': { name: 'Gemini 2.5 Flash' },
+    'gemini-2.5-flash-lite': { name: 'Gemini 2.5 Flash Lite' }
+  }
+  const claudeModels = {
+    'claude-opus-4-5-thinking': { name: 'Claude Opus 4.5 Thinking' },
+    'claude-sonnet-4-5-thinking': { name: 'Claude Sonnet 4.5 Thinking' },
+    'claude-sonnet-4-5': { name: 'Claude Sonnet 4.5' }
+  }
+
+  if (platform === 'gemini') {
+    provider[platform].npm = '@ai-sdk/google'
+    provider[platform].models = geminiModels
+  } else if (platform === 'anthropic') {
+    provider[platform].npm = '@ai-sdk/anthropic'
+  } else if (platform === 'antigravity-claude') {
+    provider[platform].npm = '@ai-sdk/anthropic'
+    provider[platform].name = 'Antigravity (Claude)'
+    provider[platform].models = claudeModels
+  } else if (platform === 'antigravity-gemini') {
+    provider[platform].npm = '@ai-sdk/google'
+    provider[platform].name = 'Antigravity (Gemini)'
+    provider[platform].models = geminiModels
+  } else if (platform === 'openai') {
+    provider[platform].models = openaiModels
+  }
+
+  const agent =
+    platform === 'openai'
+      ? {
+          build: {
+            options: {
+              store: false
+            }
+          },
+          plan: {
+            options: {
+              store: false
+            }
+          }
+        }
+      : undefined
+
+  const content = JSON.stringify(
+    {
+      provider,
+      ...(agent ? { agent } : {}),
+      $schema: 'https://opencode.ai/config.json'
+    },
+    null,
+    2
+  )
+
+  return {
+    path: pathLabel ?? 'opencode.json',
+    content,
+    hint: t('keys.useKeyModal.opencode.hint')
+  }
 }
 
 const copyContent = async (content: string, index: number) => {

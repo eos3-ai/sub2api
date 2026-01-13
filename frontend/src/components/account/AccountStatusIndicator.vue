@@ -55,7 +55,7 @@
       <div
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
-        Rate limited until {{ formatTime(account.rate_limit_reset_at) }}
+        {{ t('admin.accounts.status.rateLimitedUntil', { time: formatTime(account.rate_limit_reset_at) }) }}
         <div
           class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
         ></div>
@@ -74,7 +74,7 @@
       <div
         class="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-900 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 dark:bg-gray-700"
       >
-        Overloaded until {{ formatTime(account.overload_until) }}
+        {{ t('admin.accounts.status.overloadedUntil', { time: formatTime(account.overload_until) }) }}
         <div
           class="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"
         ></div>

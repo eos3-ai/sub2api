@@ -26,6 +26,16 @@ func NewGitHubReleaseClient() service.GitHubReleaseClient {
 	if err != nil {
 		sharedClient = &http.Client{Timeout: 30 * time.Second}
 	}
+
+	// 下载客户端需要更长的超时时间
+	downloadClient, err := httpclient.GetClient(httpclient.Options{
+		Timeout:  10 * time.Minute,
+		ProxyURL: proxyURL,
+	})
+	if err != nil {
+		downloadClient = &http.Client{Timeout: 10 * time.Minute}
+	}
+
 	return &githubReleaseClient{
 		httpClient:        sharedClient,
 		allowPrivateHosts: allowPrivate,

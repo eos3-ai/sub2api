@@ -423,6 +423,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultDefaultValidityDays
 		_c.mutation.SetDefaultValidityDays(v)
 	}
+	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
+		v := group.DefaultClaudeCodeOnly
+		_c.mutation.SetClaudeCodeOnly(v)
+	}
 	return nil
 }
 
@@ -474,6 +478,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.DefaultValidityDays(); !ok {
 		return &ValidationError{Name: "default_validity_days", err: errors.New(`ent: missing required field "Group.default_validity_days"`)}
+	}
+	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
+		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}
 	}
 	return nil
 }

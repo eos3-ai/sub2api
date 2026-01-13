@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -31,6 +33,8 @@ type SettingRepository interface {
 type SettingService struct {
 	settingRepo SettingRepository
 	cfg         *config.Config
+	onUpdate    func() // Callback when settings are updated (for cache invalidation)
+	version     string // Application version
 }
 
 // NewSettingService 创建系统设置服务实例
@@ -69,6 +73,13 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	settings, err := s.settingRepo.GetMultiple(ctx, keys)
 	if err != nil {
 		return nil, fmt.Errorf("get public settings: %w", err)
+	}
+
+	linuxDoEnabled := false
+	if raw, ok := settings[SettingKeyLinuxDoConnectEnabled]; ok {
+		linuxDoEnabled = raw == "true"
+	} else {
+		linuxDoEnabled = s.cfg != nil && s.cfg.LinuxDo.Enabled
 	}
 
 	return &PublicSettings{
@@ -111,6 +122,14 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 		updates[SettingKeyTurnstileSecretKey] = settings.TurnstileSecretKey
 	}
 
+	// LinuxDo Connect OAuth 登录
+	updates[SettingKeyLinuxDoConnectEnabled] = strconv.FormatBool(settings.LinuxDoConnectEnabled)
+	updates[SettingKeyLinuxDoConnectClientID] = settings.LinuxDoConnectClientID
+	updates[SettingKeyLinuxDoConnectRedirectURL] = settings.LinuxDoConnectRedirectURL
+	if settings.LinuxDoConnectClientSecret != "" {
+		updates[SettingKeyLinuxDoConnectClientSecret] = settings.LinuxDoConnectClientSecret
+	}
+
 	// OEM设置
 	updates[SettingKeySiteName] = settings.SiteName
 	updates[SettingKeySiteLogo] = settings.SiteLogo
@@ -123,15 +142,38 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
 
-	return s.settingRepo.SetMultiple(ctx, updates)
+	// Model fallback configuration
+	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
+	updates[SettingKeyFallbackModelAnthropic] = settings.FallbackModelAnthropic
+	updates[SettingKeyFallbackModelOpenAI] = settings.FallbackModelOpenAI
+	updates[SettingKeyFallbackModelGemini] = settings.FallbackModelGemini
+	updates[SettingKeyFallbackModelAntigravity] = settings.FallbackModelAntigravity
+
+	// Identity patch configuration (Claude -> Gemini)
+	updates[SettingKeyEnableIdentityPatch] = strconv.FormatBool(settings.EnableIdentityPatch)
+	updates[SettingKeyIdentityPatchPrompt] = settings.IdentityPatchPrompt
+
+	// Ops monitoring (vNext)
+	updates[SettingKeyOpsMonitoringEnabled] = strconv.FormatBool(settings.OpsMonitoringEnabled)
+	updates[SettingKeyOpsRealtimeMonitoringEnabled] = strconv.FormatBool(settings.OpsRealtimeMonitoringEnabled)
+	updates[SettingKeyOpsQueryModeDefault] = string(ParseOpsQueryMode(settings.OpsQueryModeDefault))
+	if settings.OpsMetricsIntervalSeconds > 0 {
+		updates[SettingKeyOpsMetricsIntervalSeconds] = strconv.Itoa(settings.OpsMetricsIntervalSeconds)
+	}
+
+	err := s.settingRepo.SetMultiple(ctx, updates)
+	if err == nil && s.onUpdate != nil {
+		s.onUpdate() // Invalidate cache after settings update
+	}
+	return err
 }
 
 // IsRegistrationEnabled 检查是否开放注册
 func (s *SettingService) IsRegistrationEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
 	if err != nil {
-		// 默认开放注册
-		return true
+		// 安全默认：如果设置不存在或查询出错，默认关闭注册
+		return false
 	}
 	return value == "true"
 }
@@ -231,7 +273,7 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	if port, err := strconv.Atoi(settings[SettingKeySMTPPort]); err == nil {
 		result.SmtpPort = port
 	} else {
-		result.SmtpPort = 587
+		result.SMTPPort = 587
 	}
 
 	if concurrency, err := strconv.Atoi(settings[SettingKeyDefaultConcurrency]); err == nil {
@@ -248,6 +290,15 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	}
 
 	return result
+}
+
+func isFalseSettingValue(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "false", "0", "off", "disabled":
+		return true
+	default:
+		return false
+	}
 }
 
 // getStringOrDefault 获取字符串值或默认值
@@ -276,8 +327,27 @@ func (s *SettingService) GetTurnstileSecretKey(ctx context.Context) string {
 	return value
 }
 
-// GenerateAdminApiKey 生成新的管理员 API Key
-func (s *SettingService) GenerateAdminApiKey(ctx context.Context) (string, error) {
+// IsIdentityPatchEnabled 检查是否启用身份补丁（Claude -> Gemini systemInstruction 注入）
+func (s *SettingService) IsIdentityPatchEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyEnableIdentityPatch)
+	if err != nil {
+		// 默认开启，保持兼容
+		return true
+	}
+	return value == "true"
+}
+
+// GetIdentityPatchPrompt 获取自定义身份补丁提示词（为空表示使用内置默认模板）
+func (s *SettingService) GetIdentityPatchPrompt(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyIdentityPatchPrompt)
+	if err != nil {
+		return ""
+	}
+	return value
+}
+
+// GenerateAdminAPIKey 生成新的管理员 API Key
+func (s *SettingService) GenerateAdminAPIKey(ctx context.Context) (string, error) {
 	// 生成 32 字节随机数 = 64 位十六进制字符
 	bytes := make([]byte, 32)
 	if _, err := rand.Read(bytes); err != nil {
@@ -294,7 +364,7 @@ func (s *SettingService) GenerateAdminApiKey(ctx context.Context) (string, error
 	return key, nil
 }
 
-// GetAdminApiKeyStatus 获取管理员 API Key 状态
+// GetAdminAPIKeyStatus 获取管理员 API Key 状态
 // 返回脱敏的 key、是否存在、错误
 func (s *SettingService) GetAdminApiKeyStatus(ctx context.Context) (maskedKey string, exists bool, err error) {
 	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKey)
@@ -318,7 +388,7 @@ func (s *SettingService) GetAdminApiKeyStatus(ctx context.Context) (maskedKey st
 	return maskedKey, true, nil
 }
 
-// GetAdminApiKey 获取完整的管理员 API Key（仅供内部验证使用）
+// GetAdminAPIKey 获取完整的管理员 API Key（仅供内部验证使用）
 // 如果未配置返回空字符串和 nil 错误，只有数据库错误时才返回 error
 func (s *SettingService) GetAdminApiKey(ctx context.Context) (string, error) {
 	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKey)

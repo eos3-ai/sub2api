@@ -11,6 +11,9 @@
         </p>
       </div>
 
+      <!-- LinuxDo Connect OAuth 登录 -->
+      <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled" :disabled="isLoading" />
+
       <!-- Registration Disabled Message -->
       <div
         v-if="!registrationEnabled && settingsLoaded"
@@ -203,7 +206,7 @@ import { AuthLayout } from '@/components/layout'
 import Icon from '@/components/icons/Icon.vue'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
-import { getPublicSettings } from '@/api/auth'
+import { getPublicSettings, validatePromoCode } from '@/api/auth'
 
 const { t } = useI18n()
 
@@ -211,6 +214,7 @@ const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
@@ -227,10 +231,21 @@ const emailVerifyEnabled = ref<boolean>(false)
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
 const siteName = ref<string>('Sub2API')
+const linuxdoOAuthEnabled = ref<boolean>(false)
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
 const turnstileToken = ref<string>('')
+
+// Promo code validation
+const promoValidating = ref<boolean>(false)
+const promoValidation = reactive({
+  valid: false,
+  invalid: false,
+  bonusAmount: null as number | null,
+  message: ''
+})
+let promoValidateTimeout: ReturnType<typeof setTimeout> | null = null
 
 const formData = reactive({
   email: '',
@@ -247,6 +262,14 @@ const errors = reactive({
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
+  // Read promo code from URL parameter
+  const promoParam = route.query.promo as string
+  if (promoParam) {
+    formData.promo_code = promoParam
+    // Validate the promo code from URL
+    await validatePromoCodeDebounced(promoParam)
+  }
+
   try {
     const settings = await getPublicSettings()
     registrationEnabled.value = settings.registration_enabled
@@ -265,6 +288,85 @@ onMounted(async () => {
     settingsLoaded.value = true
   }
 })
+
+onUnmounted(() => {
+  if (promoValidateTimeout) {
+    clearTimeout(promoValidateTimeout)
+  }
+})
+
+// ==================== Promo Code Validation ====================
+
+function handlePromoCodeInput(): void {
+  const code = formData.promo_code.trim()
+
+  // Clear previous validation
+  promoValidation.valid = false
+  promoValidation.invalid = false
+  promoValidation.bonusAmount = null
+  promoValidation.message = ''
+
+  if (!code) {
+    promoValidating.value = false
+    return
+  }
+
+  // Debounce validation
+  if (promoValidateTimeout) {
+    clearTimeout(promoValidateTimeout)
+  }
+
+  promoValidateTimeout = setTimeout(() => {
+    validatePromoCodeDebounced(code)
+  }, 500)
+}
+
+async function validatePromoCodeDebounced(code: string): Promise<void> {
+  if (!code.trim()) return
+
+  promoValidating.value = true
+
+  try {
+    const result = await validatePromoCode(code)
+
+    if (result.valid) {
+      promoValidation.valid = true
+      promoValidation.invalid = false
+      promoValidation.bonusAmount = result.bonus_amount || 0
+      promoValidation.message = ''
+    } else {
+      promoValidation.valid = false
+      promoValidation.invalid = true
+      promoValidation.bonusAmount = null
+      // 根据错误码显示对应的翻译
+      promoValidation.message = getPromoErrorMessage(result.error_code)
+    }
+  } catch (error) {
+    console.error('Failed to validate promo code:', error)
+    promoValidation.valid = false
+    promoValidation.invalid = true
+    promoValidation.message = t('auth.promoCodeInvalid')
+  } finally {
+    promoValidating.value = false
+  }
+}
+
+function getPromoErrorMessage(errorCode?: string): string {
+  switch (errorCode) {
+    case 'PROMO_CODE_NOT_FOUND':
+      return t('auth.promoCodeNotFound')
+    case 'PROMO_CODE_EXPIRED':
+      return t('auth.promoCodeExpired')
+    case 'PROMO_CODE_DISABLED':
+      return t('auth.promoCodeDisabled')
+    case 'PROMO_CODE_MAX_USED':
+      return t('auth.promoCodeMaxUsed')
+    case 'PROMO_CODE_ALREADY_USED':
+      return t('auth.promoCodeAlreadyUsed')
+    default:
+      return t('auth.promoCodeInvalid')
+  }
+}
 
 // ==================== Turnstile Handlers ====================
 
@@ -334,6 +436,20 @@ async function handleRegister(): Promise<void> {
   // Validate form
   if (!validateForm()) {
     return
+  }
+
+  // Check promo code validation status
+  if (formData.promo_code.trim()) {
+    // If promo code is being validated, wait
+    if (promoValidating.value) {
+      errorMessage.value = t('auth.promoCodeValidating')
+      return
+    }
+    // If promo code is invalid, block submission
+    if (promoValidation.invalid) {
+      errorMessage.value = t('auth.promoCodeInvalidCannotRegister')
+      return
+    }
   }
 
   isLoading.value = true

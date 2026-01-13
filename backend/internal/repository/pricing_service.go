@@ -19,7 +19,8 @@ type pricingRemoteClient struct {
 
 func NewPricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
 	sharedClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout: 30 * time.Second,
+		Timeout:  30 * time.Second,
+		ProxyURL: proxyURL,
 	})
 	if err != nil {
 		sharedClient = &http.Client{Timeout: 30 * time.Second}

@@ -511,7 +511,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
@@ -534,6 +534,7 @@ const columns = computed<Column[]>(() => [
   { key: 'name', label: t('admin.proxies.columns.name'), sortable: true },
   { key: 'protocol', label: t('admin.proxies.columns.protocol'), sortable: true },
   { key: 'address', label: t('admin.proxies.columns.address'), sortable: false },
+  { key: 'account_count', label: t('admin.proxies.columns.accounts'), sortable: true },
   { key: 'status', label: t('admin.proxies.columns.status'), sortable: true },
   { key: 'actions', label: t('admin.proxies.columns.actions'), sortable: false }
 ])
@@ -549,8 +550,8 @@ const protocolOptions = computed(() => [
 
 const statusOptions = computed(() => [
   { value: '', label: t('admin.proxies.allStatus') },
-  { value: 'active', label: t('common.active') },
-  { value: 'inactive', label: t('common.inactive') }
+  { value: 'active', label: t('admin.accounts.status.active') },
+  { value: 'inactive', label: t('admin.accounts.status.inactive') }
 ])
 
 // Form options
@@ -932,5 +933,10 @@ const confirmDelete = async () => {
 
 onMounted(() => {
   loadProxies()
+})
+
+onUnmounted(() => {
+  clearTimeout(searchTimeout)
+  abortController?.abort()
 })
 </script>

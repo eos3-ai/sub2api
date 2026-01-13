@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
@@ -29,6 +30,7 @@ type APIKeyQuery struct {
 	withUser      *UserQuery
 	withGroup     *GroupQuery
 	withUsageLogs *UsageLogQuery
+	modifiers     []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -458,6 +460,9 @@ func (_q *APIKeyQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*APIKe
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
+	if len(_q.modifiers) > 0 {
+		_spec.Modifiers = _q.modifiers
+	}
 	for i := range hooks {
 		hooks[i](ctx, _spec)
 	}
@@ -583,6 +588,9 @@ func (_q *APIKeyQuery) loadUsageLogs(ctx context.Context, query *UsageLogQuery, 
 
 func (_q *APIKeyQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
+	if len(_q.modifiers) > 0 {
+		_spec.Modifiers = _q.modifiers
+	}
 	_spec.Node.Columns = _q.ctx.Fields
 	if len(_q.ctx.Fields) > 0 {
 		_spec.Unique = _q.ctx.Unique != nil && *_q.ctx.Unique
@@ -650,6 +658,9 @@ func (_q *APIKeyQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	}
 	if _q.ctx.Unique != nil && *_q.ctx.Unique {
 		selector.Distinct()
+	}
+	for _, m := range _q.modifiers {
+		m(selector)
 	}
 	for _, p := range _q.predicates {
 		p(selector)

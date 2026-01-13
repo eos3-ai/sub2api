@@ -40,7 +40,22 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* 自定义滚动条 */
+  /* 自定义滚动条 - 默认隐藏，悬停或滚动时显示 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  *:hover,
+  *:focus-within {
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+
+  .dark *:hover,
+  .dark *:focus-within {
+    scrollbar-color: rgba(75, 85, 99, 0.5) transparent;
+  }
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;

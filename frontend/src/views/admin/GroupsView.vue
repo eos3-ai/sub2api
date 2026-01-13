@@ -739,8 +739,8 @@ const columns = computed<Column[]>(() => [
 // Filter options
 const statusOptions = computed(() => [
   { value: '', label: t('admin.groups.allStatus') },
-  { value: 'active', label: t('common.active') },
-  { value: 'inactive', label: t('common.inactive') }
+  { value: 'active', label: t('admin.accounts.status.active') },
+  { value: 'inactive', label: t('admin.accounts.status.inactive') }
 ])
 
 const exclusiveOptions = computed(() => [
@@ -765,14 +765,43 @@ const platformFilterOptions = computed(() => [
 ])
 
 const editStatusOptions = computed(() => [
-  { value: 'active', label: t('common.active') },
-  { value: 'inactive', label: t('common.inactive') }
+  { value: 'active', label: t('admin.accounts.status.active') },
+  { value: 'inactive', label: t('admin.accounts.status.inactive') }
 ])
 
 const subscriptionTypeOptions = computed(() => [
   { value: 'standard', label: t('admin.groups.subscription.standard') },
   { value: 'subscription', label: t('admin.groups.subscription.subscription') }
 ])
+
+// 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
+const fallbackGroupOptions = computed(() => {
+  const options: { value: number | null; label: string }[] = [
+    { value: null, label: t('admin.groups.claudeCode.noFallback') }
+  ]
+  const eligibleGroups = groups.value.filter(
+    (g) => g.platform === 'anthropic' && !g.claude_code_only && g.status === 'active'
+  )
+  eligibleGroups.forEach((g) => {
+    options.push({ value: g.id, label: g.name })
+  })
+  return options
+})
+
+// 降级分组选项（编辑时）- 排除自身
+const fallbackGroupOptionsForEdit = computed(() => {
+  const options: { value: number | null; label: string }[] = [
+    { value: null, label: t('admin.groups.claudeCode.noFallback') }
+  ]
+  const currentId = editingGroup.value?.id
+  const eligibleGroups = groups.value.filter(
+    (g) => g.platform === 'anthropic' && !g.claude_code_only && g.status === 'active' && g.id !== currentId
+  )
+  eligibleGroups.forEach((g) => {
+    options.push({ value: g.id, label: g.name })
+  })
+  return options
+})
 
 const groups = ref<Group[]>([])
 const loading = ref(false)
@@ -864,7 +893,8 @@ const loadGroups = async () => {
     const response = await adminAPI.groups.list(pagination.page, pagination.page_size, {
       platform: (filters.platform as GroupPlatform) || undefined,
       status: filters.status as any,
-      is_exclusive: filters.is_exclusive ? filters.is_exclusive === 'true' : undefined
+      is_exclusive: filters.is_exclusive ? filters.is_exclusive === 'true' : undefined,
+      search: searchQuery.value.trim() || undefined
     }, { signal })
     if (signal.aborted) return
     groups.value = response.items
@@ -881,6 +911,15 @@ const loadGroups = async () => {
       loading.value = false
     }
   }
+}
+
+let searchTimeout: ReturnType<typeof setTimeout>
+const handleSearch = () => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    pagination.page = 1
+    loadGroups()
+  }, 300)
 }
 
 const handlePageChange = (page: number) => {
@@ -966,7 +1005,12 @@ const handleUpdateGroup = async () => {
 
   submitting.value = true
   try {
-    await adminAPI.groups.update(editingGroup.value.id, editForm)
+    // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
+    const payload = {
+      ...editForm,
+      fallback_group_id: editForm.fallback_group_id === null ? 0 : editForm.fallback_group_id
+    }
+    await adminAPI.groups.update(editingGroup.value.id, payload)
     appStore.showSuccess(t('admin.groups.groupUpdated'))
     closeEditModal()
     loadGroups()

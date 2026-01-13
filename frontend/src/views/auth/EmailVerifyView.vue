@@ -201,6 +201,7 @@ const email = ref<string>('')
 const password = ref<string>('')
 const inviteCode = ref<string>('')
 const initialTurnstileToken = ref<string>('')
+const promoCode = ref<string>('')
 const hasRegisterData = ref<boolean>(false)
 
 // Public settings
@@ -230,6 +231,7 @@ onMounted(async () => {
       password.value = registerData.password || ''
       inviteCode.value = registerData.invite_code || ''
       initialTurnstileToken.value = registerData.turnstile_token || ''
+      promoCode.value = registerData.promo_code || ''
       hasRegisterData.value = !!(email.value && password.value)
     } catch {
       hasRegisterData.value = false

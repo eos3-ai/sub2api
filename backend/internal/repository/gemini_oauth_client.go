@@ -37,7 +37,8 @@ func (c *geminiOAuthClient) ExchangeCode(ctx context.Context, oauthType, code, c
 		ClientSecret: c.cfg.Gemini.OAuth.ClientSecret,
 		Scopes:       c.cfg.Gemini.OAuth.Scopes,
 	}
-	if oauthType == "code_assist" {
+	if oauthType == "code_assist" || oauthType == "google_one" {
+		// Force use of built-in Gemini CLI OAuth client
 		oauthCfgInput.ClientID = ""
 		oauthCfgInput.ClientSecret = ""
 	}
@@ -78,7 +79,8 @@ func (c *geminiOAuthClient) RefreshToken(ctx context.Context, oauthType, refresh
 		ClientSecret: c.cfg.Gemini.OAuth.ClientSecret,
 		Scopes:       c.cfg.Gemini.OAuth.Scopes,
 	}
-	if oauthType == "code_assist" {
+	if oauthType == "code_assist" || oauthType == "google_one" {
+		// Force use of built-in Gemini CLI OAuth client
 		oauthCfgInput.ClientID = ""
 		oauthCfgInput.ClientSecret = ""
 	}
