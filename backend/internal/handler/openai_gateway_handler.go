@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -229,13 +230,12 @@ func (h *OpenAIGatewayHandler) Responses(c *gin.Context) {
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionHash, account.ID); err != nil {
 				log.Printf("Bind sticky session failed: %v", err)
 			}
-		}
-		// 账号槽位/等待计数需要在超时或断开时安全回收
-		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
-		accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
+			}
+			// 账号槽位/等待计数需要在超时或断开时安全回收
+			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
-		// Forward request
-		result, err := h.gatewayService.Forward(c.Request.Context(), c, account, body)
+			// Forward request
+			result, err := h.gatewayService.Forward(c.Request.Context(), c, account, body)
 		if accountReleaseFunc != nil {
 			accountReleaseFunc()
 		}

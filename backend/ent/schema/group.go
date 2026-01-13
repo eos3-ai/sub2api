@@ -2,7 +2,6 @@ package schema
 
 import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
-	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -49,15 +48,15 @@ func (Group) Fields() []ent.Field {
 			Default(false),
 		field.String("status").
 			MaxLen(20).
-			Default(service.StatusActive),
+			Default("active"),
 
 		// Subscription-related fields (added by migration 003)
 		field.String("platform").
 			MaxLen(50).
-			Default(service.PlatformAnthropic),
+			Default("anthropic"),
 		field.String("subscription_type").
 			MaxLen(20).
-			Default(service.SubscriptionTypeStandard),
+			Default("standard"),
 		field.Float("daily_limit_usd").
 			Optional().
 			Nillable().
@@ -86,6 +85,15 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
+
+		// Claude Code 客户端限制 (added by migration 029)
+		field.Bool("claude_code_only").
+			Default(false).
+			Comment("是否仅允许 Claude Code 客户端"),
+		field.Int64("fallback_group_id").
+			Optional().
+			Nillable().
+			Comment("非 Claude Code 请求降级使用的分组 ID"),
 	}
 }
 

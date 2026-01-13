@@ -126,6 +126,8 @@ type ForwardResult struct {
 	Stream       bool
 	Duration     time.Duration
 	FirstTokenMs *int // 首字时间（流式请求）
+	// ClientDisconnect indicates whether the client disconnected during streaming.
+	ClientDisconnect bool
 
 	// 图片生成计费字段（仅 gemini-3-pro-image 使用）
 	ImageCount int    // 生成的图片数量
@@ -577,16 +579,16 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 				}
 			})
 
-			for _, item := range available {
-				result, err := s.tryAcquireAccountSlot(ctx, item.account.ID, item.account.Concurrency)
-				if err == nil && result.Acquired {
-					if sessionHash != "" && s.cache != nil {
-						_ = s.cache.SetSessionAccountID(ctx, sessionHash, item.account.ID, stickySessionTTL)
-					}
-					return &AccountSelectionResult{
-						Account:     item.account,
-						Acquired:    true,
-						ReleaseFunc: result.ReleaseFunc,
+					for _, item := range available {
+						result, err := s.tryAcquireAccountSlot(ctx, item.account.ID, item.account.Concurrency)
+						if err == nil && result.Acquired {
+							if sessionHash != "" && s.cache != nil {
+								_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, item.account.ID, stickySessionTTL)
+							}
+							return &AccountSelectionResult{
+								Account:     item.account,
+								Acquired:    true,
+								ReleaseFunc: result.ReleaseFunc,
 					}, nil
 				}
 			}
@@ -613,16 +615,16 @@ func (s *GatewayService) tryAcquireByLegacyOrder(ctx context.Context, candidates
 	ordered := append([]*Account(nil), candidates...)
 	sortAccountsByPriorityAndLastUsed(ordered, preferOAuth)
 
-	for _, acc := range ordered {
-		result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
-		if err == nil && result.Acquired {
-			if sessionHash != "" && s.cache != nil {
-				_ = s.cache.SetSessionAccountID(ctx, sessionHash, acc.ID, stickySessionTTL)
-			}
-			return &AccountSelectionResult{
-				Account:     acc,
-				Acquired:    true,
-				ReleaseFunc: result.ReleaseFunc,
+		for _, acc := range ordered {
+			result, err := s.tryAcquireAccountSlot(ctx, acc.ID, acc.Concurrency)
+			if err == nil && result.Acquired {
+				if sessionHash != "" && s.cache != nil {
+					_ = s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, acc.ID, stickySessionTTL)
+				}
+				return &AccountSelectionResult{
+					Account:     acc,
+					Acquired:    true,
+					ReleaseFunc: result.ReleaseFunc,
 			}, true
 		}
 	}
@@ -855,13 +857,13 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	preferOAuth := platform == PlatformGemini
 	// 1. 查询粘性会话
 	if sessionHash != "" && s.cache != nil {
-		accountID, err := s.cache.GetSessionAccountID(ctx, sessionHash)
+		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
 			if _, excluded := excludedIDs[accountID]; !excluded {
 				account, err := s.accountRepo.GetByID(ctx, accountID)
 				// 检查账号分组归属和平台匹配（确保粘性会话不会跨分组或跨平台）
 				if err == nil && s.isAccountInGroup(account, groupID) && account.Platform == platform && account.IsSchedulable() && (requestedModel == "" || s.isModelSupportedByAccount(account, requestedModel)) {
-					if err := s.cache.RefreshSessionTTL(ctx, sessionHash, stickySessionTTL); err != nil {
+					if err := s.cache.RefreshSessionTTL(ctx, derefGroupID(groupID), sessionHash, stickySessionTTL); err != nil {
 						log.Printf("refresh session ttl failed: session=%s err=%v", sessionHash, err)
 					}
 					return account, nil
@@ -926,7 +928,7 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 
 	// 4. 建立粘性绑定
 	if sessionHash != "" && s.cache != nil {
-		if err := s.cache.SetSessionAccountID(ctx, sessionHash, selected.ID, stickySessionTTL); err != nil {
+		if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
 			log.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}
@@ -941,7 +943,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 
 	// 1. 查询粘性会话
 	if sessionHash != "" && s.cache != nil {
-		accountID, err := s.cache.GetSessionAccountID(ctx, sessionHash)
+		accountID, err := s.cache.GetSessionAccountID(ctx, derefGroupID(groupID), sessionHash)
 		if err == nil && accountID > 0 {
 			if _, excluded := excludedIDs[accountID]; !excluded {
 				account, err := s.accountRepo.GetByID(ctx, accountID)
@@ -1014,7 +1016,7 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 
 	// 4. 建立粘性绑定
 	if sessionHash != "" && s.cache != nil {
-		if err := s.cache.SetSessionAccountID(ctx, sessionHash, selected.ID, stickySessionTTL); err != nil {
+		if err := s.cache.SetSessionAccountID(ctx, derefGroupID(groupID), sessionHash, selected.ID, stickySessionTTL); err != nil {
 			log.Printf("set session account failed: session=%s account_id=%d err=%v", sessionHash, selected.ID, err)
 		}
 	}

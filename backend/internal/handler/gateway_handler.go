@@ -16,7 +16,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/antigravity"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	pkgerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -203,7 +202,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
 
-	setOpsRequestContext(c, reqModel, reqStream, body)
+	setOpsRequestContext(c, reqModel, reqStream, parsedReq.Body)
 
 	// 验证 model 必填
 	if reqModel == "" {
@@ -354,9 +353,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 					log.Printf("Bind sticky session failed: %v", err)
 				}
 			}
-			// 账号槽位/等待计数需要在超时或断开时安全回收
-			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
-			accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
+				// 账号槽位需要在超时或断开时安全回收
+				accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
 			// 转发请求 - 根据账号平台分流
 			var result *service.ForwardResult
@@ -471,9 +469,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				log.Printf("Bind sticky session failed: %v", err)
 			}
 		}
-		// 账号槽位/等待计数需要在超时或断开时安全回收
-		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
-		accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
+			// 账号槽位需要在超时或断开时安全回收
+			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
 		// 转发请求 - 根据账号平台分流
 		var result *service.ForwardResult
@@ -829,7 +826,7 @@ func (h *GatewayHandler) CountTokens(c *gin.Context) {
 		return
 	}
 
-	setOpsRequestContext(c, parsedReq.Model, parsedReq.Stream, body)
+	setOpsRequestContext(c, parsedReq.Model, parsedReq.Stream, parsedReq.Body)
 
 	// 获取订阅信息（可能为nil）
 	subscription, _ := middleware2.GetSubscriptionFromContext(c)

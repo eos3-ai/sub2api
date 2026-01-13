@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/ctxkey"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
@@ -27,14 +26,17 @@ func (f fakeAPIKeyRepo) Create(ctx context.Context, key *service.APIKey) error {
 func (f fakeAPIKeyRepo) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
 	return nil, errors.New("not implemented")
 }
-func (f fakeAPIKeyRepo) GetOwnerID(ctx context.Context, id int64) (int64, error) {
-	return 0, errors.New("not implemented")
+func (f fakeAPIKeyRepo) GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error) {
+	return "", 0, errors.New("not implemented")
 }
 func (f fakeAPIKeyRepo) GetByKey(ctx context.Context, key string) (*service.APIKey, error) {
 	if f.getByKey == nil {
 		return nil, errors.New("unexpected call")
 	}
 	return f.getByKey(ctx, key)
+}
+func (f fakeAPIKeyRepo) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
+	return f.GetByKey(ctx, key)
 }
 func (f fakeAPIKeyRepo) Update(ctx context.Context, key *service.APIKey) error {
 	return errors.New("not implemented")

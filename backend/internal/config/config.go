@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,7 +46,12 @@ type Config struct {
 	Turnstile    TurnstileConfig    `mapstructure:"turnstile"`
 	Database     DatabaseConfig     `mapstructure:"database"`
 	Redis        RedisConfig        `mapstructure:"redis"`
+	Ops          OpsConfig          `mapstructure:"ops"`
+	APIKeyAuth   APIKeyAuthCacheConfig        `mapstructure:"api_key_auth_cache"`
+	Dashboard    DashboardCacheConfig       `mapstructure:"dashboard_cache"`
+	DashboardAgg DashboardAggregationConfig `mapstructure:"dashboard_aggregation"`
 	JWT          JWTConfig          `mapstructure:"jwt"`
+	LinuxDo      LinuxDoConnectConfig `mapstructure:"linuxdo_connect"`
 	Default      DefaultConfig      `mapstructure:"default"`
 	RateLimit    RateLimitConfig    `mapstructure:"rate_limit"`
 	Pricing      PricingConfig      `mapstructure:"pricing"`
@@ -59,6 +65,7 @@ type Config struct {
 	Dingtalk     DingtalkConfig     `mapstructure:"dingtalk"`
 	Timezone     string             `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
 	Gemini       GeminiConfig       `mapstructure:"gemini"`
+	Update       UpdateConfig       `mapstructure:"update"`
 }
 
 type GeminiConfig struct {

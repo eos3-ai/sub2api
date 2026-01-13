@@ -140,6 +140,169 @@ func (s *DashboardService) GetModelStatsWithFilters(ctx context.Context, startTi
 	return stats, nil
 }
 
+func (s *DashboardService) getCachedDashboardStats(ctx context.Context) (*usagestats.DashboardStats, bool, error) {
+	data, err := s.cache.GetDashboardStats(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var entry dashboardStatsCacheEntry
+	if err := json.Unmarshal([]byte(data), &entry); err != nil {
+		s.evictDashboardStatsCache(err)
+		return nil, false, ErrDashboardStatsCacheMiss
+	}
+	if entry.Stats == nil {
+		s.evictDashboardStatsCache(errors.New("仪表盘缓存缺少统计数据"))
+		return nil, false, ErrDashboardStatsCacheMiss
+	}
+
+	age := time.Since(time.Unix(entry.UpdatedAt, 0))
+	return entry.Stats, age <= s.cacheFreshTTL, nil
+}
+
+func (s *DashboardService) refreshDashboardStats(ctx context.Context) (*usagestats.DashboardStats, error) {
+	stats, err := s.fetchDashboardStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	s.applyAggregationStatus(ctx, stats)
+	cacheCtx, cancel := s.cacheOperationContext()
+	defer cancel()
+	s.saveDashboardStatsCache(cacheCtx, stats)
+	return stats, nil
+}
+
+func (s *DashboardService) refreshDashboardStatsAsync() {
+	if s.cache == nil {
+		return
+	}
+	if !atomic.CompareAndSwapInt32(&s.refreshing, 0, 1) {
+		return
+	}
+
+	go func() {
+		defer atomic.StoreInt32(&s.refreshing, 0)
+
+		ctx, cancel := context.WithTimeout(context.Background(), s.refreshTimeout)
+		defer cancel()
+
+		stats, err := s.fetchDashboardStats(ctx)
+		if err != nil {
+			log.Printf("[Dashboard] 仪表盘缓存异步刷新失败: %v", err)
+			return
+		}
+		s.applyAggregationStatus(ctx, stats)
+		cacheCtx, cancel := s.cacheOperationContext()
+		defer cancel()
+		s.saveDashboardStatsCache(cacheCtx, stats)
+	}()
+}
+
+func (s *DashboardService) fetchDashboardStats(ctx context.Context) (*usagestats.DashboardStats, error) {
+	if !s.aggEnabled {
+		if fetcher, ok := s.usageRepo.(dashboardStatsRangeFetcher); ok {
+			now := time.Now().UTC()
+			start := truncateToDayUTC(now.AddDate(0, 0, -s.aggUsageDays))
+			return fetcher.GetDashboardStatsWithRange(ctx, start, now)
+		}
+	}
+	return s.usageRepo.GetDashboardStats(ctx)
+}
+
+func (s *DashboardService) saveDashboardStatsCache(ctx context.Context, stats *usagestats.DashboardStats) {
+	if s.cache == nil || stats == nil {
+		return
+	}
+
+	entry := dashboardStatsCacheEntry{
+		Stats:     stats,
+		UpdatedAt: time.Now().Unix(),
+	}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("[Dashboard] 仪表盘缓存序列化失败: %v", err)
+		return
+	}
+
+	if err := s.cache.SetDashboardStats(ctx, string(data), s.cacheTTL); err != nil {
+		log.Printf("[Dashboard] 仪表盘缓存写入失败: %v", err)
+	}
+}
+
+func (s *DashboardService) evictDashboardStatsCache(reason error) {
+	if s.cache == nil {
+		return
+	}
+	cacheCtx, cancel := s.cacheOperationContext()
+	defer cancel()
+
+	if err := s.cache.DeleteDashboardStats(cacheCtx); err != nil {
+		log.Printf("[Dashboard] 仪表盘缓存清理失败: %v", err)
+	}
+	if reason != nil {
+		log.Printf("[Dashboard] 仪表盘缓存异常，已清理: %v", reason)
+	}
+}
+
+func (s *DashboardService) cacheOperationContext() (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), s.refreshTimeout)
+}
+
+func (s *DashboardService) applyAggregationStatus(ctx context.Context, stats *usagestats.DashboardStats) {
+	if stats == nil {
+		return
+	}
+	updatedAt := s.fetchAggregationUpdatedAt(ctx)
+	stats.StatsUpdatedAt = updatedAt.UTC().Format(time.RFC3339)
+	stats.StatsStale = s.isAggregationStale(updatedAt, time.Now().UTC())
+}
+
+func (s *DashboardService) refreshAggregationStaleness(stats *usagestats.DashboardStats) {
+	if stats == nil {
+		return
+	}
+	updatedAt := parseStatsUpdatedAt(stats.StatsUpdatedAt)
+	stats.StatsStale = s.isAggregationStale(updatedAt, time.Now().UTC())
+}
+
+func (s *DashboardService) fetchAggregationUpdatedAt(ctx context.Context) time.Time {
+	if s.aggRepo == nil {
+		return time.Unix(0, 0).UTC()
+	}
+	updatedAt, err := s.aggRepo.GetAggregationWatermark(ctx)
+	if err != nil {
+		log.Printf("[Dashboard] 读取聚合水位失败: %v", err)
+		return time.Unix(0, 0).UTC()
+	}
+	if updatedAt.IsZero() {
+		return time.Unix(0, 0).UTC()
+	}
+	return updatedAt.UTC()
+}
+
+func (s *DashboardService) isAggregationStale(updatedAt, now time.Time) bool {
+	if !s.aggEnabled {
+		return true
+	}
+	epoch := time.Unix(0, 0).UTC()
+	if !updatedAt.After(epoch) {
+		return true
+	}
+	threshold := s.aggInterval + s.aggLookback
+	return now.Sub(updatedAt) > threshold
+}
+
+func parseStatsUpdatedAt(raw string) time.Time {
+	if raw == "" {
+		return time.Unix(0, 0).UTC()
+	}
+	parsed, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return time.Unix(0, 0).UTC()
+	}
+	return parsed.UTC()
+}
+
 func (s *DashboardService) GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.APIKeyUsageTrendPoint, error) {
 	trend, err := s.usageRepo.GetAPIKeyUsageTrend(ctx, startTime, endTime, granularity, limit)
 	if err != nil {

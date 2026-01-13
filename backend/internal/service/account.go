@@ -22,6 +22,9 @@ type Account struct {
 	Status       string
 	ErrorMessage string
 	LastUsedAt   *time.Time
+	ExpiresAt    *time.Time
+	// AutoPauseOnExpired controls whether the account becomes unschedulable after ExpiresAt.
+	AutoPauseOnExpired bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 

@@ -108,6 +108,17 @@ func TransformClaudeToGeminiWithOptions(claudeReq *ClaudeRequest, projectID, map
 	return json.Marshal(v1Req)
 }
 
+func generateStableSessionID(contents []GeminiContent) string {
+	b, err := json.Marshal(contents)
+	if err != nil {
+		// 退化到进程内唯一值（稳定性降低，但不影响功能正确性）
+		return uuid.New().String()
+	}
+	sum := sha256.Sum256(b)
+	// 取前 8 字节作为稳定 ID（足够区分不同会话）
+	return fmt.Sprintf("%x", binary.BigEndian.Uint64(sum[:8]))
+}
+
 func defaultIdentityPatch(modelName string) string {
 	return fmt.Sprintf(
 		"--- [IDENTITY_PATCH] ---\n"+
@@ -137,10 +148,7 @@ func buildSystemInstruction(system json.RawMessage, modelName string, opts Trans
 		var sysStr string
 		if err := json.Unmarshal(system, &sysStr); err == nil {
 			if strings.TrimSpace(sysStr) != "" {
-				userSystemParts = append(userSystemParts, GeminiPart{Text: sysStr})
-				if strings.Contains(sysStr, "You are Antigravity") {
-					userHasAntigravityIdentity = true
-				}
+				parts = append(parts, GeminiPart{Text: sysStr})
 			}
 		} else {
 			// 尝试解析为数组
@@ -148,10 +156,7 @@ func buildSystemInstruction(system json.RawMessage, modelName string, opts Trans
 			if err := json.Unmarshal(system, &sysBlocks); err == nil {
 				for _, block := range sysBlocks {
 					if block.Type == "text" && strings.TrimSpace(block.Text) != "" {
-						userSystemParts = append(userSystemParts, GeminiPart{Text: block.Text})
-						if strings.Contains(block.Text, "You are Antigravity") {
-							userHasAntigravityIdentity = true
-						}
+						parts = append(parts, GeminiPart{Text: block.Text})
 					}
 				}
 			}

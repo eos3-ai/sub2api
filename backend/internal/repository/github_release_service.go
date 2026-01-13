@@ -14,14 +14,16 @@ import (
 )
 
 type githubReleaseClient struct {
-	httpClient        *http.Client
-	allowPrivateHosts bool
+	httpClient         *http.Client
+	downloadHTTPClient *http.Client
 }
 
-func NewGitHubReleaseClient() service.GitHubReleaseClient {
-	allowPrivate := false
+// NewGitHubReleaseClient 创建 GitHub Release 客户端
+// proxyURL 为空时直连 GitHub，支持 http/https/socks5/socks5h 协议
+func NewGitHubReleaseClient(proxyURL string) service.GitHubReleaseClient {
 	sharedClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout:            30 * time.Second,
+		Timeout:  30 * time.Second,
+		ProxyURL: proxyURL,
 	})
 	if err != nil {
 		sharedClient = &http.Client{Timeout: 30 * time.Second}
@@ -37,8 +39,8 @@ func NewGitHubReleaseClient() service.GitHubReleaseClient {
 	}
 
 	return &githubReleaseClient{
-		httpClient:        sharedClient,
-		allowPrivateHosts: allowPrivate,
+		httpClient:         sharedClient,
+		downloadHTTPClient: downloadClient,
 	}
 }
 
@@ -76,13 +78,8 @@ func (c *githubReleaseClient) DownloadFile(ctx context.Context, url, dest string
 		return err
 	}
 
-	downloadClient, err := httpclient.GetClient(httpclient.Options{
-		Timeout:            10 * time.Minute,
-	})
-	if err != nil {
-		downloadClient = &http.Client{Timeout: 10 * time.Minute}
-	}
-	resp, err := downloadClient.Do(req)
+	// 使用预配置的下载客户端（已包含代理配置）
+	resp, err := c.downloadHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

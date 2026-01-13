@@ -128,6 +128,13 @@ GOPROXY=off go test ./...
 
 如果本地 Go module 缓存齐全，上述命令应可通过；若缺依赖，会提示无法下载（此时再按需要开放网络或预热缓存）。
 
+#### 本次实际验证结果（2026-01-13）
+
+- 已在本地以 `GOPROXY=off` 方式跑通：`cd backend && GOPROXY=off go test ./...`
+- 过程中为修复编译/注入问题，执行了 Wire 生成：
+  - `cd backend/cmd/server && GOPROXY=off go generate`
+  - 并补齐了 Wire Provider（例如 `PromoCodeRepository`、`TimeoutCounterCache`）以满足注入依赖
+
 ### 6.2 前端（不安装依赖也能做的检查）
 
 ```bash

@@ -277,13 +277,12 @@ func (h *GatewayHandler) GeminiV1BetaModels(c *gin.Context) {
 			if err := h.gatewayService.BindStickySession(c.Request.Context(), apiKey.GroupID, sessionKey, account.ID); err != nil {
 				log.Printf("Bind sticky session failed: %v", err)
 			}
-		}
-		// 账号槽位/等待计数需要在超时或断开时安全回收
-		accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
-		accountWaitRelease = wrapReleaseOnDone(c.Request.Context(), accountWaitRelease)
+			}
+			// 账号槽位/等待计数需要在超时或断开时安全回收
+			accountReleaseFunc = wrapReleaseOnDone(c.Request.Context(), accountReleaseFunc)
 
-		// 5) forward (根据平台分流)
-		var result *service.ForwardResult
+			// 5) forward (根据平台分流)
+			var result *service.ForwardResult
 		if account.Platform == service.PlatformAntigravity {
 			result, err = h.antigravityGatewayService.ForwardGemini(c.Request.Context(), c, account, modelName, action, stream, body)
 		} else {

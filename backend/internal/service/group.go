@@ -10,6 +10,8 @@ type Group struct {
 	RateMultiplier float64
 	IsExclusive    bool
 	Status         string
+	ClaudeCodeOnly bool
+	FallbackGroupID *int64
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
 	SubscriptionType    string
@@ -68,4 +70,21 @@ func (g *Group) GetImagePrice(imageSize string) *float64 {
 		// 未知尺寸默认按 2K 计费
 		return g.ImagePrice2K
 	}
+}
+
+// IsGroupContextValid reports whether a group from context has the fields required for routing decisions.
+func IsGroupContextValid(group *Group) bool {
+	if group == nil {
+		return false
+	}
+	if group.ID <= 0 {
+		return false
+	}
+	if !group.Hydrated {
+		return false
+	}
+	if group.Platform == "" || group.Status == "" {
+		return false
+	}
+	return true
 }

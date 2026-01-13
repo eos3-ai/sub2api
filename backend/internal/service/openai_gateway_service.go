@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/responseheaders"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 	"github.com/gin-gonic/gin"
@@ -1196,6 +1197,110 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 	c.Data(resp.StatusCode, contentType, body)
 
 	return usage, nil
+}
+
+func isEventStreamResponse(header http.Header) bool {
+	contentType := strings.ToLower(header.Get("Content-Type"))
+	return strings.Contains(contentType, "text/event-stream")
+}
+
+func (s *OpenAIGatewayService) handleOAuthSSEToJSON(resp *http.Response, c *gin.Context, body []byte, originalModel, mappedModel string) (*OpenAIUsage, error) {
+	bodyText := string(body)
+	finalResponse, ok := extractCodexFinalResponse(bodyText)
+
+	usage := &OpenAIUsage{}
+	if ok {
+		var response struct {
+			Usage struct {
+				InputTokens       int `json:"input_tokens"`
+				OutputTokens      int `json:"output_tokens"`
+				InputTokenDetails struct {
+					CachedTokens int `json:"cached_tokens"`
+				} `json:"input_tokens_details"`
+			} `json:"usage"`
+		}
+		if err := json.Unmarshal(finalResponse, &response); err == nil {
+			usage.InputTokens = response.Usage.InputTokens
+			usage.OutputTokens = response.Usage.OutputTokens
+			usage.CacheReadInputTokens = response.Usage.InputTokenDetails.CachedTokens
+		}
+		body = finalResponse
+		if originalModel != mappedModel {
+			body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
+		}
+	} else {
+		usage = s.parseSSEUsageFromBody(bodyText)
+		if originalModel != mappedModel {
+			bodyText = s.replaceModelInSSEBody(bodyText, mappedModel, originalModel)
+		}
+		body = []byte(bodyText)
+	}
+
+	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.cfg.Security.ResponseHeaders)
+
+	contentType := "application/json; charset=utf-8"
+	if !ok {
+		contentType = resp.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "text/event-stream"
+		}
+	}
+	c.Data(resp.StatusCode, contentType, body)
+
+	return usage, nil
+}
+
+func extractCodexFinalResponse(body string) ([]byte, bool) {
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		if !openaiSSEDataRe.MatchString(line) {
+			continue
+		}
+		data := openaiSSEDataRe.ReplaceAllString(line, "")
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		var event struct {
+			Type     string          `json:"type"`
+			Response json.RawMessage `json:"response"`
+		}
+		if json.Unmarshal([]byte(data), &event) != nil {
+			continue
+		}
+		if event.Type == "response.done" || event.Type == "response.completed" {
+			if len(event.Response) > 0 {
+				return event.Response, true
+			}
+		}
+	}
+	return nil, false
+}
+
+func (s *OpenAIGatewayService) parseSSEUsageFromBody(body string) *OpenAIUsage {
+	usage := &OpenAIUsage{}
+	lines := strings.Split(body, "\n")
+	for _, line := range lines {
+		if !openaiSSEDataRe.MatchString(line) {
+			continue
+		}
+		data := openaiSSEDataRe.ReplaceAllString(line, "")
+		if data == "" || data == "[DONE]" {
+			continue
+		}
+		s.parseSSEUsage(data, usage)
+	}
+	return usage
+}
+
+func (s *OpenAIGatewayService) replaceModelInSSEBody(body, fromModel, toModel string) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		if !openaiSSEDataRe.MatchString(line) {
+			continue
+		}
+		lines[i] = s.replaceModelInSSELine(line, fromModel, toModel)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func (s *OpenAIGatewayService) validateUpstreamBaseURL(raw string) (string, error) {

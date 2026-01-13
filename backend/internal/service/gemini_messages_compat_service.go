@@ -223,6 +223,51 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	return selected, nil
 }
 
+func (s *GeminiMessagesCompatService) getSchedulableAccount(ctx context.Context, accountID int64) (*Account, error) {
+	if s.schedulerSnapshot != nil {
+		return s.schedulerSnapshot.GetAccount(ctx, accountID)
+	}
+	return s.accountRepo.GetByID(ctx, accountID)
+}
+
+func (s *GeminiMessagesCompatService) listSchedulableAccountsOnce(ctx context.Context, groupID *int64, platform string, hasForcePlatform bool) ([]Account, error) {
+	if s.schedulerSnapshot != nil {
+		accounts, _, err := s.schedulerSnapshot.ListSchedulableAccounts(ctx, groupID, platform, hasForcePlatform)
+		return accounts, err
+	}
+
+	useMixed := platform == PlatformGemini && !hasForcePlatform
+	if useMixed {
+		platforms := []string{platform, PlatformAntigravity}
+		var accounts []Account
+		var err error
+		if groupID != nil {
+			accounts, err = s.accountRepo.ListSchedulableByGroupIDAndPlatforms(ctx, *groupID, platforms)
+		} else {
+			accounts, err = s.accountRepo.ListSchedulableByPlatforms(ctx, platforms)
+		}
+		if err != nil {
+			return nil, err
+		}
+		filtered := make([]Account, 0, len(accounts))
+		for _, acc := range accounts {
+			if acc.Platform == PlatformAntigravity && !acc.IsMixedSchedulingEnabled() {
+				continue
+			}
+			filtered = append(filtered, acc)
+		}
+		return filtered, nil
+	}
+
+	if s.cfg != nil && s.cfg.RunMode == config.RunModeSimple {
+		return s.accountRepo.ListSchedulableByPlatform(ctx, platform)
+	}
+	if groupID != nil {
+		return s.accountRepo.ListSchedulableByGroupIDAndPlatform(ctx, *groupID, platform)
+	}
+	return s.accountRepo.ListSchedulableByPlatform(ctx, platform)
+}
+
 // isModelSupportedByAccount 根据账户平台检查模型支持
 func (s *GeminiMessagesCompatService) isModelSupportedByAccount(account *Account, requestedModel string) bool {
 	if account.Platform == PlatformAntigravity {

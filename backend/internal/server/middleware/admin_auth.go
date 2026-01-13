@@ -72,6 +72,44 @@ func adminAuth(
 	}
 }
 
+func isWebSocketUpgradeRequest(c *gin.Context) bool {
+	if c == nil || c.Request == nil {
+		return false
+	}
+	// RFC6455 handshake uses:
+	//   Connection: Upgrade
+	//   Upgrade: websocket
+	upgrade := strings.ToLower(strings.TrimSpace(c.GetHeader("Upgrade")))
+	if upgrade != "websocket" {
+		return false
+	}
+	connection := strings.ToLower(c.GetHeader("Connection"))
+	return strings.Contains(connection, "upgrade")
+}
+
+func extractJWTFromWebSocketSubprotocol(c *gin.Context) string {
+	if c == nil {
+		return ""
+	}
+	raw := strings.TrimSpace(c.GetHeader("Sec-WebSocket-Protocol"))
+	if raw == "" {
+		return ""
+	}
+
+	// The header is a comma-separated list of tokens. We reserve the prefix "jwt."
+	// for carrying the admin JWT.
+	for _, part := range strings.Split(raw, ",") {
+		p := strings.TrimSpace(part)
+		if strings.HasPrefix(p, "jwt.") {
+			token := strings.TrimSpace(strings.TrimPrefix(p, "jwt."))
+			if token != "" {
+				return token
+			}
+		}
+	}
+	return ""
+}
+
 // validateAdminAPIKey 验证管理员 API Key
 func validateAdminAPIKey(
 	c *gin.Context,

@@ -4,19 +4,26 @@ type SystemSettings struct {
 	RegistrationEnabled bool
 	EmailVerifyEnabled  bool
 
-	SmtpHost     string
-	SmtpPort     int
-	SmtpUsername string
-	SmtpPassword string
-	SmtpPasswordConfigured bool
-	SmtpFrom     string
-	SmtpFromName string
-	SmtpUseTLS   bool
+	SMTPHost               string
+	SMTPPort               int
+	SMTPUsername           string
+	SMTPPassword           string
+	SMTPPasswordConfigured bool
+	SMTPFrom               string
+	SMTPFromName           string
+	SMTPUseTLS             bool
 
-	TurnstileEnabled   bool
-	TurnstileSiteKey   string
-	TurnstileSecretKey string
+	TurnstileEnabled             bool
+	TurnstileSiteKey             string
+	TurnstileSecretKey           string
 	TurnstileSecretKeyConfigured bool
+
+	// LinuxDo Connect OAuth 登录
+	LinuxDoConnectEnabled                bool
+	LinuxDoConnectClientID               string
+	LinuxDoConnectClientSecret           string
+	LinuxDoConnectClientSecretConfigured bool
+	LinuxDoConnectRedirectURL            string
 
 	SiteName     string
 	SiteLogo     string

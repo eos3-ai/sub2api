@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
-	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -44,7 +43,7 @@ func (UserSubscription) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.String("status").
 			MaxLen(20).
-			Default(service.SubscriptionStatusActive),
+			Default("active"),
 
 		field.Time("daily_window_start").
 			Optional().

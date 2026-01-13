@@ -2,8 +2,10 @@ package admin
 
 import (
 	"log"
+	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -43,26 +45,42 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 	opsEnabled := h.opsService != nil && h.opsService.IsMonitoringEnabled(c.Request.Context())
 
 	response.Success(c, dto.SystemSettings{
-		RegistrationEnabled: settings.RegistrationEnabled,
-		EmailVerifyEnabled:  settings.EmailVerifyEnabled,
-		SmtpHost:            settings.SmtpHost,
-		SmtpPort:            settings.SmtpPort,
-		SmtpUsername:        settings.SmtpUsername,
-		SmtpPasswordConfigured: settings.SmtpPasswordConfigured,
-		SmtpFrom:            settings.SmtpFrom,
-		SmtpFromName:        settings.SmtpFromName,
-		SmtpUseTLS:          settings.SmtpUseTLS,
-		TurnstileEnabled:    settings.TurnstileEnabled,
-		TurnstileSiteKey:    settings.TurnstileSiteKey,
-		TurnstileSecretKeyConfigured: settings.TurnstileSecretKeyConfigured,
-		SiteName:            settings.SiteName,
-		SiteLogo:            settings.SiteLogo,
-		SiteSubtitle:        settings.SiteSubtitle,
-		ApiBaseUrl:          settings.ApiBaseUrl,
-		ContactInfo:         settings.ContactInfo,
-		DocUrl:              settings.DocUrl,
-		DefaultConcurrency:  settings.DefaultConcurrency,
-		DefaultBalance:      settings.DefaultBalance,
+		RegistrationEnabled:                  settings.RegistrationEnabled,
+		EmailVerifyEnabled:                   settings.EmailVerifyEnabled,
+		SMTPHost:                             settings.SMTPHost,
+		SMTPPort:                             settings.SMTPPort,
+		SMTPUsername:                         settings.SMTPUsername,
+		SMTPPasswordConfigured:               settings.SMTPPasswordConfigured,
+		SMTPFrom:                             settings.SMTPFrom,
+		SMTPFromName:                         settings.SMTPFromName,
+		SMTPUseTLS:                           settings.SMTPUseTLS,
+		TurnstileEnabled:                     settings.TurnstileEnabled,
+		TurnstileSiteKey:                     settings.TurnstileSiteKey,
+		TurnstileSecretKeyConfigured:         settings.TurnstileSecretKeyConfigured,
+		LinuxDoConnectEnabled:                settings.LinuxDoConnectEnabled,
+		LinuxDoConnectClientID:               settings.LinuxDoConnectClientID,
+		LinuxDoConnectClientSecretConfigured: settings.LinuxDoConnectClientSecretConfigured,
+		LinuxDoConnectRedirectURL:            settings.LinuxDoConnectRedirectURL,
+		SiteName:                             settings.SiteName,
+		SiteLogo:                             settings.SiteLogo,
+		SiteSubtitle:                         settings.SiteSubtitle,
+		APIBaseURL:                           settings.APIBaseURL,
+		ContactInfo:                          settings.ContactInfo,
+		DocURL:                               settings.DocURL,
+		HomeContent:                          settings.HomeContent,
+		DefaultConcurrency:                   settings.DefaultConcurrency,
+		DefaultBalance:                       settings.DefaultBalance,
+		EnableModelFallback:                  settings.EnableModelFallback,
+		FallbackModelAnthropic:               settings.FallbackModelAnthropic,
+		FallbackModelOpenAI:                  settings.FallbackModelOpenAI,
+		FallbackModelGemini:                  settings.FallbackModelGemini,
+		FallbackModelAntigravity:             settings.FallbackModelAntigravity,
+		EnableIdentityPatch:                  settings.EnableIdentityPatch,
+		IdentityPatchPrompt:                  settings.IdentityPatchPrompt,
+		OpsMonitoringEnabled:                 opsEnabled && settings.OpsMonitoringEnabled,
+		OpsRealtimeMonitoringEnabled:         settings.OpsRealtimeMonitoringEnabled,
+		OpsQueryModeDefault:                  settings.OpsQueryModeDefault,
+		OpsMetricsIntervalSeconds:            settings.OpsMetricsIntervalSeconds,
 	})
 }
 
@@ -291,26 +309,42 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	response.Success(c, dto.SystemSettings{
-		RegistrationEnabled: updatedSettings.RegistrationEnabled,
-		EmailVerifyEnabled:  updatedSettings.EmailVerifyEnabled,
-		SmtpHost:            updatedSettings.SmtpHost,
-		SmtpPort:            updatedSettings.SmtpPort,
-		SmtpUsername:        updatedSettings.SmtpUsername,
-		SmtpPasswordConfigured: updatedSettings.SmtpPasswordConfigured,
-		SmtpFrom:            updatedSettings.SmtpFrom,
-		SmtpFromName:        updatedSettings.SmtpFromName,
-		SmtpUseTLS:          updatedSettings.SmtpUseTLS,
-		TurnstileEnabled:    updatedSettings.TurnstileEnabled,
-		TurnstileSiteKey:    updatedSettings.TurnstileSiteKey,
-		TurnstileSecretKeyConfigured: updatedSettings.TurnstileSecretKeyConfigured,
-		SiteName:            updatedSettings.SiteName,
-		SiteLogo:            updatedSettings.SiteLogo,
-		SiteSubtitle:        updatedSettings.SiteSubtitle,
-		ApiBaseUrl:          updatedSettings.ApiBaseUrl,
-		ContactInfo:         updatedSettings.ContactInfo,
-		DocUrl:              updatedSettings.DocUrl,
-		DefaultConcurrency:  updatedSettings.DefaultConcurrency,
-		DefaultBalance:      updatedSettings.DefaultBalance,
+		RegistrationEnabled:                  updatedSettings.RegistrationEnabled,
+		EmailVerifyEnabled:                   updatedSettings.EmailVerifyEnabled,
+		SMTPHost:                             updatedSettings.SMTPHost,
+		SMTPPort:                             updatedSettings.SMTPPort,
+		SMTPUsername:                         updatedSettings.SMTPUsername,
+		SMTPPasswordConfigured:               updatedSettings.SMTPPasswordConfigured,
+		SMTPFrom:                             updatedSettings.SMTPFrom,
+		SMTPFromName:                         updatedSettings.SMTPFromName,
+		SMTPUseTLS:                           updatedSettings.SMTPUseTLS,
+		TurnstileEnabled:                     updatedSettings.TurnstileEnabled,
+		TurnstileSiteKey:                     updatedSettings.TurnstileSiteKey,
+		TurnstileSecretKeyConfigured:         updatedSettings.TurnstileSecretKeyConfigured,
+		LinuxDoConnectEnabled:                updatedSettings.LinuxDoConnectEnabled,
+		LinuxDoConnectClientID:               updatedSettings.LinuxDoConnectClientID,
+		LinuxDoConnectClientSecretConfigured: updatedSettings.LinuxDoConnectClientSecretConfigured,
+		LinuxDoConnectRedirectURL:            updatedSettings.LinuxDoConnectRedirectURL,
+		SiteName:                             updatedSettings.SiteName,
+		SiteLogo:                             updatedSettings.SiteLogo,
+		SiteSubtitle:                         updatedSettings.SiteSubtitle,
+		APIBaseURL:                           updatedSettings.APIBaseURL,
+		ContactInfo:                          updatedSettings.ContactInfo,
+		DocURL:                               updatedSettings.DocURL,
+		HomeContent:                          updatedSettings.HomeContent,
+		DefaultConcurrency:                   updatedSettings.DefaultConcurrency,
+		DefaultBalance:                       updatedSettings.DefaultBalance,
+		EnableModelFallback:                  updatedSettings.EnableModelFallback,
+		FallbackModelAnthropic:               updatedSettings.FallbackModelAnthropic,
+		FallbackModelOpenAI:                  updatedSettings.FallbackModelOpenAI,
+		FallbackModelGemini:                  updatedSettings.FallbackModelGemini,
+		FallbackModelAntigravity:             updatedSettings.FallbackModelAntigravity,
+		EnableIdentityPatch:                  updatedSettings.EnableIdentityPatch,
+		IdentityPatchPrompt:                  updatedSettings.IdentityPatchPrompt,
+		OpsMonitoringEnabled:                 updatedSettings.OpsMonitoringEnabled,
+		OpsRealtimeMonitoringEnabled:         updatedSettings.OpsRealtimeMonitoringEnabled,
+		OpsQueryModeDefault:                  updatedSettings.OpsQueryModeDefault,
+		OpsMetricsIntervalSeconds:            updatedSettings.OpsMetricsIntervalSeconds,
 	})
 }
 
@@ -332,80 +366,6 @@ func (h *SettingHandler) auditSettingsUpdate(c *gin.Context, before *service.Sys
 		role,
 		changed,
 	)
-}
-
-func diffSettings(before *service.SystemSettings, after *service.SystemSettings, req UpdateSettingsRequest) []string {
-	changed := make([]string, 0, 16)
-	if before.RegistrationEnabled != after.RegistrationEnabled {
-		changed = append(changed, "registration_enabled")
-	}
-	if before.EmailVerifyEnabled != after.EmailVerifyEnabled {
-		changed = append(changed, "email_verify_enabled")
-	}
-	if before.SmtpHost != after.SmtpHost {
-		changed = append(changed, "smtp_host")
-	}
-	if before.SmtpPort != after.SmtpPort {
-		changed = append(changed, "smtp_port")
-	}
-	if before.SmtpUsername != after.SmtpUsername {
-		changed = append(changed, "smtp_username")
-	}
-	if req.SmtpPassword != "" {
-		changed = append(changed, "smtp_password")
-	}
-	if before.SmtpFrom != after.SmtpFrom {
-		changed = append(changed, "smtp_from_email")
-	}
-	if before.SmtpFromName != after.SmtpFromName {
-		changed = append(changed, "smtp_from_name")
-	}
-	if before.SmtpUseTLS != after.SmtpUseTLS {
-		changed = append(changed, "smtp_use_tls")
-	}
-	if before.TurnstileEnabled != after.TurnstileEnabled {
-		changed = append(changed, "turnstile_enabled")
-	}
-	if before.TurnstileSiteKey != after.TurnstileSiteKey {
-		changed = append(changed, "turnstile_site_key")
-	}
-	if req.TurnstileSecretKey != "" {
-		changed = append(changed, "turnstile_secret_key")
-	}
-	if before.SiteName != after.SiteName {
-		changed = append(changed, "site_name")
-	}
-	if before.SiteLogo != after.SiteLogo {
-		changed = append(changed, "site_logo")
-	}
-	if before.SiteSubtitle != after.SiteSubtitle {
-		changed = append(changed, "site_subtitle")
-	}
-	if before.ApiBaseUrl != after.ApiBaseUrl {
-		changed = append(changed, "api_base_url")
-	}
-	if before.ContactInfo != after.ContactInfo {
-		changed = append(changed, "contact_info")
-	}
-	if before.DocUrl != after.DocUrl {
-		changed = append(changed, "doc_url")
-	}
-	if before.DefaultConcurrency != after.DefaultConcurrency {
-		changed = append(changed, "default_concurrency")
-	}
-	if before.DefaultBalance != after.DefaultBalance {
-		changed = append(changed, "default_balance")
-	}
-	return changed
-}
-
-// TestSmtpRequest 测试SMTP连接请求
-type TestSmtpRequest struct {
-	SmtpHost     string `json:"smtp_host" binding:"required"`
-	SmtpPort     int    `json:"smtp_port"`
-	SmtpUsername string `json:"smtp_username"`
-	SmtpPassword string `json:"smtp_password"`
-	SmtpUseTLS   bool   `json:"smtp_use_tls"`
 }
 
 func diffSettings(before *service.SystemSettings, after *service.SystemSettings, req UpdateSettingsRequest) []string {
@@ -553,9 +513,9 @@ func (h *SettingHandler) TestSMTPConnection(c *gin.Context) {
 	}
 
 	config := &service.SMTPConfig{
-		Host:     req.SmtpHost,
-		Port:     req.SmtpPort,
-		Username: req.SmtpUsername,
+		Host:     req.SMTPHost,
+		Port:     req.SMTPPort,
+		Username: req.SMTPUsername,
 		Password: password,
 		UseTLS:   req.SMTPUseTLS,
 	}
@@ -604,9 +564,9 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 	}
 
 	config := &service.SMTPConfig{
-		Host:     req.SmtpHost,
-		Port:     req.SmtpPort,
-		Username: req.SmtpUsername,
+		Host:     req.SMTPHost,
+		Port:     req.SMTPPort,
+		Username: req.SMTPUsername,
 		Password: password,
 		From:     req.SMTPFrom,
 		FromName: req.SMTPFromName,

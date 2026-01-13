@@ -23,6 +23,7 @@ var (
 	ErrAPIKeyTooShort     = infraerrors.BadRequest("API_KEY_TOO_SHORT", "api key must be at least 16 characters")
 	ErrAPIKeyInvalidChars = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
 	ErrAPIKeyRateLimited  = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
+	ErrInvalidIPPattern   = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
 )
 
 const (
@@ -32,9 +33,11 @@ const (
 type APIKeyRepository interface {
 	Create(ctx context.Context, key *APIKey) error
 	GetByID(ctx context.Context, id int64) (*APIKey, error)
-	// GetOwnerID 仅获取 API Key 的所有者 ID，用于删除前的轻量级权限验证
-	GetOwnerID(ctx context.Context, id int64) (int64, error)
+	// GetKeyAndOwnerID 仅获取 API Key 的 key 与所有者 ID，用于删除等轻量场景
+	GetKeyAndOwnerID(ctx context.Context, id int64) (string, int64, error)
 	GetByKey(ctx context.Context, key string) (*APIKey, error)
+	// GetByKeyForAuth 认证专用查询，返回最小字段集
+	GetByKeyForAuth(ctx context.Context, key string) (*APIKey, error)
 	Update(ctx context.Context, key *APIKey) error
 	Delete(ctx context.Context, id int64) error
 
@@ -66,16 +69,20 @@ type APIKeyCache interface {
 
 // CreateAPIKeyRequest 创建API Key请求
 type CreateAPIKeyRequest struct {
-	Name      string  `json:"name"`
-	GroupID   *int64  `json:"group_id"`
-	CustomKey *string `json:"custom_key"` // 可选的自定义key
+	Name        string   `json:"name"`
+	GroupID     *int64   `json:"group_id"`
+	CustomKey   *string  `json:"custom_key"`   // 可选的自定义key
+	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单
+	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单
 }
 
 // UpdateAPIKeyRequest 更新API Key请求
 type UpdateAPIKeyRequest struct {
-	Name    *string `json:"name"`
-	GroupID *int64  `json:"group_id"`
-	Status  *string `json:"status"`
+	Name        *string  `json:"name"`
+	GroupID     *int64   `json:"group_id"`
+	Status      *string  `json:"status"`
+	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
+	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
 }
 
 // APIKeyService API Key服务
@@ -100,7 +107,7 @@ func NewAPIKeyService(
 	cache APIKeyCache,
 	cfg *config.Config,
 ) *APIKeyService {
-	return &APIKeyService{
+	svc := &APIKeyService{
 		apiKeyRepo:  apiKeyRepo,
 		userRepo:    userRepo,
 		groupRepo:   groupRepo,
@@ -264,11 +271,13 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 创建API Key记录
 	apiKey := &APIKey{
-		UserID:  userID,
-		Key:     key,
-		Name:    req.Name,
-		GroupID: req.GroupID,
-		Status:  StatusActive,
+		UserID:      userID,
+		Key:         key,
+		Name:        req.Name,
+		GroupID:     req.GroupID,
+		Status:      StatusActive,
+		IPWhitelist: req.IPWhitelist,
+		IPBlacklist: req.IPBlacklist,
 	}
 
 	if err := s.apiKeyRepo.Create(ctx, apiKey); err != nil {
@@ -434,8 +443,8 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 // 优化：使用 GetOwnerID 替代 GetByID 进行权限验证，
 // 避免加载完整 APIKey 对象及其关联数据（User、Group），提升删除操作的性能
 func (s *APIKeyService) Delete(ctx context.Context, id int64, userID int64) error {
-	// 仅获取所有者 ID 用于权限验证，而非加载完整对象
-	ownerID, err := s.apiKeyRepo.GetOwnerID(ctx, id)
+	// 仅获取 key 与 owner 用于权限验证和 cache invalidation，而非加载完整对象
+	key, ownerID, err := s.apiKeyRepo.GetKeyAndOwnerID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("get api key: %w", err)
 	}

@@ -85,6 +85,8 @@ type CreateAccountRequest struct {
 	Concurrency int            `json:"concurrency"`
 	Priority    int            `json:"priority"`
 	GroupIDs    []int64        `json:"group_ids"`
+	ExpiresAt          *time.Time `json:"expires_at"`
+	AutoPauseOnExpired *bool      `json:"auto_pause_on_expired"`
 }
 
 // UpdateAccountRequest 更新账号请求
@@ -98,6 +100,8 @@ type UpdateAccountRequest struct {
 	Priority    *int            `json:"priority"`
 	Status      *string         `json:"status"`
 	GroupIDs    *[]int64        `json:"group_ids"`
+	ExpiresAt          *time.Time `json:"expires_at"`
+	AutoPauseOnExpired *bool      `json:"auto_pause_on_expired"`
 }
 
 // AccountService 账号管理服务

@@ -45,10 +45,6 @@ type UsageLog struct {
 	ImageCount int
 	ImageSize  *string
 
-	// 图片生成字段
-	ImageCount int
-	ImageSize  *string
-
 	CreatedAt time.Time
 
 	User         *User

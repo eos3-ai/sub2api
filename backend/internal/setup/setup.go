@@ -113,12 +113,12 @@ func NeedsSetup() bool {
 		"./backend",
 		"./backend/config",
 		"/etc/sub2api",
-	}
-	for _, dir := range configSearchPaths {
-		if _, err := os.Stat(dir + "/" + ConfigFile); err == nil {
-			return false
 		}
-	}
+		for _, dir := range configSearchPaths {
+			if _, err := os.Stat(dir + "/" + ConfigFileName); err == nil {
+				return false
+			}
+		}
 
 	// Check 2: Installation lock file (harder to bypass)
 	if _, err := os.Stat(GetInstallLockPath()); !os.IsNotExist(err) {

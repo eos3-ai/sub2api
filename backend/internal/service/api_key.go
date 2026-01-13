@@ -9,6 +9,8 @@ type APIKey struct {
 	Name      string
 	GroupID   *int64
 	Status    string
+	IPWhitelist []string
+	IPBlacklist []string
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	User      *User

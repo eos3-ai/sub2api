@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -17,7 +16,9 @@ type pricingRemoteClient struct {
 	httpClient *http.Client
 }
 
-func NewPricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
+// NewPricingRemoteClient 创建定价数据远程客户端
+// proxyURL 为空时直连，支持 http/https/socks5/socks5h 协议
+func NewPricingRemoteClient(proxyURL string) service.PricingRemoteClient {
 	sharedClient, err := httpclient.GetClient(httpclient.Options{
 		Timeout:  30 * time.Second,
 		ProxyURL: proxyURL,

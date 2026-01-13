@@ -251,6 +251,7 @@ type adminServiceImpl struct {
 	redeemCodeRepo      RedeemCodeRepository
 	balanceService      *BalanceService
 	billingCacheService *BillingCacheService
+	authCacheInvalidator APIKeyAuthCacheInvalidator
 	proxyProber         ProxyExitInfoProber
 	paymentOrderRepo    PaymentOrderRepository
 	cfg                 *config.Config
@@ -266,6 +267,7 @@ func NewAdminService(
 	redeemCodeRepo RedeemCodeRepository,
 	balanceService *BalanceService,
 	billingCacheService *BillingCacheService,
+	authCacheInvalidator APIKeyAuthCacheInvalidator,
 	proxyProber ProxyExitInfoProber,
 	paymentOrderRepo PaymentOrderRepository,
 	cfg *config.Config,
@@ -279,6 +281,7 @@ func NewAdminService(
 		redeemCodeRepo:      redeemCodeRepo,
 		balanceService:      balanceService,
 		billingCacheService: billingCacheService,
+		authCacheInvalidator: authCacheInvalidator,
 		proxyProber:         proxyProber,
 		paymentOrderRepo:    paymentOrderRepo,
 		cfg:                 cfg,

@@ -20,14 +20,16 @@ type User struct {
 }
 
 type APIKey struct {
-	ID        int64     `json:"id"`
-	UserID    int64     `json:"user_id"`
-	Key       string    `json:"key"`
-	Name      string    `json:"name"`
-	GroupID   *int64    `json:"group_id"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Key         string    `json:"key"`
+	Name        string    `json:"name"`
+	GroupID     *int64    `json:"group_id"`
+	Status      string    `json:"status"`
+	IPWhitelist []string  `json:"ip_whitelist"`
+	IPBlacklist []string  `json:"ip_blacklist"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 
 	User  *User  `json:"user,omitempty"`
 	Group *Group `json:"group,omitempty"`
@@ -52,6 +54,10 @@ type Group struct {
 	ImagePrice2K *float64 `json:"image_price_2k"`
 	ImagePrice4K *float64 `json:"image_price_4k"`
 
+	// Claude Code 客户端限制
+	ClaudeCodeOnly  bool   `json:"claude_code_only"`
+	FallbackGroupID *int64 `json:"fallback_group_id"`
+
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
@@ -60,21 +66,23 @@ type Group struct {
 }
 
 type Account struct {
-	ID           int64          `json:"id"`
-	Name         string         `json:"name"`
-	Notes        *string        `json:"notes"`
-	Platform     string         `json:"platform"`
-	Type         string         `json:"type"`
-	Credentials  map[string]any `json:"credentials"`
-	Extra        map[string]any `json:"extra"`
-	ProxyID      *int64         `json:"proxy_id"`
-	Concurrency  int            `json:"concurrency"`
-	Priority     int            `json:"priority"`
-	Status       string         `json:"status"`
-	ErrorMessage string         `json:"error_message"`
-	LastUsedAt   *time.Time     `json:"last_used_at"`
-	CreatedAt    time.Time      `json:"created_at"`
-	UpdatedAt    time.Time      `json:"updated_at"`
+	ID                 int64          `json:"id"`
+	Name               string         `json:"name"`
+	Notes              *string        `json:"notes"`
+	Platform           string         `json:"platform"`
+	Type               string         `json:"type"`
+	Credentials        map[string]any `json:"credentials"`
+	Extra              map[string]any `json:"extra"`
+	ProxyID            *int64         `json:"proxy_id"`
+	Concurrency        int            `json:"concurrency"`
+	Priority           int            `json:"priority"`
+	Status             string         `json:"status"`
+	ErrorMessage       string         `json:"error_message"`
+	LastUsedAt         *time.Time     `json:"last_used_at"`
+	ExpiresAt          *int64         `json:"expires_at"`
+	AutoPauseOnExpired bool           `json:"auto_pause_on_expired"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
 
 	Schedulable bool `json:"schedulable"`
 
@@ -178,11 +186,17 @@ type UsageLog struct {
 	ImageCount int     `json:"image_count"`
 	ImageSize  *string `json:"image_size"`
 
+	// User-Agent
+	UserAgent *string `json:"user_agent"`
+
+	// IP 地址（仅管理员可见）
+	IPAddress *string `json:"ip_address,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 
 	User         *User             `json:"user,omitempty"`
 	APIKey       *APIKey           `json:"api_key,omitempty"`
-	Account      *Account          `json:"account,omitempty"`
+	Account      *AccountSummary   `json:"account,omitempty"` // Use minimal AccountSummary to prevent data leakage
 	Group        *Group            `json:"group,omitempty"`
 	Subscription *UserSubscription `json:"subscription,omitempty"`
 }
@@ -237,44 +251,27 @@ type BulkAssignResult struct {
 	Errors        []string           `json:"errors"`
 }
 
-type RechargeRecord struct {
-	ID            int64     `json:"id"`
-	UserID        int64     `json:"user_id"`
-	Type          string    `json:"type"`
-	Amount        float64   `json:"amount"`
-	BalanceBefore float64   `json:"balance_before"`
-	BalanceAfter  float64   `json:"balance_after"`
-	Remark        string    `json:"remark"`
-	CreatedAt     time.Time `json:"created_at"`
+// PromoCode 注册优惠码
+type PromoCode struct {
+	ID          int64      `json:"id"`
+	Code        string     `json:"code"`
+	BonusAmount float64    `json:"bonus_amount"`
+	MaxUses     int        `json:"max_uses"`
+	UsedCount   int        `json:"used_count"`
+	Status      string     `json:"status"`
+	ExpiresAt   *time.Time `json:"expires_at"`
+	Notes       string     `json:"notes"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
-type PaymentPlan struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	AmountUSD    float64 `json:"amount_usd"`
-	PayUSD       float64 `json:"pay_usd"`
-	CreditsUSD   float64 `json:"credits_usd"`
-	ExchangeRate float64 `json:"exchange_rate"`
-	DiscountRate float64 `json:"discount_rate"`
-	Enabled      bool    `json:"enabled"`
-}
+// PromoCodeUsage 优惠码使用记录
+type PromoCodeUsage struct {
+	ID          int64     `json:"id"`
+	PromoCodeID int64     `json:"promo_code_id"`
+	UserID      int64     `json:"user_id"`
+	BonusAmount float64   `json:"bonus_amount"`
+	UsedAt      time.Time `json:"used_at"`
 
-type PaymentOrder struct {
-	ID        int64      `json:"id"`
-	OrderNo   string     `json:"order_no"`
-	OrderType string     `json:"order_type"`
-	UserID    int64      `json:"user_id"`
-	UserEmail string     `json:"user_email,omitempty"`
-	Username  string     `json:"username"`
-	Provider  string     `json:"provider"`
-	Channel   string     `json:"channel"`
-	Status    string     `json:"status"`
-	Remark    string     `json:"remark,omitempty"`
-	AmountCNY float64    `json:"amount_cny"`
-	AmountUSD float64    `json:"amount_usd"`
-	TotalUSD  float64    `json:"total_usd"`
-	ExpireAt  time.Time  `json:"expire_at"`
-	CreatedAt time.Time  `json:"created_at"`
-	UpdatedAt time.Time  `json:"updated_at"`
-	PaidAt    *time.Time `json:"paid_at,omitempty"`
+	User *User `json:"user,omitempty"`
 }

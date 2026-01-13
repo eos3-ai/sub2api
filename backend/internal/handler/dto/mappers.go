@@ -2,7 +2,7 @@
 package dto
 
 import (
-	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
@@ -53,16 +53,18 @@ func APIKeyFromService(k *service.APIKey) *APIKey {
 		return nil
 	}
 	return &APIKey{
-		ID:        k.ID,
-		UserID:    k.UserID,
-		Key:       k.Key,
-		Name:      k.Name,
-		GroupID:   k.GroupID,
-		Status:    k.Status,
-		CreatedAt: k.CreatedAt,
-		UpdatedAt: k.UpdatedAt,
-		User:      UserFromServiceShallow(k.User),
-		Group:     GroupFromServiceShallow(k.Group),
+		ID:          k.ID,
+		UserID:      k.UserID,
+		Key:         k.Key,
+		Name:        k.Name,
+		GroupID:     k.GroupID,
+		Status:      k.Status,
+		IPWhitelist: k.IPWhitelist,
+		IPBlacklist: k.IPBlacklist,
+		CreatedAt:   k.CreatedAt,
+		UpdatedAt:   k.UpdatedAt,
+		User:        UserFromServiceShallow(k.User),
+		Group:       GroupFromServiceShallow(k.Group),
 	}
 }
 
@@ -85,6 +87,8 @@ func GroupFromServiceShallow(g *service.Group) *Group {
 		ImagePrice1K:     g.ImagePrice1K,
 		ImagePrice2K:     g.ImagePrice2K,
 		ImagePrice4K:     g.ImagePrice4K,
+		ClaudeCodeOnly:   g.ClaudeCodeOnly,
+		FallbackGroupID:  g.FallbackGroupID,
 		CreatedAt:        g.CreatedAt,
 		UpdatedAt:        g.UpdatedAt,
 		AccountCount:     g.AccountCount,
@@ -124,6 +128,8 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 		Status:                  a.Status,
 		ErrorMessage:            a.ErrorMessage,
 		LastUsedAt:              a.LastUsedAt,
+		ExpiresAt:               timeToUnixSeconds(a.ExpiresAt),
+		AutoPauseOnExpired:      a.AutoPauseOnExpired,
 		CreatedAt:               a.CreatedAt,
 		UpdatedAt:               a.UpdatedAt,
 		Schedulable:             a.Schedulable,
@@ -279,10 +285,11 @@ func usageLogFromServiceBase(l *service.UsageLog, account *AccountSummary, inclu
 		FirstTokenMs:          l.FirstTokenMs,
 		ImageCount:            l.ImageCount,
 		ImageSize:             l.ImageSize,
+		UserAgent:             l.UserAgent,
 		CreatedAt:             l.CreatedAt,
 		User:                  UserFromServiceShallow(l.User),
 		APIKey:                APIKeyFromService(l.APIKey),
-		Account:               AccountFromService(l.Account),
+		Account:               account,
 		Group:                 GroupFromServiceShallow(l.Group),
 		Subscription:          UserSubscriptionFromService(l.Subscription),
 	}
@@ -364,48 +371,34 @@ func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult 
 	}
 }
 
-func RechargeRecordFromService(r *service.RechargeRecord) *RechargeRecord {
-	if r == nil {
+func PromoCodeFromService(pc *service.PromoCode) *PromoCode {
+	if pc == nil {
 		return nil
 	}
-	return &RechargeRecord{
-		ID:            r.ID,
-		UserID:        r.UserID,
-		Type:          r.Type,
-		Amount:        r.Amount,
-		BalanceBefore: r.BalanceBefore,
-		BalanceAfter:  r.BalanceAfter,
-		Remark:        r.Remark,
-		CreatedAt:     r.CreatedAt,
+	return &PromoCode{
+		ID:          pc.ID,
+		Code:        pc.Code,
+		BonusAmount: pc.BonusAmount,
+		MaxUses:     pc.MaxUses,
+		UsedCount:   pc.UsedCount,
+		Status:      pc.Status,
+		ExpiresAt:   pc.ExpiresAt,
+		Notes:       pc.Notes,
+		CreatedAt:   pc.CreatedAt,
+		UpdatedAt:   pc.UpdatedAt,
 	}
 }
 
-func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
-	if o == nil {
+func PromoCodeUsageFromService(u *service.PromoCodeUsage) *PromoCodeUsage {
+	if u == nil {
 		return nil
 	}
-	orderType := "online_recharge"
-	if strings.EqualFold(o.Provider, "admin") {
-		orderType = "admin_recharge"
-	} else if strings.EqualFold(o.Provider, "activity") {
-		orderType = "activity_recharge"
-	}
-	return &PaymentOrder{
-		ID:        o.ID,
-		OrderNo:   o.OrderNo,
-		OrderType: orderType,
-		UserID:    o.UserID,
-		Username:  o.Username,
-		Provider:  o.Provider,
-		Channel:   o.Channel,
-		Status:    o.Status,
-		Remark:    o.Remark,
-		AmountCNY: o.AmountCNY,
-		AmountUSD: o.AmountUSD,
-		TotalUSD:  o.TotalUSD,
-		ExpireAt:  o.ExpireAt,
-		CreatedAt: o.CreatedAt,
-		UpdatedAt: o.UpdatedAt,
-		PaidAt:    o.PaidAt,
+	return &PromoCodeUsage{
+		ID:          u.ID,
+		PromoCodeID: u.PromoCodeID,
+		UserID:      u.UserID,
+		BonusAmount: u.BonusAmount,
+		UsedAt:      u.UsedAt,
+		User:        UserFromServiceShallow(u.User),
 	}
 }

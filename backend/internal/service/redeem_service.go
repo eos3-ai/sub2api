@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -69,20 +68,19 @@ type RedeemCodeResponse struct {
 
 // RedeemService 兑换码服务
 type RedeemService struct {
-	redeemRepo          RedeemCodeRepository
-	userRepo            UserRepository
-	balanceService      *BalanceService
-	subscriptionService *SubscriptionService
-	cache               RedeemCache
-	billingCacheService *BillingCacheService
-	entClient           *dbent.Client
+	redeemRepo           RedeemCodeRepository
+	userRepo             UserRepository
+	subscriptionService  *SubscriptionService
+	cache                RedeemCache
+	billingCacheService  *BillingCacheService
+	entClient            *dbent.Client
+	authCacheInvalidator APIKeyAuthCacheInvalidator
 }
 
 // NewRedeemService 创建兑换码服务实例
 func NewRedeemService(
 	redeemRepo RedeemCodeRepository,
 	userRepo UserRepository,
-	balanceService *BalanceService,
 	subscriptionService *SubscriptionService,
 	cache RedeemCache,
 	billingCacheService *BillingCacheService,
@@ -90,13 +88,13 @@ func NewRedeemService(
 	authCacheInvalidator APIKeyAuthCacheInvalidator,
 ) *RedeemService {
 	return &RedeemService{
-		redeemRepo:          redeemRepo,
-		userRepo:            userRepo,
-		balanceService:      balanceService,
-		subscriptionService: subscriptionService,
-		cache:               cache,
-		billingCacheService: billingCacheService,
-		entClient:           entClient,
+		redeemRepo:           redeemRepo,
+		userRepo:             userRepo,
+		subscriptionService:  subscriptionService,
+		cache:                cache,
+		billingCacheService:  billingCacheService,
+		entClient:            entClient,
+		authCacheInvalidator: authCacheInvalidator,
 	}
 }
 
@@ -279,30 +277,9 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	// 执行兑换逻辑（兑换码已被锁定，此时可安全操作）
 	switch redeemCode.Type {
 	case RedeemTypeBalance:
-		// 增加用户余额，并写入流水（用于“充值记录”可视化）
-		if s.balanceService != nil {
-			_, err := s.balanceService.ApplyChange(txCtx, BalanceChangeRequest{
-				UserID:    userID,
-				Amount:    redeemCode.Value,
-				Type:      RechargeTypeRedeem,
-				Operator:  "system",
-				Remark:    fmt.Sprintf("redeem %s", redeemCode.Code),
-				RelatedID: &redeemCode.Code,
-			})
-			if err != nil {
-				return nil, fmt.Errorf("apply balance: %w", err)
-			}
-		} else {
-			// 兼容：若 BalanceService 未注入，回退为旧逻辑
-			if err := s.userRepo.UpdateBalance(txCtx, userID, redeemCode.Value); err != nil {
-				return nil, fmt.Errorf("update user balance: %w", err)
-			}
-			// 失效余额缓存（同步操作）
-			if s.billingCacheService != nil {
-				if err := s.billingCacheService.InvalidateUserBalance(txCtx, userID); err != nil {
-					log.Printf("Warning: failed to invalidate balance cache for user %d: %v", userID, err)
-				}
-			}
+		// 增加用户余额
+		if err := s.userRepo.UpdateBalance(txCtx, userID, redeemCode.Value); err != nil {
+			return nil, fmt.Errorf("update user balance: %w", err)
 		}
 
 	case RedeemTypeConcurrency:
@@ -352,8 +329,23 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64, redeemCode *RedeemCode) {
 	switch redeemCode.Type {
 	case RedeemTypeBalance:
-		if err := s.billingCacheService.InvalidateUserBalance(ctx, userID); err != nil {
-			log.Printf("Warning: failed to invalidate balance cache for user %d: %v", userID, err)
+		if s.authCacheInvalidator != nil {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+		}
+		if s.billingCacheService == nil {
+			return
+		}
+		go func() {
+			cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = s.billingCacheService.InvalidateUserBalance(cacheCtx, userID)
+		}()
+	case RedeemTypeConcurrency:
+		if s.authCacheInvalidator != nil {
+			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+		}
+		if s.billingCacheService == nil {
+			return
 		}
 	case RedeemTypeSubscription:
 		if s.authCacheInvalidator != nil {
@@ -364,9 +356,11 @@ func (s *RedeemService) invalidateRedeemCaches(ctx context.Context, userID int64
 		}
 		if redeemCode.GroupID != nil {
 			groupID := *redeemCode.GroupID
-			if err := s.billingCacheService.InvalidateSubscription(ctx, userID, groupID); err != nil {
-				log.Printf("Warning: failed to invalidate subscription cache for user %d group %d: %v", userID, groupID, err)
-			}
+			go func() {
+				cacheCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID)
+			}()
 		}
 	}
 }

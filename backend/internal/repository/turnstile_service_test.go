@@ -37,12 +37,6 @@ func (s *TurnstileServiceSuite) setupTransport(handler http.HandlerFunc) {
 	}
 }
 
-func (s *TurnstileServiceSuite) setupServer(handler http.HandlerFunc) {
-	s.srv = httptest.NewServer(handler)
-	s.verifier.verifyURL = s.srv.URL
-	s.verifier.httpClient = s.srv.Client()
-}
-
 func (s *TurnstileServiceSuite) TestVerifyToken_SendsFormAndDecodesJSON() {
 	s.setupTransport(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Capture form data in main goroutine context later
