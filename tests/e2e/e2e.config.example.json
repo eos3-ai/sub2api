@@ -1,0 +1,49 @@
+{
+  "environments": {
+    "demo": {
+      "baseURL": "https://sub2api-demo.tokenfreeai.com",
+      "accounts": {
+        "user": {
+          "email": "REPLACE_ME",
+          "password": "REPLACE_ME"
+        },
+        "admin": {
+          "email": "REPLACE_ME",
+          "password": "REPLACE_ME"
+        }
+      },
+      "registration": {
+        "password": "Test123456",
+        "emailDomain": "example.com"
+      },
+      "features": {
+        "allowNoQRCode": false,
+        "requirePaidRecharge": false,
+        "requireReferralReward": false
+      }
+    },
+    "prod": {
+      "baseURL": "https://router.aitokencloud.com",
+      "accounts": {
+        "user": {
+          "email": "REPLACE_ME",
+          "password": "REPLACE_ME"
+        },
+        "admin": {
+          "email": "REPLACE_ME",
+          "password": "REPLACE_ME"
+        }
+      },
+      "registration": {
+        "password": "Test123456",
+        "emailDomain": "example.com"
+      },
+      "features": {
+        "allowNoQRCode": false,
+        "requirePaidRecharge": false,
+        "requireReferralReward": false
+      }
+    }
+  }
+}
+

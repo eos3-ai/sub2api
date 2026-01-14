@@ -109,9 +109,30 @@ deploy/config.yaml
 backend/.installed
 
 # ===================
+# Playwright E2E（敏感信息 & 产物）
+# ===================
+tests/e2e/e2e.config.local.json
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+tests/e2e/.auth/
+
+# Legacy location (optional)
+e2e/e2e.config.local.json
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/
+
+# ===================
+# tests/（默认忽略，但放开 tests/e2e）
+# ===================
+!tests/
+tests/*
+!tests/e2e/
+!tests/e2e/**
+
+# ===================
 # 其他
 # ===================
-tests
 CLAUDE.md
 AGENTS.md
 .claude

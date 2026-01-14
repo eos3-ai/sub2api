@@ -1,0 +1,18 @@
+{
+  "name": "sub2api-e2e",
+  "private": true,
+  "version": "0.1.0",
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.6.3"
+  },
+  "scripts": {
+    "install:browsers": "playwright install",
+    "test": "playwright test",
+    "test:demo": "SUB2API_E2E_ENV=demo playwright test",
+    "test:prod": "SUB2API_E2E_ENV=prod playwright test",
+    "report": "playwright show-report"
+  }
+}
+
