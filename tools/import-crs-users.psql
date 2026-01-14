@@ -1,0 +1,72 @@
+\set ON_ERROR_STOP on
+
+-- Import CRS users export into Sub2API Postgres.
+--
+-- Input CSV header (from CRS export script):
+--   email,usernames,username,password_hash,available_balance
+--
+-- This script is meant to be executed *after* a CSV has been loaded into a
+-- temp table named `crs_users_import`. Use the wrapper:
+--   bash tools/import-crs-users.sh /abs/path/to/sub2api-users.csv
+--
+-- Requirements:
+-- - One Sub2API user per email
+-- - Merge (SUM) balances for same email
+-- - password_hash must be unique per email (fail-fast if conflicts exist)
+--
+-- Usage:
+--   psql "$DATABASE_URL" -f tools/import-crs-users.psql   (not recommended)
+
+-- Normalize email.
+UPDATE crs_users_import SET email = lower(trim(email));
+
+-- Optional: exclude admin email.
+\if :{?admin_email}
+DELETE FROM crs_users_import WHERE email = lower(:'admin_email');
+\endif
+
+-- Safety: clamp negative balances to 0 (Sub2API may enforce a non-negative balance constraint).
+UPDATE crs_users_import SET available_balance = 0 WHERE available_balance < 0;
+
+-- Fail-fast if any email has multiple distinct password hashes.
+DO $$
+DECLARE
+  conflict_count int;
+BEGIN
+  SELECT COUNT(*) INTO conflict_count
+  FROM (
+    SELECT email
+    FROM crs_users_import
+    GROUP BY email
+    HAVING COUNT(DISTINCT password_hash) > 1
+  ) t;
+
+  IF conflict_count > 0 THEN
+    RAISE EXCEPTION 'Import aborted: % emails have multiple distinct password_hash values. Resolve conflicts in export first.', conflict_count;
+  END IF;
+END $$;
+
+WITH merged AS (
+  SELECT
+    email,
+    MIN(password_hash) AS password_hash, -- safe because we asserted only 1 distinct hash per email
+    SUM(available_balance) AS balance
+  FROM crs_users_import
+  GROUP BY email
+)
+INSERT INTO users (email, password_hash, role, balance, concurrency, status, created_at, updated_at)
+SELECT
+  email,
+  password_hash,
+  'user' AS role,
+  balance,
+  COALESCE(NULLIF(:'concurrency', '')::int, 5) AS concurrency,
+  'active' AS status,
+  NOW() AS created_at,
+  NOW() AS updated_at
+FROM merged
+ON CONFLICT (email) WHERE deleted_at IS NULL
+DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  balance = EXCLUDED.balance,
+  updated_at = NOW();
