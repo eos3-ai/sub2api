@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/url"
 	"regexp"
@@ -78,6 +80,14 @@ func (h *DingtalkBotHandler) RechargeStatus(c *gin.Context) {
 }
 
 func (h *DingtalkBotHandler) Recharge(c *gin.Context) {
+	bodyBytes, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Printf("dingtalk bot request read failed: %v", err)
+	} else {
+		logDingtalkRequest(c, bodyBytes)
+	}
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 	botConfig := h.getBotConfig()
 	if botConfig == nil || !botConfig.Enabled {
 		c.JSON(503, createDingtalkMarkdownResponse("功能未启用", "### ⚠️ 钉钉机器人充值功能未启用"))
@@ -347,6 +357,38 @@ func buildDingtalkRemark(defaultRemark, operator, conversationID string) string 
 		remarkParts = append(remarkParts, fmt.Sprintf("Conv:%s", conversationID))
 	}
 	return strings.Join(remarkParts, " / ")
+}
+
+func logDingtalkRequest(c *gin.Context, body []byte) {
+	if c == nil || c.Request == nil {
+		return
+	}
+	query := c.Request.URL.Query()
+	queryToken := maskDingtalkSecret(query.Get("token"))
+	querySign := maskDingtalkSecret(query.Get("sign"))
+	headerToken := maskDingtalkSecret(c.GetHeader("x-dingtalk-token"))
+	bodyText := strings.TrimSpace(string(body))
+	log.Printf(
+		"dingtalk bot request: method=%s path=%s token=%s timestamp=%s sign=%s header_token=%s body=%s",
+		c.Request.Method,
+		c.Request.URL.Path,
+		queryToken,
+		query.Get("timestamp"),
+		querySign,
+		headerToken,
+		bodyText,
+	)
+}
+
+func maskDingtalkSecret(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if len(value) <= 8 {
+		return "****"
+	}
+	return value[:4] + "****" + value[len(value)-4:]
 }
 
 func parseCommaSeparated(value string) []string {
