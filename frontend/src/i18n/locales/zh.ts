@@ -537,6 +537,8 @@ export default {
     usage: '用量',
     today: '今日',
     total: '累计',
+    rateMultiplierNotice:
+      '模型倍率说明：模型倍率可以理解为实际的结算价格。如2× 表示实际结算单价按 2 元≈1 美金额度进行换算，最终结算以系统显示为准。',
     useKey: '使用密钥',
     useKeyModal: {
       title: '使用 API 密钥',

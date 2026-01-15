@@ -539,6 +539,8 @@ export default {
     usage: 'Usage',
     today: 'Today',
     total: 'Total',
+    rateMultiplierNotice:
+      'Rate multiplier note: The multiplier represents the actual settlement price. For example, 2x means the settlement unit price is converted at 2 CNY ~ 1 USD. Final billing is subject to the system display.',
     useKey: 'Use Key',
     useKeyModal: {
       title: 'Use API Key',
