@@ -24,7 +24,7 @@ import (
 const dingtalkMaxTimeDiff = time.Hour
 
 var (
-	dingtalkAtUserRe   = regexp.MustCompile(`@\S+`)
+	dingtalkAtUserRe   = regexp.MustCompile(`(^|\s)@\S+`)
 	dingtalkAmountRe   = regexp.MustCompile(`[^0-9.,-]+`)
 	dingtalkWhitespace = regexp.MustCompile(`\s+`)
 )
@@ -257,7 +257,7 @@ func cleanDingtalkContent(raw string, atUsers []dingtalkAtUser) string {
 			content = strings.ReplaceAll(content, "@"+user.DingtalkID, " ")
 		}
 	}
-	content = dingtalkAtUserRe.ReplaceAllString(content, " ")
+	content = dingtalkAtUserRe.ReplaceAllString(content, "$1")
 	content = dingtalkWhitespace.ReplaceAllString(content, " ")
 	return strings.TrimSpace(content)
 }
