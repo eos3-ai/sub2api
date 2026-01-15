@@ -63,6 +63,7 @@ type Config struct {
 	Referral     ReferralConfig     `mapstructure:"referral"`
 	Payment      PaymentConfig      `mapstructure:"payment"`
 	Dingtalk     DingtalkConfig     `mapstructure:"dingtalk"`
+	DingtalkBot  DingtalkBotConfig  `mapstructure:"dingtalk_bot"`
 	Timezone     string             `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
 	Gemini       GeminiConfig       `mapstructure:"gemini"`
 	Update       UpdateConfig       `mapstructure:"update"`
@@ -471,6 +472,14 @@ type DingtalkConfig struct {
 	Secret     string `mapstructure:"secret"`
 	AtMobiles  string `mapstructure:"at_mobiles"` // comma separated
 	AtAll      bool   `mapstructure:"at_all"`
+}
+
+type DingtalkBotConfig struct {
+	Enabled          bool   `mapstructure:"enabled"`
+	AccessToken      string `mapstructure:"access_token"`
+	SignSecret       string `mapstructure:"sign_secret"`
+	AllowedSenderIDs string `mapstructure:"allowed_sender_ids"` // comma separated
+	DefaultRemark    string `mapstructure:"default_remark"`
 }
 
 type PaymentConfig struct {
@@ -910,6 +919,12 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("dingtalk.secret", "DINGTALK_SECRET")
 	_ = v.BindEnv("dingtalk.at_mobiles", "DINGTALK_AT_MOBILES")
 	_ = v.BindEnv("dingtalk.at_all", "DINGTALK_AT_ALL")
+	// Dingtalk bot (incoming)
+	_ = v.BindEnv("dingtalk_bot.enabled", "DINGTALK_BOT_ENABLED")
+	_ = v.BindEnv("dingtalk_bot.access_token", "DINGTALK_BOT_ACCESS_TOKEN")
+	_ = v.BindEnv("dingtalk_bot.sign_secret", "DINGTALK_BOT_SIGN_SECRET")
+	_ = v.BindEnv("dingtalk_bot.allowed_sender_ids", "DINGTALK_BOT_ALLOWED_SENDER_IDS")
+	_ = v.BindEnv("dingtalk_bot.default_remark", "DINGTALK_BOT_DEFAULT_REMARK")
 
 	// Referral (legacy and docker env friendly)
 	_ = v.BindEnv("referral.enabled", "REFERRAL_ENABLED")
@@ -1052,6 +1067,12 @@ func setDefaults() {
 	viper.SetDefault("dingtalk.secret", "")
 	viper.SetDefault("dingtalk.at_mobiles", "")
 	viper.SetDefault("dingtalk.at_all", false)
+	// Dingtalk bot (incoming)
+	viper.SetDefault("dingtalk_bot.enabled", false)
+	viper.SetDefault("dingtalk_bot.access_token", "")
+	viper.SetDefault("dingtalk_bot.sign_secret", "")
+	viper.SetDefault("dingtalk_bot.allowed_sender_ids", "")
+	viper.SetDefault("dingtalk_bot.default_remark", "")
 
 	// Payment
 	viper.SetDefault("payment.enabled", false)

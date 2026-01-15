@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -22,6 +23,7 @@ type PaymentPlan struct {
 type PaymentOrder struct {
 	ID      int64  `json:"id"`
 	OrderNo string `json:"order_no"`
+	OrderType string `json:"order_type"`
 	TradeNo *string `json:"trade_no,omitempty"`
 
 	UserID    int64  `json:"user_id"`
@@ -62,9 +64,16 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 	if o == nil {
 		return nil
 	}
+	orderType := "online_recharge"
+	if strings.EqualFold(o.Provider, "admin") {
+		orderType = "admin_recharge"
+	} else if strings.EqualFold(o.Provider, "activity") {
+		orderType = "activity_recharge"
+	}
 	return &PaymentOrder{
 		ID:           o.ID,
 		OrderNo:      o.OrderNo,
+		OrderType:    orderType,
 		TradeNo:      o.TradeNo,
 		UserID:       o.UserID,
 		Username:     o.Username,
@@ -92,4 +101,3 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 		UpdatedAt:    o.UpdatedAt,
 	}
 }
-

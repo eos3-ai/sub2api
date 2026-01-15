@@ -489,13 +489,17 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 		}
 	}
 
-	// Mark admin top-up as an order visible to the user (only for explicit "add" operations).
-	if operation == "add" && balance > 0 {
+	// Mark admin balance adjustment as an order visible to the user.
+	if (operation == "add" || operation == "subtract") && balance > 0 {
+		adjustment := balance
+		if operation == "subtract" {
+			adjustment = -balance
+		}
 		updatedUser, _ := s.userRepo.GetByID(ctx, userID)
 		if updatedUser != nil {
-			_ = s.createAdminRechargeOrder(ctx, updatedUser, balance, notes)
+			_ = s.createAdminRechargeOrder(ctx, updatedUser, adjustment, notes)
 		} else {
-			_ = s.createAdminRechargeOrder(ctx, user, balance, notes)
+			_ = s.createAdminRechargeOrder(ctx, user, adjustment, notes)
 		}
 	}
 
@@ -529,7 +533,7 @@ func (s *adminServiceImpl) createAdminRechargeOrder(ctx context.Context, user *U
 		UserID:        user.ID,
 		Username:      user.Email,
 		AmountCNY:     0,
-		AmountUSD:     0,
+		AmountUSD:     amountUSD,
 		BonusUSD:      0,
 		TotalUSD:      amountUSD,
 		ExchangeRate:  exchangeRate,

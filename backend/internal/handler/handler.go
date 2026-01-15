@@ -41,6 +41,7 @@ type Handlers struct {
 	Gateway       *GatewayHandler
 	OpenAIGateway *OpenAIGatewayHandler
 	Setting       *SettingHandler
+	DingtalkBot   *DingtalkBotHandler
 }
 
 // BuildInfo contains build-time information

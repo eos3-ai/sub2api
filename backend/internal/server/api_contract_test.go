@@ -503,6 +503,16 @@ func (r *stubUserRepo) GetByEmail(ctx context.Context, email string) (*service.U
 	return nil, service.ErrUserNotFound
 }
 
+func (r *stubUserRepo) GetByUsername(ctx context.Context, username string) (*service.User, error) {
+	for _, user := range r.users {
+		if user.Username == username {
+			clone := *user
+			return &clone, nil
+		}
+	}
+	return nil, service.ErrUserNotFound
+}
+
 func (r *stubUserRepo) GetFirstAdmin(ctx context.Context) (*service.User, error) {
 	for _, user := range r.users {
 		if user.Role == service.RoleAdmin && user.Status == service.StatusActive {

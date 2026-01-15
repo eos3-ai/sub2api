@@ -243,7 +243,7 @@
                       ${{ o.total_usd.toFixed(2) }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      ¥{{ o.amount_cny.toFixed(2) }}
+                      {{ shouldShowPayAmount(o.order_type) ? `¥${o.amount_cny.toFixed(2)}` : '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ paymentStatusLabel(o.status) }}
@@ -735,6 +735,10 @@ function channelLabel(channel: string): string {
 function shouldShowChannel(orderType?: string): boolean {
   const value = String(orderType || '').toLowerCase()
   return value === '' || value === 'online_recharge'
+}
+
+function shouldShowPayAmount(orderType?: string): boolean {
+  return shouldShowChannel(orderType)
 }
 
 function orderTypeLabel(orderType?: string): string {

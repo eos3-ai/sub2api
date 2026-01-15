@@ -112,7 +112,9 @@
             </template>
 
             <template #cell-amount_cny="{ row }">
-              <span class="text-base font-bold text-gray-900 dark:text-white">¥{{ row.amount_cny.toFixed(2) }}</span>
+              <span class="text-base font-bold text-gray-900 dark:text-white">
+                {{ shouldShowPayAmount(row.order_type) ? `¥${row.amount_cny.toFixed(2)}` : '-' }}
+              </span>
             </template>
 
             <template #cell-status="{ row }">
@@ -211,6 +213,10 @@ function channelLabel(channel: string): string {
 function shouldShowChannel(orderType?: string): boolean {
   const value = String(orderType || '').toLowerCase()
   return value === '' || value === 'online_recharge'
+}
+
+function shouldShowPayAmount(orderType?: string): boolean {
+  return shouldShowChannel(orderType)
 }
 
 function orderTypeLabel(orderType?: string): string {

@@ -69,6 +69,8 @@ func registerRoutes(
 	routes.RegisterCommonRoutes(r)
 	// 支付渠道回调（无需认证）
 	routes.RegisterPaymentCallbackRoutes(r, h)
+	// 钉钉机器人回调（无需认证）
+	routes.RegisterDingtalkBotRoutes(r, h)
 
 	// API v1
 	v1 := r.Group("/api/v1")

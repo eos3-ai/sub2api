@@ -26,6 +26,7 @@ type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	GetByID(ctx context.Context, id int64) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
+	GetByUsername(ctx context.Context, username string) (*User, error)
 	// GetEmailsByIDs returns a mapping from user_id to email for batch display/export use cases.
 	GetEmailsByIDs(ctx context.Context, ids []int64) (map[int64]string, error)
 	GetFirstAdmin(ctx context.Context) (*User, error)
@@ -83,6 +84,24 @@ func (s *UserService) GetProfile(ctx context.Context, userID int64) (*User, erro
 	user, err := s.userRepo.GetByID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("get user: %w", err)
+	}
+	return user, nil
+}
+
+// GetByEmail gets user by email.
+func (s *UserService) GetByEmail(ctx context.Context, email string) (*User, error) {
+	user, err := s.userRepo.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, fmt.Errorf("get user by email: %w", err)
+	}
+	return user, nil
+}
+
+// GetByUsername gets user by username.
+func (s *UserService) GetByUsername(ctx context.Context, username string) (*User, error) {
+	user, err := s.userRepo.GetByUsername(ctx, username)
+	if err != nil {
+		return nil, fmt.Errorf("get user by username: %w", err)
 	}
 	return user, nil
 }

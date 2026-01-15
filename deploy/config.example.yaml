@@ -255,6 +255,27 @@ pricing:
   hash_check_interval_minutes: 10
 
 # =============================================================================
+# Dingtalk Bot Recharge (Optional)
+# 钉钉机器人余额充值（可选）
+# =============================================================================
+dingtalk_bot:
+  # Enable recharge via DingTalk bot webhook
+  # 是否启用钉钉机器人充值接口
+  enabled: false
+  # Access token for validation (optional)
+  # 访问令牌（可选）
+  access_token: ""
+  # Signature secret for request verification (optional)
+  # 签名密钥（可选）
+  sign_secret: ""
+  # Allowed sender IDs, comma-separated (staffId or senderId)
+  # 允许执行充值的发送者 ID，英文逗号分隔（staffId 或 senderId）
+  allowed_sender_ids: ""
+  # Default remark appended to recharge records
+  # 充值流水默认备注
+  default_remark: ""
+
+# =============================================================================
 # Gemini OAuth (Required for Gemini accounts)
 # Gemini OAuth 配置（Gemini 账户必需）
 # =============================================================================

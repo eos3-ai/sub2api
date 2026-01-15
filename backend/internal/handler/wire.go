@@ -75,6 +75,7 @@ func ProvideHandlers(
 	gatewayHandler *GatewayHandler,
 	openaiGatewayHandler *OpenAIGatewayHandler,
 	settingHandler *SettingHandler,
+	dingtalkBotHandler *DingtalkBotHandler,
 ) *Handlers {
 	return &Handlers{
 		Auth:          authHandler,
@@ -90,6 +91,7 @@ func ProvideHandlers(
 		Gateway:       gatewayHandler,
 		OpenAIGateway: openaiGatewayHandler,
 		Setting:       settingHandler,
+		DingtalkBot:   dingtalkBotHandler,
 	}
 }
 
@@ -107,6 +109,7 @@ var ProviderSet = wire.NewSet(
 	NewReferralHandler,
 	NewGatewayHandler,
 	NewOpenAIGatewayHandler,
+	NewDingtalkBotHandler,
 	ProvideSettingHandler,
 
 	// Admin handlers
