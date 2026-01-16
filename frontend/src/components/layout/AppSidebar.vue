@@ -52,8 +52,8 @@
           </router-link>
         </div>
 
-        <!-- Admin "My Account" section is disabled in this deployment to focus on management-only features. -->
-        <!--
+        <div v-if="!sidebarCollapsed" class="mx-3 my-2 h-px bg-gray-200 dark:bg-dark-700"></div>
+
         <div v-if="!authStore.isSimpleMode" class="sidebar-section">
           <div v-if="!sidebarCollapsed" class="sidebar-section-title">
             {{ t('nav.myAccount') }}
@@ -76,7 +76,6 @@
             </transition>
           </router-link>
         </div>
-        -->
       </template>
 
       <!-- Regular User View -->
@@ -395,6 +394,8 @@ const userNavItems = computed(() => {
   ]
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
 })
+
+const personalNavItems = computed(() => userNavItems.value)
 
 // Admin navigation items
 const adminNavItems = computed(() => {
