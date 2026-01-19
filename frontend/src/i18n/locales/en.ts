@@ -156,6 +156,8 @@ export default {
     noOptionsFound: 'No options found',
     saving: 'Saving...',
     refresh: 'Refresh',
+    settings: 'Settings',
+    stettings: 'Settings',
     createdAt: 'Created At',
     updatedAt: 'Updated At',
     time: {

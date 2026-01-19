@@ -156,6 +156,8 @@ export default {
     saving: '保存中...',
     selectedCount: '（已选 {count} 个）',
     refresh: '刷新',
+    settings: '设置',
+    stettings: '设置',
     createdAt: '创建时间',
     updatedAt: '更新时间',
     time: {
