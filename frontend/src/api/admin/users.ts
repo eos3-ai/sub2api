@@ -56,13 +56,24 @@ export async function exportRecords(filters?: {
   status?: 'active' | 'disabled'
   role?: 'admin' | 'user'
   search?: string
+  attributes?: Record<number, string>
 }): Promise<Blob> {
+  const params: Record<string, any> = {
+    status: filters?.status || undefined,
+    role: filters?.role || undefined,
+    search: filters?.search || undefined
+  }
+
+  if (filters?.attributes) {
+    for (const [attrId, value] of Object.entries(filters.attributes)) {
+      if (value) {
+        params[`attr[${attrId}]`] = value
+      }
+    }
+  }
+
   const { data } = await apiClient.get('/admin/users/export', {
-    params: {
-      status: filters?.status || undefined,
-      role: filters?.role || undefined,
-      search: filters?.search || undefined
-    },
+    params,
     responseType: 'blob'
   })
   return data as Blob

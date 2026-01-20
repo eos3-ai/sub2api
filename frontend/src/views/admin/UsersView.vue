@@ -112,6 +112,14 @@
               >
                 <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
               </button>
+              <!-- Export Button -->
+              <button
+                @click="exportFiltered"
+                :disabled="exporting"
+                class="btn btn-primary"
+              >
+                {{ exporting ? t('common.loading') : t('admin.users.exportRecords') }}
+              </button>
               <!-- Filter Settings Dropdown -->
               <div class="relative" ref="filterDropdownRef">
                 <button
@@ -538,6 +546,7 @@ import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { formatDateTime } from '@/utils/format'
+import { saveAs } from 'file-saver'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
@@ -561,6 +570,7 @@ import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsMod
 import UserBalanceModal from '@/components/admin/user/UserBalanceModal.vue'
 
 const appStore = useAppStore()
+const exporting = ref(false)
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>
@@ -978,6 +988,35 @@ const loadUsers = async () => {
     if (abortController === currentAbortController) {
       loading.value = false
     }
+  }
+}
+
+const exportFiltered = async () => {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const attrFilters: Record<number, string> = {}
+    for (const [attrId, value] of Object.entries(activeAttributeFilters)) {
+      if (value) {
+        attrFilters[Number(attrId)] = value
+      }
+    }
+
+    const blob = await adminAPI.users.exportRecords({
+      status: (filters.status || undefined) as any,
+      role: (filters.role || undefined) as any,
+      search: searchQuery.value || undefined,
+      attributes: Object.keys(attrFilters).length > 0 ? attrFilters : undefined
+    })
+    const now = new Date()
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(
+      now.getHours()
+    ).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    saveAs(blob, `users_${stamp}.csv`)
+  } catch (error) {
+    appStore.showError((error as { message?: string }).message || t('common.error'))
+  } finally {
+    exporting.value = false
   }
 }
 
