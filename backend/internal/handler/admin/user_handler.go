@@ -122,14 +122,19 @@ func parseAttributeFilters(c *gin.Context) map[int64]string {
 // Export exports filtered users as CSV.
 // GET /api/v1/admin/users/export?status=active&role=user&search=foo&attr[1]=company
 func (h *UserHandler) Export(c *gin.Context) {
+	search := strings.TrimSpace(c.Query("search"))
+	if len(search) > 100 {
+		search = search[:100]
+	}
+
 	filters := service.UserListFilters{
 		Status:     c.Query("status"),
 		Role:       c.Query("role"),
-		Search:     c.Query("search"),
+		Search:     search,
 		Attributes: parseAttributeFilters(c),
 	}
 
-	pageSize := 200
+	pageSize := 100
 	page := 1
 
 	all := make([]service.User, 0, pageSize)
