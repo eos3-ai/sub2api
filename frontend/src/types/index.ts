@@ -338,6 +338,12 @@ export interface Group {
   image_price_1k: number | null
   image_price_2k: number | null
   image_price_4k: number | null
+  // Claude Code 客户端限制
+  claude_code_only: boolean
+  fallback_group_id: number | null
+  // 模型路由配置（仅 anthropic 平台使用）
+  model_routing: Record<string, number[]> | null
+  model_routing_enabled: boolean
   account_count?: number
   created_at: string
   updated_at: string
@@ -433,8 +439,24 @@ export interface Proxy {
   password?: string | null
   status: 'active' | 'inactive'
   account_count?: number // Number of accounts using this proxy
+  latency_ms?: number
+  latency_status?: 'success' | 'failed'
+  latency_message?: string
+  ip_address?: string
+  country?: string
+  country_code?: string
+  region?: string
+  city?: string
   created_at: string
   updated_at: string
+}
+
+export interface ProxyAccountSummary {
+  id: number
+  name: string
+  platform: AccountPlatform
+  type: AccountType
+  notes?: string | null
 }
 
 // Gemini credentials structure for OAuth and API Key authentication
@@ -497,6 +519,7 @@ export interface Account {
   concurrency: number
   current_concurrency?: number // Real-time concurrency count from Redis
   priority: number
+  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   status: 'active' | 'inactive' | 'error'
   error_message: string | null
   last_used_at: string | null
@@ -520,13 +543,34 @@ export interface Account {
   session_window_start: string | null
   session_window_end: string | null
   session_window_status: 'allowed' | 'allowed_warning' | 'rejected' | null
+
+  // 5h窗口费用控制（仅 Anthropic OAuth/SetupToken 账号有效）
+  window_cost_limit?: number | null
+  window_cost_sticky_reserve?: number | null
+
+  // 会话数量控制（仅 Anthropic OAuth/SetupToken 账号有效）
+  max_sessions?: number | null
+  session_idle_timeout_minutes?: number | null
+
+  // TLS指纹伪装（仅 Anthropic OAuth/SetupToken 账号有效）
+  enable_tls_fingerprint?: boolean | null
+
+  // 会话ID伪装（仅 Anthropic OAuth/SetupToken 账号有效）
+  // 启用后将在15分钟内固定 metadata.user_id 中的 session ID
+  session_id_masking_enabled?: boolean | null
+
+  // 运行时状态（仅当启用对应限制时返回）
+  current_window_cost?: number | null // 当前窗口费用
+  active_sessions?: number | null // 当前活跃会话数
 }
 
 // Account Usage types
 export interface WindowStats {
   requests: number
   tokens: number
-  cost: number
+  cost: number // Account cost (account multiplier)
+  standard_cost?: number
+  user_cost?: number
 }
 
 export interface UsageProgress {
@@ -591,6 +635,7 @@ export interface CreateAccountRequest {
   proxy_id?: number | null
   concurrency?: number
   priority?: number
+  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   group_ids?: number[]
   expires_at?: number | null
   auto_pause_on_expired?: boolean
@@ -606,6 +651,7 @@ export interface UpdateAccountRequest {
   proxy_id?: number | null
   concurrency?: number
   priority?: number
+  rate_multiplier?: number // Account billing multiplier (>=0, 0 means free)
   schedulable?: boolean
   status?: 'active' | 'inactive'
   group_ids?: number[]
@@ -660,6 +706,8 @@ export interface UsageLog {
   total_cost: number
   actual_cost: number
   rate_multiplier: number
+  account_rate_multiplier?: number | null
+  billing_type: number
 
   stream: boolean
   duration_ms: number
@@ -679,6 +727,33 @@ export interface UsageLog {
   account?: Account
   group?: Group
   subscription?: UserSubscription
+}
+
+export interface UsageCleanupFilters {
+  start_time: string
+  end_time: string
+  user_id?: number
+  api_key_id?: number
+  account_id?: number
+  group_id?: number
+  model?: string | null
+  stream?: boolean | null
+  billing_type?: number | null
+}
+
+export interface UsageCleanupTask {
+  id: number
+  status: string
+  filters: UsageCleanupFilters
+  created_by: number
+  deleted_rows: number
+  error_message?: string | null
+  canceled_by?: number | null
+  canceled_at?: string | null
+  started_at?: string | null
+  finished_at?: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface RedeemCode {
@@ -904,6 +979,7 @@ export interface UsageQueryParams {
   group_id?: number
   model?: string
   stream?: boolean
+  billing_type?: number | null
   start_date?: string
   end_date?: string
 }
@@ -916,23 +992,27 @@ export interface AccountUsageHistory {
   requests: number
   tokens: number
   cost: number
-  actual_cost: number
+  actual_cost: number // Account cost (account multiplier)
+  user_cost: number // User/API key billed cost (group multiplier)
 }
 
 export interface AccountUsageSummary {
   days: number
   actual_days_used: number
-  total_cost: number
+  total_cost: number // Account cost (account multiplier)
+  total_user_cost: number
   total_standard_cost: number
   total_requests: number
   total_tokens: number
-  avg_daily_cost: number
+  avg_daily_cost: number // Account cost
+  avg_daily_user_cost: number
   avg_daily_requests: number
   avg_daily_tokens: number
   avg_duration_ms: number
   today: {
     date: string
     cost: number
+    user_cost: number
     requests: number
     tokens: number
   } | null
@@ -940,6 +1020,7 @@ export interface AccountUsageSummary {
     date: string
     label: string
     cost: number
+    user_cost: number
     requests: number
   } | null
   highest_request_day: {
@@ -947,6 +1028,7 @@ export interface AccountUsageSummary {
     label: string
     requests: number
     cost: number
+    user_cost: number
   } | null
 }
 

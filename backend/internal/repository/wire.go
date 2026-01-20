@@ -37,36 +37,48 @@ func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient 
 	return NewPricingRemoteClient(cfg.Update.ProxyURL)
 }
 
+// ProvideSessionLimitCache 创建会话限制缓存
+// 用于 Anthropic OAuth/SetupToken 账号的并发会话数量控制
+func ProvideSessionLimitCache(rdb *redis.Client, cfg *config.Config) service.SessionLimitCache {
+	defaultIdleTimeoutMinutes := 5 // 默认 5 分钟空闲超时
+	if cfg != nil && cfg.Gateway.SessionIdleTimeoutMinutes > 0 {
+		defaultIdleTimeoutMinutes = cfg.Gateway.SessionIdleTimeoutMinutes
+	}
+	return NewSessionLimitCache(rdb, defaultIdleTimeoutMinutes)
+}
+
 // ProviderSet is the Wire provider set for all repositories
-	var ProviderSet = wire.NewSet(
-		NewUserRepository,
-		NewAPIKeyRepository,
-		NewGroupRepository,
-		NewAccountRepository,
-		NewProxyRepository,
-		NewRedeemCodeRepository,
-		NewRechargeRecordRepository,
-		NewPromoCodeRepository,
-		NewPromotionRepository,
-		NewReferralRepository,
-		NewPaymentOrderRepository,
-		NewUsageLogRepository,
-		NewDashboardAggregationRepository,
-		NewSettingRepository,
-		NewOpsRepository,
-		NewUserSubscriptionRepository,
-		NewUserAttributeDefinitionRepository,
-		NewUserAttributeValueRepository,
+var ProviderSet = wire.NewSet(
+	NewUserRepository,
+	NewAPIKeyRepository,
+	NewGroupRepository,
+	NewAccountRepository,
+	NewProxyRepository,
+	NewRedeemCodeRepository,
+	NewRechargeRecordRepository,
+	NewPromoCodeRepository,
+	NewPromotionRepository,
+	NewReferralRepository,
+	NewPaymentOrderRepository,
+	NewUsageLogRepository,
+	NewUsageCleanupRepository,
+	NewDashboardAggregationRepository,
+	NewSettingRepository,
+	NewOpsRepository,
+	NewUserSubscriptionRepository,
+	NewUserAttributeDefinitionRepository,
+	NewUserAttributeValueRepository,
 
 	// Cache implementations
 	NewGatewayCache,
 	NewBillingCache,
-		NewAPIKeyCache,
-		NewTempUnschedCache,
-		NewTimeoutCounterCache,
-		ProvideConcurrencyCache,
-		NewDashboardCache,
-		NewEmailCache,
+	NewAPIKeyCache,
+	NewTempUnschedCache,
+	NewTimeoutCounterCache,
+	ProvideConcurrencyCache,
+	ProvideSessionLimitCache,
+	NewDashboardCache,
+	NewEmailCache,
 	NewIdentityCache,
 	NewRedeemCache,
 	NewPromotionCache,
@@ -76,6 +88,7 @@ func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient 
 	NewGeminiTokenCache,
 	NewSchedulerCache,
 	NewSchedulerOutboxRepository,
+	NewProxyLatencyCache,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,

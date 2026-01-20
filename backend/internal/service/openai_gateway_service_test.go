@@ -3,6 +3,7 @@ package service
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -14,6 +15,172 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 )
+
+type stubOpenAIAccountRepo struct {
+	AccountRepository
+	accounts []Account
+}
+
+func (r stubOpenAIAccountRepo) ListSchedulableByGroupIDAndPlatform(ctx context.Context, groupID int64, platform string) ([]Account, error) {
+	return append([]Account(nil), r.accounts...), nil
+}
+
+func (r stubOpenAIAccountRepo) ListSchedulableByPlatform(ctx context.Context, platform string) ([]Account, error) {
+	return append([]Account(nil), r.accounts...), nil
+}
+
+type stubConcurrencyCache struct {
+	ConcurrencyCache
+}
+
+func (c stubConcurrencyCache) AcquireAccountSlot(ctx context.Context, accountID int64, maxConcurrency int, requestID string) (bool, error) {
+	return true, nil
+}
+
+func (c stubConcurrencyCache) ReleaseAccountSlot(ctx context.Context, accountID int64, requestID string) error {
+	return nil
+}
+
+func (c stubConcurrencyCache) GetAccountsLoadBatch(ctx context.Context, accounts []AccountWithConcurrency) (map[int64]*AccountLoadInfo, error) {
+	out := make(map[int64]*AccountLoadInfo, len(accounts))
+	for _, acc := range accounts {
+		out[acc.ID] = &AccountLoadInfo{AccountID: acc.ID, LoadRate: 0}
+	}
+	return out, nil
+}
+
+func TestOpenAIGatewayService_GenerateSessionHash_Priority(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/openai/v1/responses", nil)
+
+	svc := &OpenAIGatewayService{}
+
+	// 1) session_id header wins
+	c.Request.Header.Set("session_id", "sess-123")
+	c.Request.Header.Set("conversation_id", "conv-456")
+	h1 := svc.GenerateSessionHash(c, map[string]any{"prompt_cache_key": "ses_aaa"})
+	if h1 == "" {
+		t.Fatalf("expected non-empty hash")
+	}
+
+	// 2) conversation_id used when session_id absent
+	c.Request.Header.Del("session_id")
+	h2 := svc.GenerateSessionHash(c, map[string]any{"prompt_cache_key": "ses_aaa"})
+	if h2 == "" {
+		t.Fatalf("expected non-empty hash")
+	}
+	if h1 == h2 {
+		t.Fatalf("expected different hashes for different keys")
+	}
+
+	// 3) prompt_cache_key used when both headers absent
+	c.Request.Header.Del("conversation_id")
+	h3 := svc.GenerateSessionHash(c, map[string]any{"prompt_cache_key": "ses_aaa"})
+	if h3 == "" {
+		t.Fatalf("expected non-empty hash")
+	}
+	if h2 == h3 {
+		t.Fatalf("expected different hashes for different keys")
+	}
+
+	// 4) empty when no signals
+	h4 := svc.GenerateSessionHash(c, map[string]any{})
+	if h4 != "" {
+		t.Fatalf("expected empty hash when no signals")
+	}
+}
+
+func TestOpenAISelectAccountWithLoadAwareness_FiltersUnschedulable(t *testing.T) {
+	now := time.Now()
+	resetAt := now.Add(10 * time.Minute)
+	groupID := int64(1)
+
+	rateLimited := Account{
+		ID:               1,
+		Platform:         PlatformOpenAI,
+		Type:             AccountTypeAPIKey,
+		Status:           StatusActive,
+		Schedulable:      true,
+		Concurrency:      1,
+		Priority:         0,
+		RateLimitResetAt: &resetAt,
+	}
+	available := Account{
+		ID:          2,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        stubOpenAIAccountRepo{accounts: []Account{rateLimited, available}},
+		concurrencyService: NewConcurrencyService(stubConcurrencyCache{}),
+	}
+
+	selection, err := svc.SelectAccountWithLoadAwareness(context.Background(), &groupID, "", "gpt-5.2", nil)
+	if err != nil {
+		t.Fatalf("SelectAccountWithLoadAwareness error: %v", err)
+	}
+	if selection == nil || selection.Account == nil {
+		t.Fatalf("expected selection with account")
+	}
+	if selection.Account.ID != available.ID {
+		t.Fatalf("expected account %d, got %d", available.ID, selection.Account.ID)
+	}
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
+func TestOpenAISelectAccountWithLoadAwareness_FiltersUnschedulableWhenNoConcurrencyService(t *testing.T) {
+	now := time.Now()
+	resetAt := now.Add(10 * time.Minute)
+	groupID := int64(1)
+
+	rateLimited := Account{
+		ID:               1,
+		Platform:         PlatformOpenAI,
+		Type:             AccountTypeAPIKey,
+		Status:           StatusActive,
+		Schedulable:      true,
+		Concurrency:      1,
+		Priority:         0,
+		RateLimitResetAt: &resetAt,
+	}
+	available := Account{
+		ID:          2,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		Priority:    1,
+	}
+
+	svc := &OpenAIGatewayService{
+		accountRepo: stubOpenAIAccountRepo{accounts: []Account{rateLimited, available}},
+		// concurrencyService is nil, forcing the non-load-batch selection path.
+	}
+
+	selection, err := svc.SelectAccountWithLoadAwareness(context.Background(), &groupID, "", "gpt-5.2", nil)
+	if err != nil {
+		t.Fatalf("SelectAccountWithLoadAwareness error: %v", err)
+	}
+	if selection == nil || selection.Account == nil {
+		t.Fatalf("expected selection with account")
+	}
+	if selection.Account.ID != available.ID {
+		t.Fatalf("expected account %d, got %d", available.ID, selection.Account.ID)
+	}
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
 
 func TestOpenAIStreamingTimeout(t *testing.T) {
 	gin.SetMode(gin.TestMode)

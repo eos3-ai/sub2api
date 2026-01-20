@@ -36,6 +36,8 @@ type GatewayHandler struct {
 	billingCacheService       *service.BillingCacheService
 	concurrencyHelper         *ConcurrencyHelper
 	maxRequestBodyBytes       int64 // 请求体大小限制（从配置读取）
+	maxAccountSwitches        int
+	maxAccountSwitchesGemini  int
 }
 
 func (h *GatewayHandler) recordUsageSync(apiKey *service.APIKey, subscription *service.UserSubscription, result *service.ForwardResult, usedAccount *service.Account) {
@@ -67,6 +69,8 @@ func NewGatewayHandler(
 ) *GatewayHandler {
 	pingInterval := time.Duration(0)
 	maxBodyBytes := maxGatewayRequestBodyBytes // 默认 10MB
+	maxAccountSwitches := 10
+	maxAccountSwitchesGemini := 3
 
 	if cfg != nil {
 		pingInterval = time.Duration(cfg.Concurrency.PingInterval) * time.Second
@@ -74,6 +78,12 @@ func NewGatewayHandler(
 		// 从配置读取请求体大小限制
 		if cfg.Gateway.MaxBodySize > 0 {
 			maxBodyBytes = cfg.Gateway.MaxBodySize
+		}
+		if cfg.Gateway.MaxAccountSwitches > 0 {
+			maxAccountSwitches = cfg.Gateway.MaxAccountSwitches
+		}
+		if cfg.Gateway.MaxAccountSwitchesGemini > 0 {
+			maxAccountSwitchesGemini = cfg.Gateway.MaxAccountSwitchesGemini
 		}
 	}
 
@@ -85,6 +95,8 @@ func NewGatewayHandler(
 		billingCacheService:       billingCacheService,
 		concurrencyHelper:         NewConcurrencyHelper(concurrencyService, SSEPingFormatClaude, pingInterval),
 		maxRequestBodyBytes:       maxBodyBytes,
+		maxAccountSwitches:        maxAccountSwitches,
+		maxAccountSwitchesGemini:  maxAccountSwitchesGemini,
 	}
 }
 
@@ -273,13 +285,13 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	}
 
 	if platform == service.PlatformGemini {
-		const maxAccountSwitches = 3
+		maxAccountSwitches := h.maxAccountSwitchesGemini
 		switchCount := 0
 		failedAccountIDs := make(map[int64]struct{})
 		lastFailoverStatus := 0
 
 		for {
-			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs)
+			selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs, "") // Gemini 不使用会话限制
 			if err != nil {
 				log.Printf("Select account failed: %v", err)
 				if len(failedAccountIDs) == 0 {
@@ -390,14 +402,14 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 		}
 	}
 
-	const maxAccountSwitches = 10
+	maxAccountSwitches := h.maxAccountSwitches
 	switchCount := 0
 	failedAccountIDs := make(map[int64]struct{})
 	lastFailoverStatus := 0
 
 	for {
 		// 选择支持该模型的账号
-		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs)
+		selection, err := h.gatewayService.SelectAccountWithLoadAwareness(c.Request.Context(), apiKey.GroupID, sessionKey, reqModel, failedAccountIDs, parsedReq.MetadataUserID)
 		if err != nil {
 			log.Printf("Select account failed: %v", err)
 			if len(failedAccountIDs) == 0 {
