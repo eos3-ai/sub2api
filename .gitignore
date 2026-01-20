@@ -85,6 +85,7 @@ temp/
 .dev/
 .serena/
 .pnpm*
+.pnpm-store/
 
 # ===================
 # 构建产物
