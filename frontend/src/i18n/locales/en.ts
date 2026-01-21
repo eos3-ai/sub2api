@@ -3058,6 +3058,28 @@ export default {
         securityWarning: 'Warning: This key provides full admin access. Keep it secure.',
         usage: 'Usage: Add to request header - x-api-key: <your-admin-api-key>'
       },
+      adminApiKeyReadOnly: {
+        title: 'Read-only Admin API Key',
+        description: 'Low-privilege API key for export-only integrations',
+        notConfigured: 'Read-only admin API key not configured',
+        currentKey: 'Current Key',
+        regenerate: 'Regenerate',
+        regenerating: 'Regenerating...',
+        delete: 'Delete',
+        create: 'Create Key',
+        creating: 'Creating...',
+        regenerateConfirm: 'Are you sure? The current read-only key will be immediately invalidated.',
+        deleteConfirm: 'Are you sure you want to delete the read-only admin API key?',
+        keyGenerated: 'New read-only admin API key generated',
+        keyDeleted: 'Read-only admin API key deleted',
+        copyKey: 'Copy Key',
+        keyCopied: 'Key copied to clipboard',
+        keyWarning: 'This key will only be shown once. Please copy it now.',
+        securityWarning:
+          'Warning: This key can access sensitive export data. It is read-only and restricted to export endpoints.',
+        usage:
+          'Usage: Add to request header - x-api-key: <your-admin-api-key-read-only> (Allowed: GET /api/v1/admin/users/export, GET /api/v1/admin/usage, GET /api/v1/admin/payment/orders/export)'
+      },
       streamTimeout: {
         title: 'Stream Timeout Handling',
         description: 'Configure account handling strategy when upstream response times out',

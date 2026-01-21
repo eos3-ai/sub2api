@@ -2,8 +2,10 @@
 package middleware
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -21,9 +23,10 @@ func NewAdminAuthMiddleware(
 }
 
 // adminAuth 管理员认证中间件实现
-// 支持两种认证方式（通过不同的 header 区分）：
-// 1. Admin API Key: x-api-key: <admin-api-key>
-// 2. JWT Token: Authorization: Bearer <jwt-token> (需要管理员角色)
+// 支持三种认证方式：
+// 1. Admin API Key（读写）：x-api-key: <admin-api-key>
+// 2. Admin API Key（只读）：x-api-key: <admin-api-key-read-only>（仅允许 GET）
+// 3. JWT Token：Authorization: Bearer <jwt-token>（需要管理员角色）
 func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -47,7 +50,25 @@ func adminAuth(
 		// 检查 x-api-key header（Admin API Key 认证）
 		apiKey := c.GetHeader("x-api-key")
 		if apiKey != "" {
-			if !validateAdminAPIKey(c, apiKey, settingService, userService) {
+			access, matched, err := matchAdminAPIKeyAccess(c.Request.Context(), apiKey, settingService)
+			if err != nil {
+				AbortWithError(c, 500, "INTERNAL_ERROR", "Internal server error")
+				return
+			}
+			if !matched {
+				AbortWithError(c, 401, "INVALID_ADMIN_KEY", "Invalid admin API key")
+				return
+			}
+
+			if access == adminAPIKeyAccessReadOnly {
+				// Read-only key: allow only GET and a small allowlist of export endpoints.
+				if !isReadOnlyAdminAPIKeyMethod(c.Request.Method) || !isReadOnlyAdminAPIKeyAllowedPath(c.Request.URL.Path) {
+					AbortWithError(c, 403, "ADMIN_API_KEY_READ_ONLY", "Admin API key is read-only")
+					return
+				}
+			}
+
+			if !setAdminAPIKeyContext(c, userService) {
 				return
 			}
 			c.Next()
@@ -69,6 +90,43 @@ func adminAuth(
 
 		// 无有效认证信息
 		AbortWithError(c, 401, "UNAUTHORIZED", "Authorization required")
+	}
+}
+
+type adminAPIKeyAccess int
+
+const (
+	adminAPIKeyAccessReadWrite adminAPIKeyAccess = iota
+	adminAPIKeyAccessReadOnly
+)
+
+func isReadOnlyAdminAPIKeyMethod(method string) bool {
+	switch method {
+	case http.MethodGet:
+		return true
+	default:
+		return false
+	}
+}
+
+func isReadOnlyAdminAPIKeyAllowedPath(rawPath string) bool {
+	// Normalize trailing slashes to avoid accidental denial on "/path/".
+	path := strings.TrimSpace(rawPath)
+	if path != "" && path != "/" {
+		path = strings.TrimRight(path, "/")
+	}
+
+	// Allowlist: only export endpoints should be accessible with the read-only admin key.
+	// - 用户数据导出: GET /api/v1/admin/users/export
+	// - 使用记录导出: GET /api/v1/admin/usage
+	// - 充值记录导出: GET /api/v1/admin/payment/orders/export
+	switch path {
+	case "/api/v1/admin/users/export",
+		"/api/v1/admin/usage",
+		"/api/v1/admin/payment/orders/export":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -110,22 +168,31 @@ func extractJWTFromWebSocketSubprotocol(c *gin.Context) string {
 	return ""
 }
 
-// validateAdminAPIKey 验证管理员 API Key
-func validateAdminAPIKey(
-	c *gin.Context,
-	key string,
-	settingService *service.SettingService,
-	userService *service.UserService,
-) bool {
-	storedKey, err := settingService.GetAdminAPIKey(c.Request.Context())
-	if err != nil {
-		AbortWithError(c, 500, "INTERNAL_ERROR", "Internal server error")
-		return false
+func matchAdminAPIKeyAccess(ctx context.Context, key string, settingService *service.SettingService) (adminAPIKeyAccess, bool, error) {
+	if settingService == nil {
+		return adminAPIKeyAccessReadWrite, false, nil
 	}
 
-	// 未配置或不匹配，统一返回相同错误（避免信息泄露）
-	if storedKey == "" || subtle.ConstantTimeCompare([]byte(key), []byte(storedKey)) != 1 {
-		AbortWithError(c, 401, "INVALID_ADMIN_KEY", "Invalid admin API key")
+	storedKeyReadWrite, err := settingService.GetAdminAPIKey(ctx)
+	if err != nil {
+		return adminAPIKeyAccessReadWrite, false, err
+	}
+	storedKeyReadOnly, err := settingService.GetAdminAPIKeyReadOnly(ctx)
+	if err != nil {
+		return adminAPIKeyAccessReadWrite, false, err
+	}
+
+	if storedKeyReadWrite != "" && subtle.ConstantTimeCompare([]byte(key), []byte(storedKeyReadWrite)) == 1 {
+		return adminAPIKeyAccessReadWrite, true, nil
+	}
+	if storedKeyReadOnly != "" && subtle.ConstantTimeCompare([]byte(key), []byte(storedKeyReadOnly)) == 1 {
+		return adminAPIKeyAccessReadOnly, true, nil
+	}
+	return adminAPIKeyAccessReadWrite, false, nil
+}
+
+func setAdminAPIKeyContext(c *gin.Context, userService *service.UserService) bool {
+	if c == nil || c.Request == nil {
 		return false
 	}
 

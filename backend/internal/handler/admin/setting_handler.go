@@ -655,6 +655,46 @@ func (h *SettingHandler) DeleteAdminAPIKey(c *gin.Context) {
 	response.Success(c, gin.H{"message": "Admin API key deleted"})
 }
 
+// GetAdminAPIKeyReadOnly 获取只读管理员 API Key 状态
+// GET /api/v1/admin/settings/admin-api-key-read-only
+func (h *SettingHandler) GetAdminAPIKeyReadOnly(c *gin.Context) {
+	maskedKey, exists, err := h.settingService.GetAdminAPIKeyReadOnlyStatus(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"exists":     exists,
+		"masked_key": maskedKey,
+	})
+}
+
+// RegenerateAdminAPIKeyReadOnly 生成/重新生成只读管理员 API Key
+// POST /api/v1/admin/settings/admin-api-key-read-only/regenerate
+func (h *SettingHandler) RegenerateAdminAPIKeyReadOnly(c *gin.Context) {
+	key, err := h.settingService.GenerateAdminAPIKeyReadOnly(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"key": key, // 完整 key 只在生成时返回一次
+	})
+}
+
+// DeleteAdminAPIKeyReadOnly 删除只读管理员 API Key
+// DELETE /api/v1/admin/settings/admin-api-key-read-only
+func (h *SettingHandler) DeleteAdminAPIKeyReadOnly(c *gin.Context) {
+	if err := h.settingService.DeleteAdminAPIKeyReadOnly(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Read-only admin API key deleted"})
+}
+
 // GetStreamTimeoutSettings 获取流超时处理配置
 // GET /api/v1/admin/settings/stream-timeout
 func (h *SettingHandler) GetStreamTimeoutSettings(c *gin.Context) {

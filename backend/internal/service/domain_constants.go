@@ -107,6 +107,8 @@ const (
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）
+	// 只读管理员 API Key（仅允许 GET 等只读操作，用于低权限集成）
+	SettingKeyAdminAPIKeyReadOnly = "admin_api_key_read_only"
 
 	// Gemini 配额策略（JSON）
 	SettingKeyGeminiQuotaPolicy = "gemini_quota_policy"
@@ -155,5 +157,8 @@ const (
 	SettingKeyStreamTimeoutSettings = "stream_timeout_settings"
 )
 
-// AdminAPIKeyPrefix is the prefix for admin API keys (distinct from user "sk-" keys).
-const AdminAPIKeyPrefix = "admin-"
+// Admin API key prefixes (distinct from user "sk-" keys).
+const (
+	AdminAPIKeyPrefix         = "admin-"
+	AdminAPIKeyReadOnlyPrefix = "admin-ro-"
+)

@@ -150,6 +150,15 @@ export async function getAdminApiKey(): Promise<AdminApiKeyStatus> {
 }
 
 /**
+ * Get read-only admin API key status
+ * @returns Status indicating if key exists and masked version
+ */
+export async function getAdminApiKeyReadOnly(): Promise<AdminApiKeyStatus> {
+  const { data } = await apiClient.get<AdminApiKeyStatus>('/admin/settings/admin-api-key-read-only')
+  return data
+}
+
+/**
  * Regenerate admin API key
  * @returns The new full API key (only shown once)
  */
@@ -159,11 +168,33 @@ export async function regenerateAdminApiKey(): Promise<{ key: string }> {
 }
 
 /**
+ * Regenerate read-only admin API key
+ * @returns The new full API key (only shown once)
+ */
+export async function regenerateAdminApiKeyReadOnly(): Promise<{ key: string }> {
+  const { data } = await apiClient.post<{ key: string }>(
+    '/admin/settings/admin-api-key-read-only/regenerate'
+  )
+  return data
+}
+
+/**
  * Delete admin API key
  * @returns Success message
  */
 export async function deleteAdminApiKey(): Promise<{ message: string }> {
   const { data } = await apiClient.delete<{ message: string }>('/admin/settings/admin-api-key')
+  return data
+}
+
+/**
+ * Delete read-only admin API key
+ * @returns Success message
+ */
+export async function deleteAdminApiKeyReadOnly(): Promise<{ message: string }> {
+  const { data } = await apiClient.delete<{ message: string }>(
+    '/admin/settings/admin-api-key-read-only'
+  )
   return data
 }
 
@@ -208,8 +239,11 @@ export const settingsAPI = {
   testSmtpConnection,
   sendTestEmail,
   getAdminApiKey,
+  getAdminApiKeyReadOnly,
   regenerateAdminApiKey,
+  regenerateAdminApiKeyReadOnly,
   deleteAdminApiKey,
+  deleteAdminApiKeyReadOnly,
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings
 }

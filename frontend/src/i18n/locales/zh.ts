@@ -3217,6 +3217,27 @@ export default {
         securityWarning: '警告：此密钥拥有完整的管理员权限，请妥善保管。',
         usage: '使用方法：在请求头中添加 x-api-key: <your-admin-api-key>'
       },
+      adminApiKeyReadOnly: {
+        title: '只读管理员 API Key',
+        description: '用于外部系统集成的低权限只读密钥，仅允许导出相关接口',
+        notConfigured: '尚未配置只读管理员 API Key',
+        currentKey: '当前密钥',
+        regenerate: '重新生成',
+        regenerating: '生成中...',
+        delete: '删除',
+        create: '创建密钥',
+        creating: '创建中...',
+        regenerateConfirm: '确定要重新生成吗？当前只读密钥将立即失效。',
+        deleteConfirm: '确定要删除只读管理员 API Key 吗？',
+        keyGenerated: '新的只读管理员 API Key 已生成',
+        keyDeleted: '只读管理员 API Key 已删除',
+        copyKey: '复制密钥',
+        keyCopied: '密钥已复制到剪贴板',
+        keyWarning: '此密钥仅显示一次，请立即复制保存。',
+        securityWarning: '提示：只读密钥仍可访问敏感导出数据，请妥善保管。',
+        usage:
+          '使用方法：在请求头中添加 x-api-key: <your-admin-api-key-read-only>（仅允许：GET /api/v1/admin/users/export, GET /api/v1/admin/usage, GET /api/v1/admin/payment/orders/export）'
+      },
       streamTimeout: {
         title: '流超时处理',
         description: '配置上游响应超时时的账户处理策略，避免问题账户持续被选中',

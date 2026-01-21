@@ -314,6 +314,10 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
 		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
 		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
+		// Read-only Admin API Key 管理
+		adminSettings.GET("/admin-api-key-read-only", h.Admin.Setting.GetAdminAPIKeyReadOnly)
+		adminSettings.POST("/admin-api-key-read-only/regenerate", h.Admin.Setting.RegenerateAdminAPIKeyReadOnly)
+		adminSettings.DELETE("/admin-api-key-read-only", h.Admin.Setting.DeleteAdminAPIKeyReadOnly)
 		// 流超时处理配置
 		adminSettings.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
 		adminSettings.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)
