@@ -70,6 +70,42 @@ func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadDashboardAggregationRetentionFromEnv(t *testing.T) {
+	viper.Reset()
+	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_USAGE_LOGS_DAYS", "123")
+	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_HOURLY_DAYS", "456")
+	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS", "789")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.DashboardAgg.Retention.UsageLogsDays != 123 {
+		t.Fatalf("Retention.UsageLogsDays = %d, want 123", cfg.DashboardAgg.Retention.UsageLogsDays)
+	}
+	if cfg.DashboardAgg.Retention.HourlyDays != 456 {
+		t.Fatalf("Retention.HourlyDays = %d, want 456", cfg.DashboardAgg.Retention.HourlyDays)
+	}
+	if cfg.DashboardAgg.Retention.DailyDays != 789 {
+		t.Fatalf("Retention.DailyDays = %d, want 789", cfg.DashboardAgg.Retention.DailyDays)
+	}
+}
+
+func TestLoadUsageCleanupEnabledFromEnv(t *testing.T) {
+	viper.Reset()
+	t.Setenv("USAGE_CLEANUP_ENABLED", "false")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if cfg.UsageCleanup.Enabled {
+		t.Fatalf("UsageCleanup.Enabled = true, want false")
+	}
+}
+
 func TestLoadDefaultSecurityToggles(t *testing.T) {
 	viper.Reset()
 

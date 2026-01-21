@@ -41,35 +41,35 @@ const (
 )
 
 type Config struct {
-	Server       ServerConfig       `mapstructure:"server"`
-	CORS         CORSConfig         `mapstructure:"cors"`
-	Security     SecurityConfig     `mapstructure:"security"`
-	Billing      BillingConfig      `mapstructure:"billing"`
-	Turnstile    TurnstileConfig    `mapstructure:"turnstile"`
-	Database     DatabaseConfig     `mapstructure:"database"`
-	Redis        RedisConfig        `mapstructure:"redis"`
-	Ops          OpsConfig          `mapstructure:"ops"`
-	APIKeyAuth   APIKeyAuthCacheConfig        `mapstructure:"api_key_auth_cache"`
+	Server       ServerConfig               `mapstructure:"server"`
+	CORS         CORSConfig                 `mapstructure:"cors"`
+	Security     SecurityConfig             `mapstructure:"security"`
+	Billing      BillingConfig              `mapstructure:"billing"`
+	Turnstile    TurnstileConfig            `mapstructure:"turnstile"`
+	Database     DatabaseConfig             `mapstructure:"database"`
+	Redis        RedisConfig                `mapstructure:"redis"`
+	Ops          OpsConfig                  `mapstructure:"ops"`
+	APIKeyAuth   APIKeyAuthCacheConfig      `mapstructure:"api_key_auth_cache"`
 	Dashboard    DashboardCacheConfig       `mapstructure:"dashboard_cache"`
 	DashboardAgg DashboardAggregationConfig `mapstructure:"dashboard_aggregation"`
-	JWT          JWTConfig          `mapstructure:"jwt"`
-	LinuxDo      LinuxDoConnectConfig `mapstructure:"linuxdo_connect"`
-	Default      DefaultConfig      `mapstructure:"default"`
-	RateLimit    RateLimitConfig    `mapstructure:"rate_limit"`
-	Pricing      PricingConfig      `mapstructure:"pricing"`
-	Gateway      GatewayConfig      `mapstructure:"gateway"`
-	UsageCleanup UsageCleanupConfig `mapstructure:"usage_cleanup"`
-	Concurrency  ConcurrencyConfig  `mapstructure:"concurrency"`
-	TokenRefresh TokenRefreshConfig `mapstructure:"token_refresh"`
-	RunMode      string             `mapstructure:"run_mode" yaml:"run_mode"`
-	Promotion    PromotionConfig    `mapstructure:"promotion"`
-	Referral     ReferralConfig     `mapstructure:"referral"`
-	Payment      PaymentConfig      `mapstructure:"payment"`
-	Dingtalk     DingtalkConfig     `mapstructure:"dingtalk"`
-	DingtalkBot  DingtalkBotConfig  `mapstructure:"dingtalk_bot"`
-	Timezone     string             `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
-	Gemini       GeminiConfig       `mapstructure:"gemini"`
-	Update       UpdateConfig       `mapstructure:"update"`
+	JWT          JWTConfig                  `mapstructure:"jwt"`
+	LinuxDo      LinuxDoConnectConfig       `mapstructure:"linuxdo_connect"`
+	Default      DefaultConfig              `mapstructure:"default"`
+	RateLimit    RateLimitConfig            `mapstructure:"rate_limit"`
+	Pricing      PricingConfig              `mapstructure:"pricing"`
+	Gateway      GatewayConfig              `mapstructure:"gateway"`
+	UsageCleanup UsageCleanupConfig         `mapstructure:"usage_cleanup"`
+	Concurrency  ConcurrencyConfig          `mapstructure:"concurrency"`
+	TokenRefresh TokenRefreshConfig         `mapstructure:"token_refresh"`
+	RunMode      string                     `mapstructure:"run_mode" yaml:"run_mode"`
+	Promotion    PromotionConfig            `mapstructure:"promotion"`
+	Referral     ReferralConfig             `mapstructure:"referral"`
+	Payment      PaymentConfig              `mapstructure:"payment"`
+	Dingtalk     DingtalkConfig             `mapstructure:"dingtalk"`
+	DingtalkBot  DingtalkBotConfig          `mapstructure:"dingtalk_bot"`
+	Timezone     string                     `mapstructure:"timezone"` // e.g. "Asia/Shanghai", "UTC"
+	Gemini       GeminiConfig               `mapstructure:"gemini"`
+	Update       UpdateConfig               `mapstructure:"update"`
 }
 
 type GeminiConfig struct {
@@ -868,6 +868,24 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	// JWT
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
 	_ = v.BindEnv("jwt.expire_hour", "JWT_EXPIRE_HOUR")
+
+	// Dashboard aggregation / retention
+	_ = v.BindEnv("dashboard_aggregation.enabled", "DASHBOARD_AGGREGATION_ENABLED")
+	_ = v.BindEnv("dashboard_aggregation.interval_seconds", "DASHBOARD_AGGREGATION_INTERVAL_SECONDS")
+	_ = v.BindEnv("dashboard_aggregation.lookback_seconds", "DASHBOARD_AGGREGATION_LOOKBACK_SECONDS")
+	_ = v.BindEnv("dashboard_aggregation.backfill_enabled", "DASHBOARD_AGGREGATION_BACKFILL_ENABLED")
+	_ = v.BindEnv("dashboard_aggregation.backfill_max_days", "DASHBOARD_AGGREGATION_BACKFILL_MAX_DAYS")
+	_ = v.BindEnv("dashboard_aggregation.recompute_days", "DASHBOARD_AGGREGATION_RECOMPUTE_DAYS")
+	_ = v.BindEnv("dashboard_aggregation.retention.usage_logs_days", "DASHBOARD_AGGREGATION_RETENTION_USAGE_LOGS_DAYS")
+	_ = v.BindEnv("dashboard_aggregation.retention.hourly_days", "DASHBOARD_AGGREGATION_RETENTION_HOURLY_DAYS")
+	_ = v.BindEnv("dashboard_aggregation.retention.daily_days", "DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS")
+
+	// Usage cleanup task
+	_ = v.BindEnv("usage_cleanup.enabled", "USAGE_CLEANUP_ENABLED")
+	_ = v.BindEnv("usage_cleanup.max_range_days", "USAGE_CLEANUP_MAX_RANGE_DAYS")
+	_ = v.BindEnv("usage_cleanup.batch_size", "USAGE_CLEANUP_BATCH_SIZE")
+	_ = v.BindEnv("usage_cleanup.worker_interval_seconds", "USAGE_CLEANUP_WORKER_INTERVAL_SECONDS")
+	_ = v.BindEnv("usage_cleanup.task_timeout_seconds", "USAGE_CLEANUP_TASK_TIMEOUT_SECONDS")
 
 	// Gemini OAuth / Quota
 	_ = v.BindEnv("gemini.oauth.client_id", "GEMINI_OAUTH_CLIENT_ID")
