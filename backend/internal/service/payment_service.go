@@ -39,7 +39,7 @@ type PaymentService struct {
 	promotionService *PromotionService
 	referralService  *ReferralService
 	dingtalkService  *DingtalkService
-	entClient         *dbent.Client
+	entClient        *dbent.Client
 }
 
 func NewPaymentService(
@@ -66,7 +66,7 @@ func NewPaymentService(
 		promotionService: promotionService,
 		referralService:  referralService,
 		dingtalkService:  dingtalkService,
-		entClient:         entClient,
+		entClient:        entClient,
 	}
 }
 
@@ -470,7 +470,7 @@ func (s *PaymentService) createActivityRechargeOrder(ctx context.Context, userID
 		ExchangeRate:  exchangeRate,
 		DiscountRate:  1.0,
 		Provider:      "activity",
-		PaymentMethod: "system",
+		PaymentMethod: "admin",
 		Status:        PaymentStatusPaid,
 		PaidAt:        timePtr(now),
 		ExpireAt:      now,
