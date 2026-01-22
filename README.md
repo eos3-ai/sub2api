@@ -302,6 +302,7 @@ Additional security-related options are available in `config.yaml`:
 - `security.url_allowlist.allow_private_hosts` to allow private/local IP addresses
 - `security.response_headers.enabled` to enable configurable response header filtering (disabled uses default allowlist)
 - `security.csp` to control Content-Security-Policy headers
+- `security.admin_api_key_read_only` to configure allowlisted endpoints for the read-only Admin API key (GET-only)
 - `billing.circuit_breaker` to fail closed on billing errors
 - `server.trusted_proxies` to enable X-Forwarded-For parsing
 - `turnstile.required` to require Turnstile in release mode

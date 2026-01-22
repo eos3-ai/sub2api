@@ -106,6 +106,27 @@ func TestLoadUsageCleanupEnabledFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadAdminAPIKeyReadOnlyAllowlistFromEnv(t *testing.T) {
+	viper.Reset()
+	t.Setenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS", "/api/v1/admin/users/export,/api/v1/admin/usage")
+	t.Setenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATH_PREFIXES", `["/api/v1/admin/users"]`)
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error: %v", err)
+	}
+
+	if len(cfg.Security.AdminAPIKeyReadOnly.AllowedPaths) != 2 {
+		t.Fatalf("AdminAPIKeyReadOnly.AllowedPaths = %v, want 2 items", cfg.Security.AdminAPIKeyReadOnly.AllowedPaths)
+	}
+	if cfg.Security.AdminAPIKeyReadOnly.AllowedPaths[0] != "/api/v1/admin/users/export" || cfg.Security.AdminAPIKeyReadOnly.AllowedPaths[1] != "/api/v1/admin/usage" {
+		t.Fatalf("AdminAPIKeyReadOnly.AllowedPaths = %v, want [/api/v1/admin/users/export /api/v1/admin/usage]", cfg.Security.AdminAPIKeyReadOnly.AllowedPaths)
+	}
+	if len(cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes) != 1 || cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes[0] != "/api/v1/admin/users" {
+		t.Fatalf("AdminAPIKeyReadOnly.AllowedPathPrefixes = %v, want [/api/v1/admin/users]", cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes)
+	}
+}
+
 func TestLoadDefaultSecurityToggles(t *testing.T) {
 	viper.Reset()
 

@@ -105,6 +105,27 @@ security:
     # 允许代理探测时跳过 TLS 证书验证（仅用于调试）
     insecure_skip_verify: false
 
+  # Read-only Admin API Key allowlist
+  # 只读管理员 API Key 白名单
+  #
+  # The read-only Admin API key (admin-ro-*) is restricted to:
+  # - GET method only
+  # - This allowlist (exact paths) and optional prefix allowlist
+  #
+  # 只读管理员 API Key（admin-ro-*）限制：
+  # - 仅允许 GET 方法
+  # - 仅允许访问以下白名单路径（以及可选的前缀白名单）
+  admin_api_key_read_only:
+    # Exact path allowlist
+    # 精确路径白名单
+    allowed_paths:
+      - "/api/v1/admin/users/export"
+      - "/api/v1/admin/usage"
+      - "/api/v1/admin/payment/orders/export"
+    # Prefix allowlist (segment boundary match)
+    # 前缀白名单（按路径段边界匹配）
+    allowed_path_prefixes: []
+
 # =============================================================================
 # Gateway Configuration
 # 网关配置

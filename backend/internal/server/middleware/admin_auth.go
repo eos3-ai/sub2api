@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -18,8 +19,9 @@ func NewAdminAuthMiddleware(
 	authService *service.AuthService,
 	userService *service.UserService,
 	settingService *service.SettingService,
+	cfg *config.Config,
 ) AdminAuthMiddleware {
-	return AdminAuthMiddleware(adminAuth(authService, userService, settingService))
+	return AdminAuthMiddleware(adminAuth(authService, userService, settingService, cfg))
 }
 
 // adminAuth 管理员认证中间件实现
@@ -31,7 +33,10 @@ func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
 	settingService *service.SettingService,
+	cfg *config.Config,
 ) gin.HandlerFunc {
+	readOnlyAllowlist := newReadOnlyAdminAPIKeyAllowlist(cfg)
+
 	return func(c *gin.Context) {
 		// WebSocket upgrade requests cannot set Authorization headers in browsers.
 		// For admin WebSocket endpoints (e.g. Ops realtime), allow passing the JWT via
@@ -61,8 +66,8 @@ func adminAuth(
 			}
 
 			if access == adminAPIKeyAccessReadOnly {
-				// Read-only key: allow only GET and a small allowlist of export endpoints.
-				if !isReadOnlyAdminAPIKeyMethod(c.Request.Method) || !isReadOnlyAdminAPIKeyAllowedPath(c.Request.URL.Path) {
+				// Read-only key: allow only GET and a configurable allowlist of endpoints.
+				if !isReadOnlyAdminAPIKeyMethod(c.Request.Method) || !readOnlyAllowlist.Allows(c.Request.URL.Path) {
 					AbortWithError(c, 403, "ADMIN_API_KEY_READ_ONLY", "Admin API key is read-only")
 					return
 				}
@@ -109,25 +114,82 @@ func isReadOnlyAdminAPIKeyMethod(method string) bool {
 	}
 }
 
-func isReadOnlyAdminAPIKeyAllowedPath(rawPath string) bool {
+type readOnlyAdminAPIKeyAllowlist struct {
+	exact    map[string]struct{}
+	prefixes []string
+}
+
+func newReadOnlyAdminAPIKeyAllowlist(cfg *config.Config) readOnlyAdminAPIKeyAllowlist {
+	paths := []string{
+		"/api/v1/admin/users/export",
+		"/api/v1/admin/usage",
+		"/api/v1/admin/payment/orders/export",
+	}
+	prefixes := []string{}
+	if cfg != nil {
+		paths = cfg.Security.AdminAPIKeyReadOnly.AllowedPaths
+		prefixes = cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes
+	}
+
+	exact := make(map[string]struct{}, len(paths))
+	for _, raw := range paths {
+		p := normalizePathForAllowlist(raw)
+		if p == "" {
+			continue
+		}
+		exact[p] = struct{}{}
+	}
+	normalizedPrefixes := make([]string, 0, len(prefixes))
+	for _, raw := range prefixes {
+		p := normalizePathForAllowlist(raw)
+		if p == "" {
+			continue
+		}
+		normalizedPrefixes = append(normalizedPrefixes, p)
+	}
+
+	return readOnlyAdminAPIKeyAllowlist{
+		exact:    exact,
+		prefixes: normalizedPrefixes,
+	}
+}
+
+func (a readOnlyAdminAPIKeyAllowlist) Allows(rawPath string) bool {
+	path := normalizePathForAllowlist(rawPath)
+	if path == "" {
+		return false
+	}
+	if _, ok := a.exact[path]; ok {
+		return true
+	}
+	for _, prefix := range a.prefixes {
+		if prefix == "" {
+			continue
+		}
+		if prefix == "/" {
+			return true
+		}
+		if !strings.HasPrefix(path, prefix) {
+			continue
+		}
+		// Segment boundary match: "/a/b" matches "/a/b" and "/a/b/c", but not "/a/bc".
+		if len(path) == len(prefix) {
+			return true
+		}
+		if len(path) > len(prefix) && path[len(prefix)] == '/' {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizePathForAllowlist(raw string) string {
 	// Normalize trailing slashes to avoid accidental denial on "/path/".
-	path := strings.TrimSpace(rawPath)
+	path := strings.TrimSpace(raw)
 	if path != "" && path != "/" {
 		path = strings.TrimRight(path, "/")
 	}
-
-	// Allowlist: only export endpoints should be accessible with the read-only admin key.
-	// - 用户数据导出: GET /api/v1/admin/users/export
-	// - 使用记录导出: GET /api/v1/admin/usage
-	// - 充值记录导出: GET /api/v1/admin/payment/orders/export
-	switch path {
-	case "/api/v1/admin/users/export",
-		"/api/v1/admin/usage",
-		"/api/v1/admin/payment/orders/export":
-		return true
-	default:
-		return false
-	}
+	return path
 }
 
 func isWebSocketUpgradeRequest(c *gin.Context) bool {

@@ -187,7 +187,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	dingtalkBotHandler := handler.NewDingtalkBotHandler(configConfig, adminService, userService)
 	handlers := handler.ProvideHandlers(authHandler, userHandler, apiKeyHandler, usageHandler, redeemHandler, subscriptionHandler, paymentHandler, promotionHandler, referralHandler, adminHandlers, gatewayHandler, openAIGatewayHandler, handlerSettingHandler, dingtalkBotHandler)
 	jwtAuthMiddleware := middleware.NewJWTAuthMiddleware(authService, userService)
-	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService, userService, settingService)
+	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService, userService, settingService, configConfig)
 	apiKeyAuthMiddleware := middleware.NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, configConfig)
 	engine := server.ProvideRouter(configConfig, handlers, jwtAuthMiddleware, adminAuthMiddleware, apiKeyAuthMiddleware, apiKeyService, subscriptionService, opsService, settingService, redisClient)
 	httpServer := server.ProvideHTTPServer(configConfig, engine)

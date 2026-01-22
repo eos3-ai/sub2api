@@ -309,6 +309,7 @@ default:
 - `security.url_allowlist.allow_private_hosts` 允许私有/本地 IP 地址
 - `security.response_headers.enabled` 可启用可配置响应头过滤（关闭时使用默认白名单）
 - `security.csp` 配置 Content-Security-Policy
+- `security.admin_api_key_read_only` 配置只读管理员 API Key 可访问的白名单接口（仅 GET）
 - `billing.circuit_breaker` 计费异常时 fail-closed
 - `server.trusted_proxies` 启用可信代理解析 X-Forwarded-For
 - `turnstile.required` 在 release 模式强制启用 Turnstile

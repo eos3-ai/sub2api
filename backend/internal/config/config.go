@@ -169,6 +169,8 @@ type SecurityConfig struct {
 	ResponseHeaders ResponseHeaderConfig `mapstructure:"response_headers"`
 	CSP             CSPConfig            `mapstructure:"csp"`
 	ProxyProbe      ProxyProbeConfig     `mapstructure:"proxy_probe"`
+	// AdminAPIKeyReadOnly controls the allowlist policy for the read-only Admin API Key (x-api-key: admin-ro-...).
+	AdminAPIKeyReadOnly AdminAPIKeyReadOnlyConfig `mapstructure:"admin_api_key_read_only"`
 }
 
 type URLAllowlistConfig struct {
@@ -194,6 +196,15 @@ type CSPConfig struct {
 
 type ProxyProbeConfig struct {
 	InsecureSkipVerify bool `mapstructure:"insecure_skip_verify"` // 已禁用：禁止跳过 TLS 证书验证
+}
+
+type AdminAPIKeyReadOnlyConfig struct {
+	// AllowedPaths defines the exact request paths that the read-only Admin API key can access.
+	// Only GET requests are allowed by the middleware.
+	AllowedPaths []string `mapstructure:"allowed_paths"`
+	// AllowedPathPrefixes defines path prefixes (with segment boundary matching) that the read-only Admin API key can access.
+	// For example: "/api/v1/admin/users" matches "/api/v1/admin/users" and "/api/v1/admin/users/123", but not "/api/v1/admin/users2".
+	AllowedPathPrefixes []string `mapstructure:"allowed_path_prefixes"`
 }
 
 type BillingConfig struct {
@@ -718,6 +729,22 @@ func Load() (*Config, error) {
 		viper.Set("promotion.tiers", parsed)
 	}
 
+	// String-slice env overrides (docker-friendly). Accepts JSON array (["/a","/b"]) or CSV (/a,/b).
+	if raw := strings.TrimSpace(os.Getenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS")); raw != "" {
+		paths, err := parseStringListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS: %w", err)
+		}
+		viper.Set("security.admin_api_key_read_only.allowed_paths", paths)
+	}
+	if raw := strings.TrimSpace(os.Getenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATH_PREFIXES")); raw != "" {
+		prefixes, err := parseStringListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATH_PREFIXES: %w", err)
+		}
+		viper.Set("security.admin_api_key_read_only.allowed_path_prefixes", prefixes)
+	}
+
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("read config error: %w", err)
@@ -747,6 +774,8 @@ func Load() (*Config, error) {
 	cfg.Security.ResponseHeaders.AdditionalAllowed = normalizeStringSlice(cfg.Security.ResponseHeaders.AdditionalAllowed)
 	cfg.Security.ResponseHeaders.ForceRemove = normalizeStringSlice(cfg.Security.ResponseHeaders.ForceRemove)
 	cfg.Security.CSP.Policy = strings.TrimSpace(cfg.Security.CSP.Policy)
+	cfg.Security.AdminAPIKeyReadOnly.AllowedPaths = normalizeStringSlice(cfg.Security.AdminAPIKeyReadOnly.AllowedPaths)
+	cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes = normalizeStringSlice(cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes)
 
 	if cfg.Server.Mode != "release" && cfg.JWT.Secret == "" {
 		secret, err := generateJWTSecret(64)
@@ -868,6 +897,10 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	// JWT
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
 	_ = v.BindEnv("jwt.expire_hour", "JWT_EXPIRE_HOUR")
+
+	// Security (admin read-only API key allowlist)
+	_ = v.BindEnv("security.admin_api_key_read_only.allowed_paths", "SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS")
+	_ = v.BindEnv("security.admin_api_key_read_only.allowed_path_prefixes", "SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATH_PREFIXES")
 
 	// Dashboard aggregation / retention
 	_ = v.BindEnv("dashboard_aggregation.enabled", "DASHBOARD_AGGREGATION_ENABLED")
@@ -1053,6 +1086,14 @@ func setDefaults() {
 	viper.SetDefault("security.csp.enabled", true)
 	viper.SetDefault("security.csp.policy", DefaultCSPPolicy)
 	viper.SetDefault("security.proxy_probe.insecure_skip_verify", false)
+	// Read-only Admin API key allowlist (only affects x-api-key admin-ro-* auth path)
+	// NOTE: The middleware also enforces method=GET for the read-only key.
+	viper.SetDefault("security.admin_api_key_read_only.allowed_paths", []string{
+		"/api/v1/admin/users/export",
+		"/api/v1/admin/usage",
+		"/api/v1/admin/payment/orders/export",
+	})
+	viper.SetDefault("security.admin_api_key_read_only.allowed_path_prefixes", []string{})
 
 	// Billing
 	viper.SetDefault("billing.circuit_breaker.enabled", true)
@@ -1322,6 +1363,30 @@ func (c *Config) Validate() error {
 	}
 	if c.Security.CSP.Enabled && strings.TrimSpace(c.Security.CSP.Policy) == "" {
 		return fmt.Errorf("security.csp.policy is required when CSP is enabled")
+	}
+	for i, raw := range c.Security.AdminAPIKeyReadOnly.AllowedPaths {
+		path := strings.TrimSpace(raw)
+		if path == "" {
+			continue
+		}
+		if strings.ContainsAny(path, "\r\n") {
+			return fmt.Errorf("security.admin_api_key_read_only.allowed_paths[%d] contains invalid characters", i)
+		}
+		if !strings.HasPrefix(path, "/") {
+			return fmt.Errorf("security.admin_api_key_read_only.allowed_paths[%d] must start with '/'", i)
+		}
+	}
+	for i, raw := range c.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes {
+		prefix := strings.TrimSpace(raw)
+		if prefix == "" {
+			continue
+		}
+		if strings.ContainsAny(prefix, "\r\n") {
+			return fmt.Errorf("security.admin_api_key_read_only.allowed_path_prefixes[%d] contains invalid characters", i)
+		}
+		if !strings.HasPrefix(prefix, "/") {
+			return fmt.Errorf("security.admin_api_key_read_only.allowed_path_prefixes[%d] must start with '/'", i)
+		}
 	}
 	if c.LinuxDo.Enabled {
 		if strings.TrimSpace(c.LinuxDo.ClientID) == "" {
@@ -1595,6 +1660,29 @@ func normalizeStringSlice(values []string) []string {
 		normalized = append(normalized, trimmed)
 	}
 	return normalized
+}
+
+func parseStringListEnv(raw string) ([]string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	if strings.HasPrefix(raw, "[") {
+		var parsed []string
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil, err
+		}
+		return normalizeStringSlice(parsed), nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', '\n', ';':
+			return true
+		default:
+			return false
+		}
+	})
+	return normalizeStringSlice(parts), nil
 }
 
 func isWeakJWTSecret(secret string) bool {

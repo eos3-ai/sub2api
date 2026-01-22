@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -35,8 +36,20 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 		},
 	}, nil)
 
+	cfg := &config.Config{
+		Security: config.SecurityConfig{
+			AdminAPIKeyReadOnly: config.AdminAPIKeyReadOnlyConfig{
+				AllowedPaths: []string{
+					"/api/v1/admin/users/export",
+					"/api/v1/admin/usage",
+					"/api/v1/admin/payment/orders/export",
+				},
+			},
+		},
+	}
+
 	router := gin.New()
-	router.Use(adminAuth(nil, userService, settingService))
+	router.Use(adminAuth(nil, userService, settingService, cfg))
 
 	// Allowed paths for the read-only admin key.
 	router.GET("/api/v1/admin/users/export", func(c *gin.Context) {
