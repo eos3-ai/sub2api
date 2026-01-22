@@ -1,0 +1,7 @@
+# Example config for sub2api-recharge-analytics
+#
+# Copy to a new file (do NOT commit secrets), then edit values.
+
+url: "https://your-sub2api.example.com"
+admin_key: "admin-xxxxxxxxxxxxxxxxxxxxxxxx"
+
