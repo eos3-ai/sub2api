@@ -852,6 +852,7 @@ export default {
       status: 'Status',
       from: 'From',
       to: 'To',
+      timeRange: 'Time Range',
       export: 'Export Records'
     },
 

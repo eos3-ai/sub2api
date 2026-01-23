@@ -863,6 +863,7 @@ export default {
       status: '订单状态',
       from: '开始时间',
       to: '结束时间',
+      timeRange: '时间范围',
       export: '导出记录'
     },
 

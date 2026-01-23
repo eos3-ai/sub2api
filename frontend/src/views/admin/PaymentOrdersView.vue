@@ -29,7 +29,7 @@
           </div>
 
           <!-- 筛选条件网格 -->
-          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
                 {{ t('admin.paymentOrders.method') }}
@@ -63,24 +63,16 @@
 
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
-                {{ t('admin.paymentOrders.from') }}
+                {{ t('admin.paymentOrders.timeRange') }}
               </label>
-              <input
-                v-model="filters.from"
-                type="datetime-local"
-                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
-                {{ t('admin.paymentOrders.to') }}
-              </label>
-              <input
-                v-model="filters.to"
-                type="datetime-local"
-                class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:border-dark-700 dark:bg-dark-900 dark:text-white"
-              />
+              <div class="[&_.date-picker-trigger]:w-full">
+                <DateRangePicker
+                  :start-date="filters.startDate"
+                  :end-date="filters.endDate"
+                  @update:startDate="updateStartDate"
+                  @update:endDate="updateEndDate"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -150,6 +142,7 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import { adminAPI } from '@/api/admin'
 import type { Column } from '@/components/common/types'
 import type { AdminPaymentOrder, AdminPaymentMethod } from '@/api/admin/paymentOrders'
@@ -159,12 +152,28 @@ const { t } = useI18n()
 const loading = ref(false)
 const exporting = ref(false)
 
-const filters = reactive<{ method: AdminPaymentMethod | ''; user: string; status: string; from: string; to: string }>({
+const formatYMD = (d: Date): string => {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getDefaultRange = () => {
+  const now = new Date()
+  const weekAgo = new Date(now)
+  weekAgo.setDate(weekAgo.getDate() - 6)
+  return { startDate: formatYMD(weekAgo), endDate: formatYMD(now) }
+}
+
+const defaultRange = getDefaultRange()
+
+const filters = reactive<{ method: AdminPaymentMethod | ''; user: string; status: string; startDate: string; endDate: string }>({
   method: '',
   user: '',
   status: '',
-  from: '',
-  to: ''
+  startDate: defaultRange.startDate,
+  endDate: defaultRange.endDate
 })
 
 const pagination = reactive({
@@ -245,6 +254,28 @@ function statusLabel(status: string): string {
   }
 }
 
+function toRFC3339Start(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(`${dateStr}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString()
+}
+
+function toRFC3339End(dateStr: string): string {
+  if (!dateStr) return ''
+  const d = new Date(`${dateStr}T23:59:59.999`)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString()
+}
+
+function updateStartDate(value: string) {
+  filters.startDate = value
+}
+
+function updateEndDate(value: string) {
+  filters.endDate = value
+}
+
 async function load() {
   loading.value = true
   try {
@@ -252,8 +283,8 @@ async function load() {
       method: filters.method || '',
       user: filters.user || '',
       status: filters.status || '',
-      from: filters.from ? new Date(filters.from).toISOString() : '',
-      to: filters.to ? new Date(filters.to).toISOString() : ''
+      from: toRFC3339Start(filters.startDate),
+      to: toRFC3339End(filters.endDate)
     })
     items.value = resp.items
     pagination.total = resp.total
@@ -271,8 +302,9 @@ function resetFilters() {
   filters.method = ''
   filters.user = ''
   filters.status = ''
-  filters.from = ''
-  filters.to = ''
+  const { startDate, endDate } = getDefaultRange()
+  filters.startDate = startDate
+  filters.endDate = endDate
   applyFilters()
 }
 
@@ -294,8 +326,8 @@ async function exportRecords() {
       method: filters.method || '',
       user: filters.user || '',
       status: filters.status || '',
-      from: filters.from ? new Date(filters.from).toISOString() : '',
-      to: filters.to ? new Date(filters.to).toISOString() : ''
+      from: toRFC3339Start(filters.startDate),
+      to: toRFC3339End(filters.endDate)
     })
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(
