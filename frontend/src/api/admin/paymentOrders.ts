@@ -5,8 +5,8 @@
 import { apiClient } from '../client'
 import type { PaginatedResponse } from '@/types'
 
-export type AdminPaymentProvider = 'zpay' | 'stripe' | 'admin'
-export type AdminPaymentMethod = 'alipay' | 'wechat'
+export type AdminPaymentProvider = 'zpay' | 'stripe' | 'admin' | 'activity'
+export type AdminPaymentOrderType = 'online_recharge' | 'admin_recharge' | 'activity_recharge'
 
 export interface AdminPaymentOrder {
   id: number
@@ -25,11 +25,16 @@ export interface AdminPaymentOrder {
   paid_at?: string | null
 }
 
+export interface AdminPaymentOrdersSummary {
+  total_usd: number
+  amount_cny: number
+}
+
 export async function list(
   page: number,
   pageSize: number,
   filters?: {
-    method?: AdminPaymentMethod | ''
+    orderType?: AdminPaymentOrderType | ''
     user?: string
     status?: string
     from?: string
@@ -40,7 +45,26 @@ export async function list(
     params: {
       page,
       page_size: pageSize,
-      method: filters?.method || undefined,
+      order_type: filters?.orderType || undefined,
+      user: filters?.user || undefined,
+      status: filters?.status || undefined,
+      from: filters?.from || undefined,
+      to: filters?.to || undefined
+    }
+  })
+  return data
+}
+
+export async function summary(filters?: {
+  orderType?: AdminPaymentOrderType | ''
+  user?: string
+  status?: string
+  from?: string
+  to?: string
+}): Promise<AdminPaymentOrdersSummary> {
+  const { data } = await apiClient.get<AdminPaymentOrdersSummary>('/admin/payment/orders/summary', {
+    params: {
+      order_type: filters?.orderType || undefined,
       user: filters?.user || undefined,
       status: filters?.status || undefined,
       from: filters?.from || undefined,
@@ -51,7 +75,7 @@ export async function list(
 }
 
 export async function exportRecords(filters?: {
-  method?: AdminPaymentMethod | ''
+  orderType?: AdminPaymentOrderType | ''
   user?: string
   status?: string
   from?: string
@@ -59,7 +83,7 @@ export async function exportRecords(filters?: {
 }): Promise<Blob> {
   const { data } = await apiClient.get('/admin/payment/orders/export', {
     params: {
-      method: filters?.method || undefined,
+      order_type: filters?.orderType || undefined,
       user: filters?.user || undefined,
       status: filters?.status || undefined,
       from: filters?.from || undefined,
@@ -72,5 +96,6 @@ export async function exportRecords(filters?: {
 
 export default {
   list,
+  summary,
   exportRecords
 }

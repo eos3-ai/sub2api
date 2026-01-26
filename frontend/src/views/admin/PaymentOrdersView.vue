@@ -28,17 +28,33 @@
             </div>
           </div>
 
+          <!-- Summary -->
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
+              <p class="text-xs font-medium text-gray-500 dark:text-dark-300">
+                {{ t('admin.paymentOrders.summaryCreditsUSD') }}
+              </p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                {{ summaryLoading ? t('common.loading') : formatUSD(summary?.total_usd) }}
+              </p>
+            </div>
+            <div class="rounded-xl border border-gray-200 bg-white p-4 dark:border-dark-700 dark:bg-dark-900">
+              <p class="text-xs font-medium text-gray-500 dark:text-dark-300">
+                {{ t('admin.paymentOrders.summaryPayCNY') }}
+              </p>
+              <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">
+                {{ summaryLoading ? t('common.loading') : formatCNY(summary?.amount_cny) }}
+              </p>
+            </div>
+          </div>
+
           <!-- 筛选条件网格 -->
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <div>
               <label class="mb-1.5 block text-sm font-medium text-gray-700 dark:text-dark-200">
-                {{ t('admin.paymentOrders.method') }}
+                {{ t('admin.paymentOrders.orderType') }}
               </label>
-              <Select
-                v-model="filters.method"
-                :options="methodOptions"
-                :placeholder="t('common.all')"
-              />
+              <Select v-model="filters.orderType" :options="orderTypeOptions" :placeholder="t('common.all')" />
             </div>
 
             <div>
@@ -145,12 +161,14 @@ import Select from '@/components/common/Select.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import { adminAPI } from '@/api/admin'
 import type { Column } from '@/components/common/types'
-import type { AdminPaymentOrder, AdminPaymentMethod } from '@/api/admin/paymentOrders'
+import type { AdminPaymentOrder, AdminPaymentOrdersSummary, AdminPaymentOrderType } from '@/api/admin/paymentOrders'
 
 const { t } = useI18n()
 
 const loading = ref(false)
 const exporting = ref(false)
+const summaryLoading = ref(false)
+const summary = ref<AdminPaymentOrdersSummary | null>(null)
 
 const formatYMD = (d: Date): string => {
   const year = d.getFullYear()
@@ -168,10 +186,10 @@ const getDefaultRange = () => {
 
 const defaultRange = getDefaultRange()
 
-const filters = reactive<{ method: AdminPaymentMethod | ''; user: string; status: string; startDate: string; endDate: string }>({
-  method: '',
+const filters = reactive<{ orderType: AdminPaymentOrderType | ''; user: string; status: string; startDate: string; endDate: string }>({
+  orderType: '',
   user: '',
-  status: '',
+  status: 'paid',
   startDate: defaultRange.startDate,
   endDate: defaultRange.endDate
 })
@@ -184,10 +202,11 @@ const pagination = reactive({
 
 const items = ref<AdminPaymentOrder[]>([])
 
-const methodOptions = computed(() => [
+const orderTypeOptions = computed(() => [
   { label: t('common.all'), value: '' },
-  { label: t('payment.alipay'), value: 'alipay' },
-  { label: t('payment.wechat'), value: 'wechat' }
+  { label: t('payment.orderTypeOnline'), value: 'online_recharge' },
+  { label: t('payment.orderTypeAdmin'), value: 'admin_recharge' },
+  { label: t('payment.orderTypeActivity'), value: 'activity_recharge' }
 ])
 
 const statusOptions = computed(() => [
@@ -268,6 +287,16 @@ function toRFC3339End(dateStr: string): string {
   return d.toISOString()
 }
 
+function formatUSD(amount: number | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount)) return '-'
+  return `$${amount.toFixed(2)}`
+}
+
+function formatCNY(amount: number | null | undefined): string {
+  if (amount == null || !Number.isFinite(amount)) return '-'
+  return `¥${amount.toFixed(2)}`
+}
+
 function updateStartDate(value: string) {
   filters.startDate = value
 }
@@ -276,16 +305,28 @@ function updateEndDate(value: string) {
   filters.endDate = value
 }
 
-async function load() {
+type PaymentOrdersQuery = {
+  orderType: AdminPaymentOrderType | ''
+  user: string
+  status: string
+  from: string
+  to: string
+}
+
+function buildFilters(): PaymentOrdersQuery {
+  return {
+    orderType: filters.orderType,
+    user: filters.user,
+    status: filters.status,
+    from: toRFC3339Start(filters.startDate),
+    to: toRFC3339End(filters.endDate)
+  }
+}
+
+async function loadList() {
   loading.value = true
   try {
-    const resp = await adminAPI.paymentOrders.list(pagination.page, pagination.page_size, {
-      method: filters.method || '',
-      user: filters.user || '',
-      status: filters.status || '',
-      from: toRFC3339Start(filters.startDate),
-      to: toRFC3339End(filters.endDate)
-    })
+    const resp = await adminAPI.paymentOrders.list(pagination.page, pagination.page_size, buildFilters())
     items.value = resp.items
     pagination.total = resp.total
   } finally {
@@ -293,15 +334,30 @@ async function load() {
   }
 }
 
+async function loadSummary() {
+  summaryLoading.value = true
+  try {
+    summary.value = await adminAPI.paymentOrders.summary(buildFilters())
+  } catch {
+    summary.value = null
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadList(), loadSummary()])
+}
+
 function applyFilters() {
   pagination.page = 1
-  load()
+  loadAll()
 }
 
 function resetFilters() {
-  filters.method = ''
+  filters.orderType = ''
   filters.user = ''
-  filters.status = ''
+  filters.status = 'paid'
   const { startDate, endDate } = getDefaultRange()
   filters.startDate = startDate
   filters.endDate = endDate
@@ -310,24 +366,20 @@ function resetFilters() {
 
 function handlePageChange(page: number) {
   pagination.page = page
-  load()
+  loadList()
 }
 
 function handlePageSizeChange(pageSize: number) {
   pagination.page_size = pageSize
   pagination.page = 1
-  load()
+  loadList()
 }
 
 async function exportRecords() {
   exporting.value = true
   try {
     const blob = await adminAPI.paymentOrders.exportRecords({
-      method: filters.method || '',
-      user: filters.user || '',
-      status: filters.status || '',
-      from: toRFC3339Start(filters.startDate),
-      to: toRFC3339End(filters.endDate)
+      ...buildFilters()
     })
     const now = new Date()
     const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(
@@ -340,6 +392,6 @@ async function exportRecords() {
 }
 
 onMounted(() => {
-  load()
+  loadAll()
 })
 </script>

@@ -846,7 +846,9 @@ export default {
     paymentOrders: {
       title: 'Recharge Records',
       description: 'View all users recharge records (payment orders)',
-      method: 'Method',
+      orderType: 'Order Type',
+      summaryCreditsUSD: 'Paid Credits Total (USD)',
+      summaryPayCNY: 'Paid Amount Total (CNY)',
       userEmail: 'User Email',
       userPlaceholder: 'Enter user email',
       status: 'Status',

@@ -285,6 +285,14 @@ func (s *PaymentService) ListOrders(ctx context.Context, params pagination.Pagin
 	return s.orderRepo.List(ctx, params, filter)
 }
 
+// SummaryOrders returns aggregated totals for orders matching the given filter.
+func (s *PaymentService) SummaryOrders(ctx context.Context, filter PaymentOrderFilter) (totalUSD float64, amountCNY float64, err error) {
+	if s == nil || s.orderRepo == nil {
+		return 0, 0, nil
+	}
+	return s.orderRepo.Summary(ctx, filter)
+}
+
 // MarkOrderPaid 处理支付成功逻辑
 func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo string, callbackPayload any) (*PaymentOrder, error) {
 	log.Printf("[Payment Service] MarkOrderPaid called: order_no=%s, trade_no=%s", orderNo, tradeNo)

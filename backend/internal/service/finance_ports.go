@@ -78,8 +78,11 @@ type PaymentOrderFilter struct {
 	UserID   *int64
 	Status   string
 	Provider string
-	From     *time.Time
-	To       *time.Time
+	// OrderType is a derived field for admin filtering (online_recharge/admin_recharge/activity_recharge).
+	// Backend maps it to provider constraints.
+	OrderType string
+	From      *time.Time
+	To        *time.Time
 }
 
 // PaymentOrderRepository 定义支付订单数据访问接口
@@ -94,6 +97,7 @@ type PaymentOrderRepository interface {
 
 	ListByUser(ctx context.Context, userID int64, params pagination.PaginationParams, status string) ([]PaymentOrder, *pagination.PaginationResult, error)
 	List(ctx context.Context, params pagination.PaginationParams, filter PaymentOrderFilter) ([]PaymentOrder, *pagination.PaginationResult, error)
+	Summary(ctx context.Context, filter PaymentOrderFilter) (totalUSD float64, amountCNY float64, err error)
 
 	MarkExpired(ctx context.Context, now time.Time) (int64, error)
 }

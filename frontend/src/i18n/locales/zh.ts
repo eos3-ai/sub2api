@@ -857,7 +857,9 @@ export default {
     paymentOrders: {
       title: '充值记录',
       description: '查看所有用户的充值记录（支付订单）',
-      method: '充值方式',
+      orderType: '订单类型',
+      summaryCreditsUSD: '累计充值额度（USD，已支付）',
+      summaryPayCNY: '累计支付金额（CNY，已支付）',
       userEmail: '用户邮箱',
       userPlaceholder: '输入用户邮箱',
       status: '订单状态',

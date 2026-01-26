@@ -123,6 +123,7 @@ func newReadOnlyAdminAPIKeyAllowlist(cfg *config.Config) readOnlyAdminAPIKeyAllo
 	paths := []string{
 		"/api/v1/admin/users/export",
 		"/api/v1/admin/usage",
+		"/api/v1/admin/payment/orders/summary",
 		"/api/v1/admin/payment/orders/export",
 	}
 	prefixes := []string{}

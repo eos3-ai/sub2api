@@ -213,6 +213,18 @@ func (r *paymentOrderRepository) List(ctx context.Context, params pagination.Pag
 	if filter.Status != "" {
 		add("status", filter.Status)
 	}
+	if filter.OrderType != "" {
+		switch filter.OrderType {
+		case "admin_recharge":
+			add("provider", "admin")
+		case "activity_recharge":
+			add("provider", "activity")
+		case "online_recharge":
+			where += " AND provider NOT IN ('admin','activity')"
+		default:
+			return nil, nil, fmt.Errorf("unsupported order_type: %s", filter.OrderType)
+		}
+	}
 	if filter.Provider != "" {
 		add("provider", filter.Provider)
 	}
@@ -271,6 +283,56 @@ OFFSET $%d LIMIT $%d
 	}
 
 	return out, paginationResultFromTotal(total, params), nil
+}
+
+func (r *paymentOrderRepository) Summary(ctx context.Context, filter service.PaymentOrderFilter) (totalUSD float64, amountCNY float64, err error) {
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	where := "WHERE 1=1"
+	args := make([]any, 0, 8)
+	add := func(cond string, v any) {
+		args = append(args, v)
+		where += fmt.Sprintf(" AND %s = $%d", cond, len(args))
+	}
+
+	if filter.UserID != nil {
+		add("user_id", *filter.UserID)
+	}
+	if filter.Status != "" {
+		add("status", filter.Status)
+	}
+	if filter.OrderType != "" {
+		switch filter.OrderType {
+		case "admin_recharge":
+			add("provider", "admin")
+		case "activity_recharge":
+			add("provider", "activity")
+		case "online_recharge":
+			where += " AND provider NOT IN ('admin','activity')"
+		default:
+			return 0, 0, fmt.Errorf("unsupported order_type: %s", filter.OrderType)
+		}
+	}
+	if filter.Provider != "" {
+		add("provider", filter.Provider)
+	}
+	if filter.From != nil {
+		args = append(args, *filter.From)
+		where += fmt.Sprintf(" AND created_at >= $%d", len(args))
+	}
+	if filter.To != nil {
+		args = append(args, *filter.To)
+		where += fmt.Sprintf(" AND created_at <= $%d", len(args))
+	}
+
+	query := `SELECT COALESCE(SUM(total_usd), 0), COALESCE(SUM(amount_cny), 0) FROM payment_orders ` + where
+	if err := scanSingleRow(ctx, exec, query, args, &totalUSD, &amountCNY); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, 0, nil
+		}
+		return 0, 0, err
+	}
+	return totalUSD, amountCNY, nil
 }
 
 func (r *paymentOrderRepository) MarkExpired(ctx context.Context, now time.Time) (int64, error) {

@@ -386,6 +386,7 @@ func registerPaymentOrderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	payment := admin.Group("/payment")
 	{
 		payment.GET("/orders", h.Admin.PaymentOrders.List)
+		payment.GET("/orders/summary", h.Admin.PaymentOrders.Summary)
 		payment.GET("/orders/export", h.Admin.PaymentOrders.Export)
 	}
 }

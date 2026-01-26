@@ -56,6 +56,40 @@ func (h *PaymentOrdersHandler) List(c *gin.Context) {
 	response.Paginated(c, out, result.Total, page, pageSize)
 }
 
+// Summary returns aggregated totals for paid orders matching the current filter
+// (e.g. total credits USD + total paid CNY).
+// GET /api/v1/admin/payment/orders/summary?order_type=online_recharge&from=...&to=...
+func (h *PaymentOrdersHandler) Summary(c *gin.Context) {
+	filter, err := h.parsePaymentOrderFilter(c)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Only aggregate paid orders. If caller explicitly filters to a non-paid status,
+	// the sum should be 0 to match the list result.
+	if filter.Status == "" {
+		filter.Status = service.PaymentStatusPaid
+	} else if filter.Status != service.PaymentStatusPaid {
+		response.Success(c, gin.H{
+			"total_usd":  0,
+			"amount_cny": 0,
+		})
+		return
+	}
+
+	totalUSD, amountCNY, err := h.paymentService.SummaryOrders(c.Request.Context(), filter)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"total_usd":  totalUSD,
+		"amount_cny": amountCNY,
+	})
+}
+
 // Export exports filtered orders as CSV.
 // GET /api/v1/admin/payment/orders/export?provider=zpay|stripe&user_email=user@example.com
 func (h *PaymentOrdersHandler) Export(c *gin.Context) {
@@ -144,6 +178,21 @@ func (h *PaymentOrdersHandler) fetchAll(ctx context.Context, filter service.Paym
 
 func parsePaymentOrderFilter(c *gin.Context) (service.PaymentOrderFilter, error) {
 	var filter service.PaymentOrderFilter
+
+	orderType := strings.TrimSpace(c.Query("order_type"))
+	if orderType == "" {
+		// Backward compatible param name in some clients.
+		orderType = strings.TrimSpace(c.Query("orderType"))
+	}
+	if orderType != "" {
+		normalized := strings.ToLower(orderType)
+		switch normalized {
+		case "online_recharge", "admin_recharge", "activity_recharge":
+			filter.OrderType = normalized
+		default:
+			return filter, fmt.Errorf("invalid order_type")
+		}
+	}
 
 	method := strings.TrimSpace(c.Query("method"))
 	provider := strings.TrimSpace(c.Query("provider"))
