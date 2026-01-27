@@ -436,7 +436,7 @@ export default {
     buyerBankAccountPlaceholder: '专票必填',
 
     receiverEmail: '收票邮箱',
-    receiverEmailPlaceholder: '例如：finance@example.com',
+    receiverEmailPlaceholder: "例如：finance{'@'}example.com",
     receiverPhone: '收票手机号',
     receiverPhonePlaceholder: '可选',
 

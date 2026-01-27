@@ -441,7 +441,7 @@ export default {
     buyerBankAccountPlaceholder: 'Required for special invoice',
 
     receiverEmail: 'Receiver email',
-    receiverEmailPlaceholder: 'e.g. finance@example.com',
+    receiverEmailPlaceholder: "e.g. finance{'@'}example.com",
     receiverPhone: 'Receiver phone',
     receiverPhonePlaceholder: 'Optional',
 
