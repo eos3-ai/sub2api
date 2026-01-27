@@ -181,7 +181,7 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     payment: '在线充值',
-    invoices: '发票',
+    invoices: '发票记录',
     invoiceManagement: '开票管理',
     referral: '邀请返利',
     redeem: '兑换',

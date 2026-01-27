@@ -383,15 +383,16 @@ const ChevronDoubleRightIcon = {
 
 // User navigation items (for regular users)
 const userNavItems = computed(() => {
-  const items = [
-    { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
-    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
-    { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
-    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
-  ]
+	const items = [
+	    { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+	    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+	    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+	    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
+	    { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
+	    { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
+	    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+	    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
+	  ]
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
 })
 

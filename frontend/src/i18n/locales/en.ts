@@ -184,7 +184,7 @@ export default {
     apiKeys: 'API Keys',
     usage: 'Usage',
     payment: 'Online Recharge',
-    invoices: 'Invoices',
+    invoices: 'Invoice Records',
     invoiceManagement: 'Invoice Management',
     referral: 'Referral',
     redeem: 'Redeem',
