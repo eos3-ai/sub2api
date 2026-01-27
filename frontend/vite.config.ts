@@ -46,9 +46,10 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src'),
-      // 使用 vue-i18n 运行时版本，避免 CSP unsafe-eval 问题
-      'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js'
+      '@': resolve(__dirname, 'src')
+      // 注释掉 runtime-only 版本，使用完整版 vue-i18n 以支持运行时消息编译
+      // 这样可以处理包含插值的翻译字符串（如 {n} / {max}）
+      // 'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js'
     }
   },
   define: {
