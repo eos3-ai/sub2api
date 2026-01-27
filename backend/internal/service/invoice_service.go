@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
+
+const invoiceRequestNotifyEmailsEnv = "INVOICE_REQUEST_NOTIFY_EMAILS"
 
 type CreateInvoiceRequestInput struct {
 	OrderNos []string
@@ -252,6 +255,7 @@ func (s *InvoiceService) CreateInvoiceRequest(ctx context.Context, userID int64,
 		return nil, err
 	}
 
+	s.sendInvoiceRequestSubmittedNotification(ctx, req)
 	return req, nil
 }
 
@@ -517,6 +521,69 @@ func normalizeOrderNos(in []string) []string {
 		}
 		seen[v] = struct{}{}
 		out = append(out, v)
+	}
+	return out
+}
+
+func (s *InvoiceService) sendInvoiceRequestSubmittedNotification(ctx context.Context, req *InvoiceRequest) {
+	if s == nil || s.emailService == nil || req == nil {
+		return
+	}
+
+	recipients := parseEmailListFromEnv(invoiceRequestNotifyEmailsEnv)
+	if len(recipients) == 0 {
+		return
+	}
+
+	taxNo := strings.TrimSpace(req.TaxNo)
+	if taxNo == "" {
+		taxNo = "-"
+	}
+
+	subject := "开票申请已提交"
+	body := fmt.Sprintf(
+		"## 新的开票申请已提交\n\n- 抬头：%s\n- 税号：%s\n- 总支付金额（CNY）：%.2f\n- 收票邮箱：%s\n",
+		strings.TrimSpace(req.InvoiceTitle),
+		taxNo,
+		req.AmountCNYTotal,
+		strings.TrimSpace(req.ReceiverEmail),
+	)
+
+	for _, to := range recipients {
+		if err := s.emailService.SendPlainTextEmail(ctx, to, subject, body); err != nil {
+			if errors.Is(err, ErrEmailNotConfigured) {
+				return
+			}
+			log.Printf("[Invoice] send submit notify email failed: invoice_request_no=%s to=%s err=%v", req.InvoiceRequestNo, to, err)
+		}
+	}
+}
+
+func parseEmailListFromEnv(key string) []string {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', ';', ' ', '\t', '\n', '\r':
+			return true
+		default:
+			return false
+		}
+	})
+	seen := make(map[string]struct{}, len(parts))
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		addr := strings.TrimSpace(p)
+		if addr == "" {
+			continue
+		}
+		if _, ok := seen[addr]; ok {
+			continue
+		}
+		seen[addr] = struct{}{}
+		out = append(out, addr)
 	}
 	return out
 }

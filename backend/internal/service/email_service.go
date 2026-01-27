@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net/smtp"
 	"strconv"
+	"strings"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -117,15 +118,34 @@ func (s *EmailService) SendEmail(ctx context.Context, to, subject, body string) 
 	return s.SendEmailWithConfig(config, to, subject, body)
 }
 
+// SendPlainTextEmail sends email with text/plain content-type.
+// It can be used for Markdown content (kept as-is in the email body).
+func (s *EmailService) SendPlainTextEmail(ctx context.Context, to, subject, body string) error {
+	config, err := s.GetSMTPConfig(ctx)
+	if err != nil {
+		return err
+	}
+	return s.SendEmailWithConfigAndContentType(config, to, subject, body, "text/plain; charset=UTF-8")
+}
+
 // SendEmailWithConfig 使用指定配置发送邮件
 func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body string) error {
+	return s.SendEmailWithConfigAndContentType(config, to, subject, body, "text/html; charset=UTF-8")
+}
+
+func (s *EmailService) SendEmailWithConfigAndContentType(config *SMTPConfig, to, subject, body, contentType string) error {
 	from := config.From
 	if config.FromName != "" {
 		from = fmt.Sprintf("%s <%s>", config.FromName, config.From)
 	}
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=UTF-8\r\n\r\n%s",
-		from, to, subject, body)
+	ct := strings.TrimSpace(contentType)
+	if ct == "" {
+		ct = "text/html; charset=UTF-8"
+	}
+
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: %s\r\n\r\n%s",
+		from, to, subject, ct, body)
 
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
