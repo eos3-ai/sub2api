@@ -427,12 +427,6 @@ func (s *InvoiceService) AdminIssueInvoiceRequest(ctx context.Context, adminID i
 	}
 	invoiceNumber := strings.TrimSpace(in.InvoiceNumber)
 	pdfURL := strings.TrimSpace(in.InvoicePDFURL)
-	if invoiceNumber == "" {
-		return nil, infraerrors.BadRequest("INVOICE_NUMBER_REQUIRED", "invoice_number is required.")
-	}
-	if pdfURL == "" {
-		return nil, infraerrors.BadRequest("INVOICE_PDF_URL_REQUIRED", "invoice_pdf_url is required.")
-	}
 
 	var updated *InvoiceRequest
 	var receiverEmail string
@@ -466,7 +460,7 @@ func (s *InvoiceService) AdminIssueInvoiceRequest(ctx context.Context, adminID i
 	}
 
 	// Best-effort email notification.
-	if s.emailService != nil && receiverEmail != "" {
+	if s.emailService != nil && receiverEmail != "" && strings.TrimSpace(updated.InvoicePDFURL) != "" {
 		if err := s.emailService.SendEmail(ctx, receiverEmail, "发票已开具", fmt.Sprintf("您的发票已开具，下载链接：<a href=\"%s\">%s</a>", updated.InvoicePDFURL, updated.InvoicePDFURL)); err != nil {
 			if !errors.Is(err, ErrEmailNotConfigured) {
 				log.Printf("[Invoice] send email failed: invoice_request_id=%d to=%s err=%v", id, receiverEmail, err)

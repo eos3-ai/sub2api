@@ -114,9 +114,8 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="input-label">{{ t('invoice.invoiceType') }}</label>
-              <select v-model="form.invoiceType" class="input">
+              <select v-model="form.invoiceType" class="input" disabled>
                 <option value="normal">{{ t('invoice.invoiceTypeNormal') }}</option>
-                <option value="special">{{ t('invoice.invoiceTypeSpecial') }}</option>
               </select>
             </div>
 
@@ -164,8 +163,17 @@
 
           <div class="grid grid-cols-2 gap-4">
             <div class="col-span-2">
-              <label class="input-label">{{ t('invoice.receiverEmail') }}</label>
-              <input v-model="form.receiverEmail" class="input" type="email" :placeholder="t('invoice.receiverEmailPlaceholder')" />
+              <label class="input-label">
+                {{ t('invoice.receiverEmail') }}
+                <span class="text-rose-600 dark:text-rose-400">*</span>
+              </label>
+              <input
+                v-model="form.receiverEmail"
+                class="input"
+                type="email"
+                required
+                :placeholder="t('invoice.receiverEmailPlaceholder')"
+              />
             </div>
             <div class="col-span-2">
               <label class="input-label">{{ t('invoice.receiverPhone') }}</label>
@@ -402,7 +410,8 @@ async function bootstrap() {
 async function loadProfile() {
   try {
     const profile = await invoiceAPI.getInvoiceProfile()
-    form.invoiceType = profile.invoice_type
+    // User-side invoice requests currently only support normal e-invoice.
+    form.invoiceType = 'normal'
     form.buyerType = profile.buyer_type
     form.invoiceTitle = profile.invoice_title
     form.taxNo = profile.tax_no
@@ -484,4 +493,3 @@ function handleClose() {
   emit('close')
 }
 </script>
-

@@ -346,9 +346,10 @@
             <button
               v-if="detail?.invoice.status === 'approved'"
               class="btn btn-primary"
+              :disabled="issuing"
               @click="openIssue"
             >
-              {{ t('admin.invoices.issue') }}
+              {{ issuing ? t('common.loading') : t('admin.invoices.issue') }}
             </button>
           </div>
         </div>
@@ -767,10 +768,28 @@ async function submitReject() {
 }
 
 function openIssue() {
-  issueForm.invoice_number = ''
-  issueForm.invoice_date = ''
-  issueForm.invoice_pdf_url = ''
-  issueOpen.value = true
+  const invoice = detail.value?.invoice
+  if (!invoice) return
+
+  issuing.value = true
+  adminAPI.invoices
+    .issue(invoice.id, {
+      invoice_number: '',
+      invoice_pdf_url: ''
+    })
+    .then(async (updated) => {
+      if (detail.value) {
+        detail.value.invoice = updated
+      }
+      appStore.showSuccess(t('admin.invoices.issueSuccess'))
+      await loadList()
+    })
+    .catch((err) => {
+      appStore.showError(String((err as { message?: string })?.message || t('common.error')))
+    })
+    .finally(() => {
+      issuing.value = false
+    })
 }
 
 function isValidInvoiceDate(value: string): boolean {

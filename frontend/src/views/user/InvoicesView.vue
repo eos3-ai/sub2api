@@ -86,15 +86,6 @@
                         <button class="btn btn-secondary btn-sm" @click="openDetail(r.id)">
                           {{ t('common.details') }}
                         </button>
-                        <a
-                          v-if="r.status === 'issued' && r.invoice_pdf_url"
-                          class="btn btn-secondary btn-sm"
-                          :href="r.invoice_pdf_url"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          {{ t('invoice.download') }}
-                        </a>
                         <button
                           v-if="r.status === 'submitted'"
                           class="btn btn-secondary btn-sm"
@@ -175,17 +166,6 @@
                 <p class="mt-1 text-sm text-rose-600 dark:text-rose-400">
                   {{ detail.invoice.reject_reason }}
                 </p>
-              </div>
-              <div v-if="detail.invoice.status === 'issued' && detail.invoice.invoice_pdf_url" class="sm:col-span-2">
-                <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('invoice.invoicePDF') }}</p>
-                <a
-                  class="mt-1 inline-flex break-all text-sm text-primary-600 hover:underline dark:text-primary-400"
-                  :href="detail.invoice.invoice_pdf_url"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {{ detail.invoice.invoice_pdf_url }}
-                </a>
               </div>
             </div>
           </div>
@@ -363,4 +343,3 @@ onMounted(() => {
   load()
 })
 </script>
-
