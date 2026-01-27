@@ -542,7 +542,7 @@ func (s *InvoiceService) sendInvoiceRequestSubmittedNotification(ctx context.Con
 
 	subject := "开票申请已提交"
 	body := fmt.Sprintf(
-		"## 新的开票申请已提交\n\n- 抬头：%s\n- 税号：%s\n- 总支付金额（CNY）：%.2f\n- 收票邮箱：%s\n",
+		"## 新的开票申请已提交\n\n- 抬头：%s\n- 税号：%s\n- 申请开票金额（CNY）：%.2f\n- 收票邮箱：%s\n",
 		strings.TrimSpace(req.InvoiceTitle),
 		taxNo,
 		req.AmountCNYTotal,
