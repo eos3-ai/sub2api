@@ -15,6 +15,8 @@ export interface SystemSettings {
   // Default settings
   default_balance: number
   default_concurrency: number
+  // Invoice settings
+  invoice_default_item_name: string
   // OEM settings
   site_name: string
   site_logo: string
@@ -47,6 +49,7 @@ export interface UpdateSettingsRequest {
   email_verify_enabled?: boolean
   default_balance?: number
   default_concurrency?: number
+  invoice_default_item_name?: string
   site_name?: string
   site_logo?: string
   site_subtitle?: string

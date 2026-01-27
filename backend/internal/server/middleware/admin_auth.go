@@ -125,6 +125,7 @@ func newReadOnlyAdminAPIKeyAllowlist(cfg *config.Config) readOnlyAdminAPIKeyAllo
 		"/api/v1/admin/usage",
 		"/api/v1/admin/payment/orders/summary",
 		"/api/v1/admin/payment/orders/export",
+		"/api/v1/admin/invoices/export",
 	}
 	prefixes := []string{}
 	if cfg != nil {

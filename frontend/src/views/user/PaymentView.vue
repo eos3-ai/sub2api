@@ -170,9 +170,14 @@
       <div class="card animate-fade-in-up p-6 stagger-2">
         <div class="mb-4 flex items-center justify-between">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">{{ t('payment.myOrders') }}</h2>
-          <button class="btn btn-secondary" :disabled="loadingOrders" @click="loadOrders">
-            {{ loadingOrders ? t('common.loading') : t('common.refresh') }}
-          </button>
+          <div class="flex items-center gap-3">
+            <button class="btn btn-secondary" :disabled="loadingOrders" @click="openInvoice">
+              {{ t('invoice.createTitle') }}
+            </button>
+            <button class="btn btn-secondary" :disabled="loadingOrders" @click="loadOrders">
+              {{ loadingOrders ? t('common.loading') : t('common.refresh') }}
+            </button>
+          </div>
         </div>
 
         <div v-if="loadingOrders" class="flex items-center justify-center py-10">
@@ -399,6 +404,12 @@
         </button>
       </template>
     </Modal>
+
+    <InvoiceRequestModal
+      :show="invoiceOpen"
+      @close="invoiceOpen = false"
+      @created="handleInvoiceCreated"
+    />
   </AppLayout>
 </template>
 
@@ -409,6 +420,7 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Modal from '@/components/common/Modal.vue'
+import InvoiceRequestModal from '@/components/user/InvoiceRequestModal.vue'
 import { useAppStore } from '@/stores'
 import { paymentAPI, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
 import QRCode from 'qrcode'
@@ -438,6 +450,8 @@ const qrPayload = ref('')
 const qrImage = ref('')
 const polling = ref(false)
 let pollTimer: number | null = null
+
+const invoiceOpen = ref(false)
 
 const exchangeRate = computed(() => {
   const rate = selectedPlan.value?.exchange_rate ?? plans.value[0]?.exchange_rate
@@ -762,9 +776,20 @@ function paymentStatusLabel(status: string): string {
     case 'cancelled':
     case 'canceled':
       return t('payment.statusCancelled')
+    case 'refunded':
+      return t('payment.statusRefunded')
     default:
       return status
   }
+}
+
+function openInvoice() {
+  invoiceOpen.value = true
+}
+
+function handleInvoiceCreated() {
+  // No need to refresh order list, but keep selection UI in sync if user immediately opens again.
+  invoiceOpen.value = false
 }
 
 async function copyOrderNo(orderNo: string) {

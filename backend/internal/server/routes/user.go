@@ -46,6 +46,18 @@ func RegisterUserRoutes(
 			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
 		}
 
+		// 发票/开票申请
+		invoices := authenticated.Group("/invoices")
+		{
+			invoices.GET("/eligible-orders", h.Invoice.ListEligibleOrders)
+			invoices.GET("/profile", h.Invoice.GetProfile)
+			invoices.PUT("/profile", h.Invoice.UpdateProfile)
+			invoices.POST("", h.Invoice.CreateInvoiceRequest)
+			invoices.GET("", h.Invoice.ListMyInvoiceRequests)
+			invoices.GET("/:id", h.Invoice.GetMyInvoiceRequest)
+			invoices.POST("/:id/cancel", h.Invoice.CancelInvoiceRequest)
+		}
+
 		// API Key管理
 		keys := authenticated.Group("/keys")
 		{

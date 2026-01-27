@@ -588,6 +588,36 @@
           </div>
         </div>
 
+        <!-- Invoice Settings -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.invoice.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.invoice.description') }}
+            </p>
+          </div>
+          <div class="p-6">
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.invoice.defaultItemName') }}
+                </label>
+                <input
+                  v-model="form.invoice_default_item_name"
+                  type="text"
+                  class="input"
+                  :placeholder="t('admin.settings.invoice.defaultItemNamePlaceholder')"
+                />
+                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.invoice.defaultItemNameHint') }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Site Settings -->
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
@@ -1055,6 +1085,7 @@ const form = reactive<SettingsForm>({
   email_verify_enabled: false,
   default_balance: 0,
   default_concurrency: 1,
+  invoice_default_item_name: '技术服务费',
   site_name: 'Sub2API',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',
@@ -1139,6 +1170,7 @@ async function saveSettings() {
       email_verify_enabled: form.email_verify_enabled,
       default_balance: form.default_balance,
       default_concurrency: form.default_concurrency,
+      invoice_default_item_name: form.invoice_default_item_name,
       site_name: form.site_name,
       site_logo: form.site_logo,
       site_subtitle: form.site_subtitle,

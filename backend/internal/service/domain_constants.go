@@ -93,17 +93,20 @@ const (
 	SettingKeyLinuxDoConnectRedirectURL  = "linuxdo_connect_redirect_url"
 
 	// OEM设置
-		SettingKeySiteName     = "site_name"     // 网站名称
-		SettingKeySiteLogo     = "site_logo"     // 网站Logo (base64)
-		SettingKeySiteSubtitle = "site_subtitle" // 网站副标题
-		SettingKeyAPIBaseURL   = "api_base_url"  // API端点地址（用于客户端配置和导入）
-		SettingKeyContactInfo  = "contact_info"  // 客服联系方式
-		SettingKeyDocURL       = "doc_url"       // 文档链接
-		SettingKeyHomeContent  = "home_content"  // 首页内容（支持 Markdown/HTML，或 URL 作为 iframe src）
+	SettingKeySiteName     = "site_name"     // 网站名称
+	SettingKeySiteLogo     = "site_logo"     // 网站Logo (base64)
+	SettingKeySiteSubtitle = "site_subtitle" // 网站副标题
+	SettingKeyAPIBaseURL   = "api_base_url"  // API端点地址（用于客户端配置和导入）
+	SettingKeyContactInfo  = "contact_info"  // 客服联系方式
+	SettingKeyDocURL       = "doc_url"       // 文档链接
+	SettingKeyHomeContent  = "home_content"  // 首页内容（支持 Markdown/HTML，或 URL 作为 iframe src）
 
 	// 默认配置
 	SettingKeyDefaultConcurrency = "default_concurrency" // 新用户默认并发量
 	SettingKeyDefaultBalance     = "default_balance"     // 新用户默认余额
+
+	// 发票设置
+	SettingKeyInvoiceDefaultItemName = "invoice_default_item_name" // 默认开票内容（商品/服务名称）
 
 	// 管理员 API Key
 	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）

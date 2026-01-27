@@ -127,6 +127,8 @@ function statusLabel(status: string): string {
       return t('payment.statusPending')
     case 'paid':
       return t('payment.statusPaid')
+    case 'refunded':
+      return t('payment.statusRefunded')
     case 'failed':
       return t('payment.statusFailed')
     case 'expired':
@@ -167,4 +169,3 @@ onMounted(() => {
   refresh()
 })
 </script>
-

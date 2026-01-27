@@ -11,6 +11,7 @@ type AdminHandlers struct {
 	Group            *admin.GroupHandler
 	Account          *admin.AccountHandler
 	PaymentOrders    *admin.PaymentOrdersHandler
+	Invoices         *admin.InvoiceHandler
 	OAuth            *admin.OAuthHandler
 	OpenAIOAuth      *admin.OpenAIOAuthHandler
 	GeminiOAuth      *admin.GeminiOAuthHandler
@@ -35,6 +36,7 @@ type Handlers struct {
 	Redeem        *RedeemHandler
 	Subscription  *SubscriptionHandler
 	Payment       *PaymentHandler
+	Invoice       *InvoiceHandler
 	Promotion     *PromotionHandler
 	Referral      *ReferralHandler
 	Admin         *AdminHandlers

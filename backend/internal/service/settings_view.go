@@ -36,6 +36,9 @@ type SystemSettings struct {
 	DefaultConcurrency int
 	DefaultBalance     float64
 
+	// Invoice configuration
+	InvoiceDefaultItemName string
+
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
 	FallbackModelAnthropic   string `json:"fallback_model_anthropic"`

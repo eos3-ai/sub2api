@@ -181,6 +181,8 @@ export default {
     apiKeys: 'API 密钥',
     usage: '使用记录',
     payment: '在线充值',
+    invoices: '发票',
+    invoiceManagement: '开票管理',
     referral: '邀请返利',
     redeem: '兑换',
     profile: '个人资料',
@@ -380,7 +382,82 @@ export default {
     statusPaid: '已支付',
     statusFailed: '支付失败',
     statusExpired: '已过期',
-    statusCancelled: '已取消'
+    statusCancelled: '已取消',
+    statusRefunded: '已退款'
+  },
+
+  // Invoice
+  invoice: {
+    title: '发票',
+    description: '申请开票并查看开票状态。',
+    createTitle: '开发票',
+    myRequests: '开票申请',
+    empty: '暂无开票申请',
+    requestNo: '申请单号',
+    detailsTitle: '开票申请详情',
+    download: '下载',
+    cancel: '撤销',
+    cancelSuccess: '已撤销开票申请',
+    rejectReason: '驳回原因',
+    invoicePDF: '发票链接',
+    paidAt: '支付时间',
+
+    unavailableTitle: '开票功能未启用',
+    unavailableDesc: '当前部署暂未开放开票相关接口，请联系管理员。',
+
+    eligibleOrders: '可开票订单',
+    mergeLimitHint: '最多合并 {n} 笔',
+    mergeLimitExceeded: '最多只能合并 {n} 笔订单',
+    noEligibleOrders: '暂无可开票订单',
+    select: '选择',
+    totalAmountCny: '开票金额（CNY）',
+    totalCreditsUsd: '充值额度（USD）',
+
+    invoiceType: '发票类型',
+    invoiceTypeNormal: '电子普票',
+    invoiceTypeSpecial: '专票',
+    buyerType: '抬头类型',
+    buyerTypePersonal: '个人',
+    buyerTypeCompany: '企业',
+    specialCompanyOnlyHint: '专票仅支持企业抬头',
+
+    invoiceTitle: '发票抬头',
+    invoiceTitlePlaceholder: '例如：某某科技有限公司',
+    taxNo: '纳税人识别号',
+    taxNoPlaceholder: '企业必填',
+
+    buyerAddress: '地址',
+    buyerAddressPlaceholder: '专票必填',
+    buyerPhone: '电话',
+    buyerPhonePlaceholder: '专票必填',
+    buyerBankName: '开户行',
+    buyerBankNamePlaceholder: '专票必填',
+    buyerBankAccount: '银行账号',
+    buyerBankAccountPlaceholder: '专票必填',
+
+    receiverEmail: '收票邮箱',
+    receiverEmailPlaceholder: '例如：finance@example.com',
+    receiverPhone: '收票手机号',
+    receiverPhonePlaceholder: '可选',
+
+    invoiceItemName: '开票内容',
+    invoiceItemNamePlaceholder: '默认：技术服务费',
+    invoiceItemNameHint: '默认值可在后台系统设置中配置。',
+
+    remark: '备注',
+    remarkPlaceholder: '可选',
+
+    selectedCountHint: '已选 {n} / {max} 笔订单',
+    submit: '提交申请',
+    submitSuccess: '开票申请已提交',
+    profileLoadFailed: '加载默认开票信息失败',
+    eligibleLoadFailed: '加载可开票订单失败',
+
+    statusSubmitted: '已提交',
+    statusApproved: '已审核',
+    statusRejected: '已驳回',
+    statusIssued: '已开票',
+    statusCancelled: '已撤销'
   },
 
   // Auth
@@ -867,6 +944,36 @@ export default {
       to: '结束时间',
       timeRange: '时间范围',
       export: '导出记录'
+    },
+    invoices: {
+      title: '开票管理',
+      description: '审核用户开票申请并回填发票信息',
+      userEmail: '用户邮箱',
+      userPlaceholder: '输入用户邮箱（精确匹配）',
+      detailTitle: '开票申请详情',
+      export: '导出记录',
+      approve: '通过',
+      approveConfirm: '确认通过该开票申请？',
+      approveSuccess: '已通过开票申请',
+      reject: '驳回',
+      rejectTitle: '驳回开票申请',
+      rejectReason: '驳回原因',
+      rejectReasonPlaceholder: '请输入驳回原因',
+      rejectReasonRequired: '请输入驳回原因',
+      rejectSuccess: '已驳回开票申请',
+      issue: '标记已开票',
+      issueTitle: '标记已开票',
+      invoiceNumber: '发票号码',
+      invoiceNumberPlaceholder: '请输入发票号码',
+      invoiceNumberRequired: '请输入发票号码',
+      invoiceDate: '开票日期',
+      invoiceDatePlaceholder: 'YYYY-MM-DD（可选）',
+      invoiceDateHint: '留空表示不填写开票日期。',
+      invoiceDateInvalid: '开票日期格式错误（YYYY-MM-DD）',
+      invoicePdfUrl: '发票链接',
+      invoicePdfUrlPlaceholder: 'https://...',
+      invoicePdfUrlRequired: '请输入发票链接',
+      issueSuccess: '已标记为已开票'
     },
 
     // Users Management
@@ -3119,6 +3226,13 @@ export default {
         defaultBalanceHint: '新用户的初始余额',
         defaultConcurrency: '默认并发数',
         defaultConcurrencyHint: '新用户的最大并发请求数'
+      },
+      invoice: {
+        title: '发票设置',
+        description: '配置开票相关默认值',
+        defaultItemName: '默认开票内容',
+        defaultItemNamePlaceholder: '技术服务费',
+        defaultItemNameHint: '用户提交开票申请时默认使用该内容（商品/服务名称）。'
       },
       site: {
         title: '站点设置',

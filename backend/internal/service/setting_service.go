@@ -198,6 +198,13 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
 
+	// Invoice configuration
+	itemName := strings.TrimSpace(settings.InvoiceDefaultItemName)
+	if itemName == "" {
+		itemName = "技术服务费"
+	}
+	updates[SettingKeyInvoiceDefaultItemName] = itemName
+
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
 	updates[SettingKeyFallbackModelAnthropic] = settings.FallbackModelAnthropic
@@ -276,6 +283,19 @@ func (s *SettingService) GetDefaultBalance(ctx context.Context) float64 {
 	return s.cfg.Default.UserBalance
 }
 
+// GetInvoiceDefaultItemName returns the default invoice item name (商品/服务名称).
+// Default: "技术服务费".
+func (s *SettingService) GetInvoiceDefaultItemName(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvoiceDefaultItemName)
+	if err != nil {
+		return "技术服务费"
+	}
+	if strings.TrimSpace(value) == "" {
+		return "技术服务费"
+	}
+	return strings.TrimSpace(value)
+}
+
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
@@ -290,14 +310,15 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled: "true",
-		SettingKeyEmailVerifyEnabled:  "false",
-		SettingKeySiteName:            "Sub2API",
-		SettingKeySiteLogo:            "",
-		SettingKeyDefaultConcurrency:  strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:      strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeySMTPPort:            "587",
-		SettingKeySMTPUseTLS:          "false",
+		SettingKeyRegistrationEnabled:    "true",
+		SettingKeyEmailVerifyEnabled:     "false",
+		SettingKeySiteName:               "Sub2API",
+		SettingKeySiteLogo:               "",
+		SettingKeyDefaultConcurrency:     strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultBalance:         strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeyInvoiceDefaultItemName: "技术服务费",
+		SettingKeySMTPPort:               "587",
+		SettingKeySMTPUseTLS:             "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -360,6 +381,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.DefaultBalance = s.cfg.Default.UserBalance
 	}
+
+	// Invoice defaults
+	result.InvoiceDefaultItemName = s.getStringOrDefault(settings, SettingKeyInvoiceDefaultItemName, "技术服务费")
 
 	// 敏感信息直接返回，方便测试连接时使用
 	result.SMTPPassword = settings[SettingKeySMTPPassword]

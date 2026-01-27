@@ -24,7 +24,7 @@ export interface PaymentPlan {
   enabled?: boolean
 }
 
-export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'failed'
+export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'failed' | 'refunded'
 
 export interface PaymentOrder {
   id: number
@@ -37,6 +37,7 @@ export interface PaymentOrder {
   amount_usd: number
   total_usd: number
   status: PaymentOrderStatus
+  paid_at?: string
   created_at: string
   updated_at: string
   expire_at?: string

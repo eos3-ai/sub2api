@@ -70,6 +70,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		HomeContent:                          settings.HomeContent,
 		DefaultConcurrency:                   settings.DefaultConcurrency,
 		DefaultBalance:                       settings.DefaultBalance,
+		InvoiceDefaultItemName:               settings.InvoiceDefaultItemName,
 		EnableModelFallback:                  settings.EnableModelFallback,
 		FallbackModelAnthropic:               settings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                  settings.FallbackModelOpenAI,
@@ -122,6 +123,9 @@ type UpdateSettingsRequest struct {
 	// 默认配置
 	DefaultConcurrency int     `json:"default_concurrency"`
 	DefaultBalance     float64 `json:"default_balance"`
+
+	// Invoice configuration
+	InvoiceDefaultItemName *string `json:"invoice_default_item_name"`
 
 	// Model fallback configuration
 	EnableModelFallback      bool   `json:"enable_model_fallback"`
@@ -261,13 +265,26 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		HomeContent:                req.HomeContent,
 		DefaultConcurrency:         req.DefaultConcurrency,
 		DefaultBalance:             req.DefaultBalance,
-		EnableModelFallback:        req.EnableModelFallback,
-		FallbackModelAnthropic:     req.FallbackModelAnthropic,
-		FallbackModelOpenAI:        req.FallbackModelOpenAI,
-		FallbackModelGemini:        req.FallbackModelGemini,
-		FallbackModelAntigravity:   req.FallbackModelAntigravity,
-		EnableIdentityPatch:        req.EnableIdentityPatch,
-		IdentityPatchPrompt:        req.IdentityPatchPrompt,
+		InvoiceDefaultItemName: func() string {
+			if req.InvoiceDefaultItemName != nil {
+				v := strings.TrimSpace(*req.InvoiceDefaultItemName)
+				if v == "" {
+					return "技术服务费"
+				}
+				return v
+			}
+			if strings.TrimSpace(previousSettings.InvoiceDefaultItemName) == "" {
+				return "技术服务费"
+			}
+			return previousSettings.InvoiceDefaultItemName
+		}(),
+		EnableModelFallback:      req.EnableModelFallback,
+		FallbackModelAnthropic:   req.FallbackModelAnthropic,
+		FallbackModelOpenAI:      req.FallbackModelOpenAI,
+		FallbackModelGemini:      req.FallbackModelGemini,
+		FallbackModelAntigravity: req.FallbackModelAntigravity,
+		EnableIdentityPatch:      req.EnableIdentityPatch,
+		IdentityPatchPrompt:      req.IdentityPatchPrompt,
 		OpsMonitoringEnabled: func() bool {
 			if req.OpsMonitoringEnabled != nil {
 				return *req.OpsMonitoringEnabled
@@ -334,6 +351,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		HomeContent:                          updatedSettings.HomeContent,
 		DefaultConcurrency:                   updatedSettings.DefaultConcurrency,
 		DefaultBalance:                       updatedSettings.DefaultBalance,
+		InvoiceDefaultItemName:               updatedSettings.InvoiceDefaultItemName,
 		EnableModelFallback:                  updatedSettings.EnableModelFallback,
 		FallbackModelAnthropic:               updatedSettings.FallbackModelAnthropic,
 		FallbackModelOpenAI:                  updatedSettings.FallbackModelOpenAI,
@@ -444,6 +462,9 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.DefaultBalance != after.DefaultBalance {
 		changed = append(changed, "default_balance")
+	}
+	if before.InvoiceDefaultItemName != after.InvoiceDefaultItemName {
+		changed = append(changed, "invoice_default_item_name")
 	}
 	if before.EnableModelFallback != after.EnableModelFallback {
 		changed = append(changed, "enable_model_fallback")

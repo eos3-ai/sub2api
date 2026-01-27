@@ -18,6 +18,7 @@ import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
 import userAttributesAPI from './userAttributes'
 import paymentOrdersAPI from './paymentOrders'
+import invoicesAPI from './invoices'
 
 /**
  * Unified admin API object for convenient access
@@ -37,7 +38,8 @@ export const adminAPI = {
   gemini: geminiAPI,
   antigravity: antigravityAPI,
   userAttributes: userAttributesAPI,
-  paymentOrders: paymentOrdersAPI
+  paymentOrders: paymentOrdersAPI,
+  invoices: invoicesAPI
 }
 
 export {
@@ -55,7 +57,8 @@ export {
   geminiAPI,
   antigravityAPI,
   userAttributesAPI,
-  paymentOrdersAPI
+  paymentOrdersAPI,
+  invoicesAPI
 }
 
 export default adminAPI

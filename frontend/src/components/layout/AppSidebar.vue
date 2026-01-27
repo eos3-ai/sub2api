@@ -408,6 +408,7 @@ const adminNavItems = computed(() => {
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/admin/payment-orders', label: t('nav.rechargeRecords'), icon: CreditCardIcon },
+    { path: '/admin/invoices', label: t('nav.invoiceManagement'), icon: CreditCardIcon },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },

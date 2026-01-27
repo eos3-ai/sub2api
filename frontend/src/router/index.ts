@@ -173,6 +173,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/invoices',
+    name: 'Invoices',
+    component: () => import('@/views/user/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Invoices',
+      titleKey: 'invoice.title',
+      descriptionKey: 'invoice.description'
+    }
+  },
+  {
     path: '/referral',
     name: 'Referral',
     component: () => import('@/views/user/ReferralView.vue'),
@@ -347,6 +359,18 @@ const routes: RouteRecordRaw[] = [
       title: 'Recharge Records',
       titleKey: 'admin.paymentOrders.title',
       descriptionKey: 'admin.paymentOrders.description'
+    }
+  },
+  {
+    path: '/admin/invoices',
+    name: 'AdminInvoices',
+    component: () => import('@/views/admin/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Invoice Requests',
+      titleKey: 'admin.invoices.title',
+      descriptionKey: 'admin.invoices.description'
     }
   },
 

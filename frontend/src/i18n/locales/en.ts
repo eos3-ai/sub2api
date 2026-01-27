@@ -184,6 +184,8 @@ export default {
     apiKeys: 'API Keys',
     usage: 'Usage',
     payment: 'Online Recharge',
+    invoices: 'Invoices',
+    invoiceManagement: 'Invoice Management',
     referral: 'Referral',
     redeem: 'Redeem',
     profile: 'Profile',
@@ -385,6 +387,81 @@ export default {
     statusPaid: 'Paid',
     statusFailed: 'Failed',
     statusExpired: 'Expired',
+    statusCancelled: 'Cancelled',
+    statusRefunded: 'Refunded'
+  },
+
+  // Invoice
+  invoice: {
+    title: 'Invoices',
+    description: 'Request invoices and track their status.',
+    createTitle: 'Request Invoice',
+    myRequests: 'Invoice Requests',
+    empty: 'No invoice requests yet',
+    requestNo: 'Request No.',
+    detailsTitle: 'Invoice Request Details',
+    download: 'Download',
+    cancel: 'Cancel',
+    cancelSuccess: 'Invoice request cancelled',
+    rejectReason: 'Reject reason',
+    invoicePDF: 'Invoice link',
+    paidAt: 'Paid at',
+
+    unavailableTitle: 'Invoicing is not enabled',
+    unavailableDesc: 'Invoice-related APIs are not available in this deployment. Please contact the administrator.',
+
+    eligibleOrders: 'Eligible Orders',
+    mergeLimitHint: 'Up to {n} orders',
+    mergeLimitExceeded: 'You can select at most {n} orders',
+    noEligibleOrders: 'No eligible orders',
+    select: 'Select',
+    totalAmountCny: 'Invoice Amount (CNY)',
+    totalCreditsUsd: 'Credits (USD)',
+
+    invoiceType: 'Invoice type',
+    invoiceTypeNormal: 'Normal e-Invoice',
+    invoiceTypeSpecial: 'Special VAT Invoice',
+    buyerType: 'Buyer type',
+    buyerTypePersonal: 'Personal',
+    buyerTypeCompany: 'Company',
+    specialCompanyOnlyHint: 'Special invoices require company buyer type',
+
+    invoiceTitle: 'Invoice title',
+    invoiceTitlePlaceholder: 'e.g. Example Technology Co., Ltd.',
+    taxNo: 'Tax ID',
+    taxNoPlaceholder: 'Required for company',
+
+    buyerAddress: 'Address',
+    buyerAddressPlaceholder: 'Required for special invoice',
+    buyerPhone: 'Phone',
+    buyerPhonePlaceholder: 'Required for special invoice',
+    buyerBankName: 'Bank name',
+    buyerBankNamePlaceholder: 'Required for special invoice',
+    buyerBankAccount: 'Bank account',
+    buyerBankAccountPlaceholder: 'Required for special invoice',
+
+    receiverEmail: 'Receiver email',
+    receiverEmailPlaceholder: 'e.g. finance@example.com',
+    receiverPhone: 'Receiver phone',
+    receiverPhonePlaceholder: 'Optional',
+
+    invoiceItemName: 'Invoice item',
+    invoiceItemNamePlaceholder: 'Default: Technical service fee',
+    invoiceItemNameHint: 'The default value can be configured in admin settings.',
+
+    remark: 'Remark',
+    remarkPlaceholder: 'Optional',
+
+    selectedCountHint: 'Selected {n} / {max} orders',
+    submit: 'Submit',
+    submitSuccess: 'Invoice request submitted',
+    profileLoadFailed: 'Failed to load default invoice profile',
+    eligibleLoadFailed: 'Failed to load eligible orders',
+
+    statusSubmitted: 'Submitted',
+    statusApproved: 'Approved',
+    statusRejected: 'Rejected',
+    statusIssued: 'Issued',
     statusCancelled: 'Cancelled'
   },
 
@@ -856,6 +933,36 @@ export default {
       to: 'To',
       timeRange: 'Time Range',
       export: 'Export Records'
+    },
+    invoices: {
+      title: 'Invoice Requests',
+      description: 'Review invoice requests and record invoice details',
+      userEmail: 'User Email',
+      userPlaceholder: 'Enter user email (exact match)',
+      detailTitle: 'Invoice Request Details',
+      export: 'Export Records',
+      approve: 'Approve',
+      approveConfirm: 'Approve this invoice request?',
+      approveSuccess: 'Invoice request approved',
+      reject: 'Reject',
+      rejectTitle: 'Reject Invoice Request',
+      rejectReason: 'Reject Reason',
+      rejectReasonPlaceholder: 'Enter reject reason',
+      rejectReasonRequired: 'Reject reason is required',
+      rejectSuccess: 'Invoice request rejected',
+      issue: 'Mark Issued',
+      issueTitle: 'Mark Issued',
+      invoiceNumber: 'Invoice Number',
+      invoiceNumberPlaceholder: 'Enter invoice number',
+      invoiceNumberRequired: 'Invoice number is required',
+      invoiceDate: 'Invoice Date',
+      invoiceDatePlaceholder: 'YYYY-MM-DD (optional)',
+      invoiceDateHint: 'Leave empty to omit invoice date.',
+      invoiceDateInvalid: 'Invalid invoice date (YYYY-MM-DD)',
+      invoicePdfUrl: 'Invoice URL',
+      invoicePdfUrlPlaceholder: 'https://...',
+      invoicePdfUrlRequired: 'Invoice URL is required',
+      issueSuccess: 'Invoice request marked as issued'
     },
 
     // Users
@@ -2958,6 +3065,13 @@ export default {
         defaultBalanceHint: 'Initial balance for new users',
         defaultConcurrency: 'Default Concurrency',
         defaultConcurrencyHint: 'Maximum concurrent requests for new users'
+      },
+      invoice: {
+        title: 'Invoice Settings',
+        description: 'Configure defaults for invoicing',
+        defaultItemName: 'Default Invoice Item',
+        defaultItemNamePlaceholder: 'Technical Service Fee',
+        defaultItemNameHint: 'Used as the default item name (service/product) when users request invoices.'
       },
       site: {
         title: 'Site Settings',

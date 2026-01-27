@@ -244,6 +244,7 @@ var ProviderSet = wire.NewSet(
 	NewDingtalkService,
 	ProvideBonusService,
 	NewPaymentService,
+	NewInvoiceService,
 	NewZpayService,
 	NewStripeService,
 	NewDashboardService,

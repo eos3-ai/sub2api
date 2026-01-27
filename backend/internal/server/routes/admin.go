@@ -67,6 +67,9 @@ func RegisterAdminRoutes(
 
 		// 充值记录（支付订单）
 		registerPaymentOrderRoutes(admin, h)
+
+		// 开票管理
+		registerInvoiceRoutes(admin, h)
 	}
 }
 
@@ -388,5 +391,20 @@ func registerPaymentOrderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		payment.GET("/orders", h.Admin.PaymentOrders.List)
 		payment.GET("/orders/summary", h.Admin.PaymentOrders.Summary)
 		payment.GET("/orders/export", h.Admin.PaymentOrders.Export)
+	}
+}
+
+func registerInvoiceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h == nil || h.Admin == nil || h.Admin.Invoices == nil {
+		return
+	}
+	invoices := admin.Group("/invoices")
+	{
+		invoices.GET("", h.Admin.Invoices.List)
+		invoices.GET("/export", h.Admin.Invoices.Export)
+		invoices.GET("/:id", h.Admin.Invoices.GetByID)
+		invoices.POST("/:id/approve", h.Admin.Invoices.Approve)
+		invoices.POST("/:id/reject", h.Admin.Invoices.Reject)
+		invoices.POST("/:id/issue", h.Admin.Invoices.Issue)
 	}
 }
