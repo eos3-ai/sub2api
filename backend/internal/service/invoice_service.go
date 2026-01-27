@@ -526,12 +526,17 @@ func normalizeOrderNos(in []string) []string {
 }
 
 func (s *InvoiceService) sendInvoiceRequestSubmittedNotification(ctx context.Context, req *InvoiceRequest) {
-	if s == nil || s.emailService == nil || req == nil {
+	if s == nil || req == nil {
 		return
 	}
 
 	recipients := parseEmailListFromEnv(invoiceRequestNotifyEmailsEnv)
 	if len(recipients) == 0 {
+		log.Printf("[Invoice] submit notify skipped: invoice_request_no=%s env_%s empty", req.InvoiceRequestNo, invoiceRequestNotifyEmailsEnv)
+		return
+	}
+	if s.emailService == nil {
+		log.Printf("[Invoice] submit notify skipped: invoice_request_no=%s email_service=nil", req.InvoiceRequestNo)
 		return
 	}
 
@@ -540,7 +545,7 @@ func (s *InvoiceService) sendInvoiceRequestSubmittedNotification(ctx context.Con
 		taxNo = "-"
 	}
 
-	subject := "开票申请已提交"
+	subject := fmt.Sprintf("开票申请已提交 [%s]", strings.TrimSpace(req.InvoiceRequestNo))
 	body := fmt.Sprintf(
 		"## 新的开票申请已提交\n\n- 抬头：%s\n- 税号：%s\n- 申请开票金额（CNY）：%.2f\n- 收票邮箱：%s\n",
 		strings.TrimSpace(req.InvoiceTitle),
@@ -550,12 +555,16 @@ func (s *InvoiceService) sendInvoiceRequestSubmittedNotification(ctx context.Con
 	)
 
 	for _, to := range recipients {
+		log.Printf("[Invoice] submit notify sending: invoice_request_no=%s to=%s", req.InvoiceRequestNo, to)
 		if err := s.emailService.SendPlainTextEmail(ctx, to, subject, body); err != nil {
 			if errors.Is(err, ErrEmailNotConfigured) {
+				log.Printf("[Invoice] submit notify skipped: invoice_request_no=%s email not configured", req.InvoiceRequestNo)
 				return
 			}
 			log.Printf("[Invoice] send submit notify email failed: invoice_request_no=%s to=%s err=%v", req.InvoiceRequestNo, to, err)
+			continue
 		}
+		log.Printf("[Invoice] submit notify sent: invoice_request_no=%s to=%s", req.InvoiceRequestNo, to)
 	}
 }
 
@@ -566,7 +575,7 @@ func parseEmailListFromEnv(key string) []string {
 	}
 	parts := strings.FieldsFunc(raw, func(r rune) bool {
 		switch r {
-		case ',', ';', ' ', '\t', '\n', '\r':
+		case ',', '，', ';', '；', ' ', '\t', '\n', '\r':
 			return true
 		default:
 			return false

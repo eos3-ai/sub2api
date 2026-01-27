@@ -595,11 +595,11 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 	}
 
 	siteName := h.settingService.GetSiteName(c.Request.Context())
-	subject := "[" + siteName + "] Test Email"
+	subject := "[" + siteName + "] Test Email " + time.Now().Format(time.RFC3339)
 	body := `
-<!DOCTYPE html>
-<html>
-<head>
+	<!DOCTYPE html>
+	<html>
+	<head>
     <meta charset="UTF-8">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f5f5f5; margin: 0; padding: 20px; }
@@ -629,10 +629,12 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 `
 
 	if err := h.emailService.SendEmailWithConfig(config, req.Email, subject, body); err != nil {
+		log.Printf("[Email] send test email failed: to=%s host=%s port=%d tls=%v err=%v", req.Email, config.Host, config.Port, config.UseTLS, err)
 		response.ErrorFrom(c, err)
 		return
 	}
 
+	log.Printf("[Email] test email sent: to=%s host=%s port=%d tls=%v", req.Email, config.Host, config.Port, config.UseTLS)
 	response.Success(c, gin.H{"message": "Test email sent successfully"})
 }
 

@@ -1,12 +1,16 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"math/big"
+	"mime"
+	"mime/quotedprintable"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -136,7 +140,8 @@ func (s *EmailService) SendEmailWithConfig(config *SMTPConfig, to, subject, body
 func (s *EmailService) SendEmailWithConfigAndContentType(config *SMTPConfig, to, subject, body, contentType string) error {
 	from := config.From
 	if config.FromName != "" {
-		from = fmt.Sprintf("%s <%s>", config.FromName, config.From)
+		fromName := mime.BEncoding.Encode("UTF-8", sanitizeEmailHeaderValue(config.FromName))
+		from = fmt.Sprintf("%s <%s>", fromName, config.From)
 	}
 
 	ct := strings.TrimSpace(contentType)
@@ -144,8 +149,29 @@ func (s *EmailService) SendEmailWithConfigAndContentType(config *SMTPConfig, to,
 		ct = "text/html; charset=UTF-8"
 	}
 
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: %s\r\n\r\n%s",
-		from, to, subject, ct, body)
+	subject = sanitizeEmailHeaderValue(subject)
+	encodedSubject := mime.BEncoding.Encode("UTF-8", subject)
+
+	messageID := buildMessageID(config.From, config.Host)
+
+	var encodedBodyBuf bytes.Buffer
+	qp := quotedprintable.NewWriter(&encodedBodyBuf)
+	_, _ = qp.Write([]byte(body))
+	_ = qp.Close()
+	encodedBody := encodedBodyBuf.String()
+
+	msg := strings.Join([]string{
+		fmt.Sprintf("From: %s", from),
+		fmt.Sprintf("To: %s", sanitizeEmailHeaderValue(to)),
+		fmt.Sprintf("Subject: %s", encodedSubject),
+		fmt.Sprintf("Date: %s", time.Now().Format(time.RFC1123Z)),
+		fmt.Sprintf("Message-ID: %s", messageID),
+		"MIME-Version: 1.0",
+		fmt.Sprintf("Content-Type: %s", ct),
+		"Content-Transfer-Encoding: quoted-printable",
+		"",
+		encodedBody,
+	}, "\r\n")
 
 	addr := fmt.Sprintf("%s:%d", config.Host, config.Port)
 	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
@@ -155,6 +181,29 @@ func (s *EmailService) SendEmailWithConfigAndContentType(config *SMTPConfig, to,
 	}
 
 	return smtp.SendMail(addr, auth, config.From, []string{to}, []byte(msg))
+}
+
+func sanitizeEmailHeaderValue(value string) string {
+	v := strings.ReplaceAll(value, "\r", "")
+	v = strings.ReplaceAll(v, "\n", "")
+	return strings.TrimSpace(v)
+}
+
+func buildMessageID(fromEmail, host string) string {
+	domain := strings.TrimSpace(host)
+	if at := strings.LastIndex(fromEmail, "@"); at >= 0 && at+1 < len(fromEmail) {
+		domain = strings.TrimSpace(fromEmail[at+1:])
+	}
+	domain = sanitizeEmailHeaderValue(domain)
+	if domain == "" {
+		domain = "localhost"
+	}
+
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return fmt.Sprintf("<%d@%s>", time.Now().UnixNano(), domain)
+	}
+	return fmt.Sprintf("<%s.%d@%s>", hex.EncodeToString(buf), time.Now().UnixNano(), domain)
 }
 
 // sendMailTLS 使用TLS发送邮件
