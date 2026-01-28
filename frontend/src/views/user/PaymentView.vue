@@ -211,9 +211,6 @@
                       {{ t('payment.orderType') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
-                      {{ t('payment.remark') }}
-                    </th>
-                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
                       {{ t('payment.channel') }}
                     </th>
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
@@ -225,21 +222,31 @@
                     <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
                       {{ t('payment.status') }}
                     </th>
-                    <th class="px-5 py-4 text-right text-xs font-semibold text-gray-600 dark:text-dark-300">
-                      {{ t('common.actions') }}
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
+                      {{ t('payment.createdAt') }}
+                    </th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
+                      {{ t('payment.remark') }}
                     </th>
                   </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100 bg-white dark:divide-dark-800 dark:bg-dark-800">
                   <tr v-for="o in orders" :key="o.order_no">
                     <td class="px-5 py-4 text-sm text-gray-900 dark:text-white">
-                      <span class="font-mono text-xs">{{ o.order_no }}</span>
+                      <div class="flex items-center gap-2">
+                        <span class="font-mono text-xs">{{ o.order_no }}</span>
+                        <button
+                          type="button"
+                          class="rounded-lg p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-dark-700 dark:hover:text-gray-300"
+                          :title="t('payment.copyOrder')"
+                          @click="copyOrderNo(o.order_no)"
+                        >
+                          <Icon name="clipboard" size="sm" />
+                        </button>
+                      </div>
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ orderTypeLabel(o.order_type) }}
-                    </td>
-                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      {{ o.remark || '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ shouldShowChannel(o.order_type) ? channelLabel(o.channel || o.provider) : '-' }}
@@ -253,10 +260,11 @@
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       {{ paymentStatusLabel(o.status) }}
                     </td>
-                    <td class="px-5 py-4 text-right text-sm">
-                      <button class="btn btn-secondary btn-sm" @click="copyOrderNo(o.order_no)">
-                        {{ t('payment.copyOrder') }}
-                      </button>
+                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
+                      {{ formatDateTime(o.created_at) || '-' }}
+                    </td>
+                    <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
+                      {{ o.remark || '-' }}
                     </td>
                   </tr>
                 </tbody>
@@ -420,9 +428,11 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Modal from '@/components/common/Modal.vue'
+import Icon from '@/components/icons/Icon.vue'
 import InvoiceRequestModal from '@/components/user/InvoiceRequestModal.vue'
 import { useAppStore } from '@/stores'
 import { paymentAPI, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
+import { formatDateTime } from '@/utils/format'
 import QRCode from 'qrcode'
 
 const { t } = useI18n()

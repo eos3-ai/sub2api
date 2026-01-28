@@ -359,6 +359,7 @@ export default {
     noOrders: 'No orders yet',
     orderNo: 'Order No.',
     orderType: 'Type',
+    createdAt: 'Created at',
     orderTypeActivity: 'Activity Recharge',
     remark: 'Remark',
     orderTypeOnline: 'Online Recharge',

@@ -354,6 +354,7 @@ export default {
     noOrders: '暂无订单',
     orderNo: '订单号',
     orderType: '订单类型',
+    createdAt: '订单创建时间',
     orderTypeActivity: '活动充值',
     remark: '备注',
     orderTypeOnline: '在线充值',
