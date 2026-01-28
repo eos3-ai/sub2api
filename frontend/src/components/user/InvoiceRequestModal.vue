@@ -130,8 +130,16 @@
           </div>
 
           <div>
-            <label class="input-label">{{ t('invoice.invoiceTitle') }}</label>
-            <input v-model="form.invoiceTitle" class="input" :placeholder="t('invoice.invoiceTitlePlaceholder')" />
+            <label class="input-label">
+              {{ t('invoice.invoiceTitle') }}
+              <span class="text-rose-600 dark:text-rose-400">*</span>
+            </label>
+            <input
+              v-model="form.invoiceTitle"
+              class="input"
+              required
+              :placeholder="t('invoice.invoiceTitlePlaceholder')"
+            />
           </div>
 
           <div>
