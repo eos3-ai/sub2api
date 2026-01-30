@@ -18,6 +18,7 @@ type RateLimitService struct {
 	accountRepo           AccountRepository
 	usageRepo             UsageLogRepository
 	cfg                   *config.Config
+	accountAlert          *AccountAlertService
 	geminiQuotaService    *GeminiQuotaService
 	tempUnschedCache      TempUnschedCache
 	timeoutCounterCache   TimeoutCounterCache
@@ -41,6 +42,7 @@ func NewRateLimitService(accountRepo AccountRepository, usageRepo UsageLogReposi
 		accountRepo:        accountRepo,
 		usageRepo:          usageRepo,
 		cfg:                cfg,
+		accountAlert:       NewAccountAlertService(cfg),
 		geminiQuotaService: geminiQuotaService,
 		tempUnschedCache:   tempUnschedCache,
 		usageCache:         make(map[int64]*geminiUsageCacheEntry),
@@ -327,6 +329,11 @@ func (s *RateLimitService) handleAuthError(ctx context.Context, account *Account
 		slog.Warn("account_set_error_failed", "account_id", account.ID, "error", err)
 		return
 	}
+	account.Status = StatusError
+	account.ErrorMessage = errorMsg
+	if s.accountAlert != nil {
+		s.accountAlert.NotifyAccountStatusError(account, "ratelimit", errorMsg, map[string]string{"category": "auth_error"})
+	}
 	slog.Warn("account_disabled_auth_error", "account_id", account.ID, "error", errorMsg)
 }
 
@@ -336,6 +343,14 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 	if err := s.accountRepo.SetError(ctx, account.ID, msg); err != nil {
 		slog.Warn("account_set_error_failed", "account_id", account.ID, "status_code", statusCode, "error", err)
 		return
+	}
+	account.Status = StatusError
+	account.ErrorMessage = msg
+	if s.accountAlert != nil {
+		s.accountAlert.NotifyAccountStatusError(account, "ratelimit", msg, map[string]string{
+			"category":    "custom_error_code",
+			"status_code": strconv.Itoa(statusCode),
+		})
 	}
 	slog.Warn("account_disabled_custom_error", "account_id", account.ID, "status_code", statusCode, "error", errorMsg)
 }
@@ -770,6 +785,14 @@ func (s *RateLimitService) triggerStreamTimeoutError(ctx context.Context, accoun
 	if err := s.accountRepo.SetError(ctx, account.ID, errorMsg); err != nil {
 		slog.Warn("stream_timeout_set_error_failed", "account_id", account.ID, "error", err)
 		return false
+	}
+	account.Status = StatusError
+	account.ErrorMessage = errorMsg
+	if s.accountAlert != nil {
+		s.accountAlert.NotifyAccountStatusError(account, "stream_timeout", errorMsg, map[string]string{
+			"category": "stream_timeout",
+			"model":    model,
+		})
 	}
 
 	// 重置超时计数

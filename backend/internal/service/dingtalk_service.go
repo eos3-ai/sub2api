@@ -21,6 +21,9 @@ type DingtalkService struct {
 	client *http.Client
 }
 
+// NewDingtalkService creates a DingTalk notification client.
+//
+// DingTalk settings are env/config-file driven (see config bindings), not stored in DB.
 func NewDingtalkService(cfg *config.Config) *DingtalkService {
 	var dc *config.DingtalkConfig
 	if cfg != nil {
@@ -35,19 +38,32 @@ func NewDingtalkService(cfg *config.Config) *DingtalkService {
 }
 
 func (s *DingtalkService) Enabled() bool {
-	return s != nil && s.cfg != nil && s.cfg.Enabled && strings.TrimSpace(s.cfg.WebhookURL) != ""
+	if s == nil {
+		return false
+	}
+	return s.cfg != nil && s.cfg.Enabled && strings.TrimSpace(s.cfg.WebhookURL) != ""
 }
 
 func (s *DingtalkService) SendMarkdown(ctx context.Context, title string, text string) error {
-	if !s.Enabled() {
+	if s == nil {
 		return nil
 	}
-	endpoint, err := s.signedWebhookURL()
+	return s.SendMarkdownWithConfig(ctx, s.cfg, title, text)
+}
+
+// SendMarkdownWithConfig sends a markdown message using the provided config.
+// It does NOT read settings from DB and is intended for admin "test alert" calls.
+func (s *DingtalkService) SendMarkdownWithConfig(ctx context.Context, cfg *config.DingtalkConfig, title string, text string) error {
+	if s == nil || cfg == nil || !cfg.Enabled || strings.TrimSpace(cfg.WebhookURL) == "" {
+		return nil
+	}
+
+	endpoint, err := signedDingtalkWebhookURL(strings.TrimSpace(cfg.WebhookURL), strings.TrimSpace(cfg.Secret))
 	if err != nil {
 		return err
 	}
 
-	atMobiles := parseCommaSeparated(s.cfg.AtMobiles)
+	atMobiles := parseCommaSeparated(cfg.AtMobiles)
 
 	payload := map[string]any{
 		"msgtype": "markdown",
@@ -57,12 +73,17 @@ func (s *DingtalkService) SendMarkdown(ctx context.Context, title string, text s
 		},
 		"at": map[string]any{
 			"atMobiles": atMobiles,
-			"isAtAll":   s.cfg.AtAll,
+			"isAtAll":   cfg.AtAll,
 		},
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err
+	}
+
+	client := s.client
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
@@ -71,7 +92,7 @@ func (s *DingtalkService) SendMarkdown(ctx context.Context, title string, text s
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -83,12 +104,12 @@ func (s *DingtalkService) SendMarkdown(ctx context.Context, title string, text s
 	return nil
 }
 
-func (s *DingtalkService) signedWebhookURL() (string, error) {
-	raw := strings.TrimSpace(s.cfg.WebhookURL)
+func signedDingtalkWebhookURL(raw string, secret string) (string, error) {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return "", fmt.Errorf("missing dingtalk webhook url")
 	}
-	secret := strings.TrimSpace(s.cfg.Secret)
+	secret = strings.TrimSpace(secret)
 	if secret == "" {
 		return raw, nil
 	}
@@ -110,7 +131,8 @@ func dingtalkSign(timestampMillis int64, secret string) string {
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(message))
 	sum := mac.Sum(nil)
-	return url.QueryEscape(base64.StdEncoding.EncodeToString(sum))
+	// URL-encode is handled by url.Values.Encode; return raw base64 here.
+	return base64.StdEncoding.EncodeToString(sum)
 }
 
 func parseCommaSeparated(v string) []string {
@@ -129,4 +151,3 @@ func parseCommaSeparated(v string) []string {
 	}
 	return out
 }
-

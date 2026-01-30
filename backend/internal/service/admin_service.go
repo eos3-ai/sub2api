@@ -273,6 +273,7 @@ type adminServiceImpl struct {
 	userRepo            UserRepository
 	groupRepo           GroupRepository
 	accountRepo         AccountRepository
+	accountAlert        *AccountAlertService
 	proxyRepo           ProxyRepository
 	apiKeyRepo          APIKeyRepository
 	redeemCodeRepo      RedeemCodeRepository
@@ -305,6 +306,7 @@ func NewAdminService(
 		userRepo:             userRepo,
 		groupRepo:            groupRepo,
 		accountRepo:          accountRepo,
+		accountAlert:         NewAccountAlertService(cfg),
 		proxyRepo:            proxyRepo,
 		apiKeyRepo:           apiKeyRepo,
 		redeemCodeRepo:       redeemCodeRepo,
@@ -1168,7 +1170,18 @@ func (s *adminServiceImpl) ClearAccountError(ctx context.Context, id int64) (*Ac
 }
 
 func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorMsg string) error {
-	return s.accountRepo.SetError(ctx, id, errorMsg)
+	if err := s.accountRepo.SetError(ctx, id, errorMsg); err != nil {
+		return err
+	}
+	if s.accountAlert == nil {
+		return nil
+	}
+	account, err := s.accountRepo.GetByID(ctx, id)
+	if err != nil || account == nil {
+		return nil
+	}
+	s.accountAlert.NotifyAccountStatusError(account, "admin", errorMsg, map[string]string{"category": "manual"})
+	return nil
 }
 
 func (s *adminServiceImpl) SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error) {

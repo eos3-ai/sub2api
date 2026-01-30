@@ -129,6 +129,23 @@ See `.env.example` for all available options.
 
 ---
 
+## DingTalk Alerts (Optional)
+
+Sub2API can send DingTalk robot alerts when an upstream account is marked as abnormal (e.g. `status=error` after
+authentication failures, repeated stream timeouts, or token refresh failures).
+
+Configure in `.env`:
+
+```bash
+DINGTALK_ENABLED=true
+DINGTALK_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=...
+# Optional (only if robot security is set to "signature")
+DINGTALK_SECRET=
+# Optional mentions
+DINGTALK_AT_MOBILES=
+DINGTALK_AT_ALL=false
+```
+
 ## Gemini OAuth Configuration
 
 Sub2API supports three methods to connect to Gemini:
