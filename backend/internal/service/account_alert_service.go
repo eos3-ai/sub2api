@@ -35,7 +35,7 @@ type AccountAlertService struct {
 
 func NewAccountAlertService(cfg *config.Config) *AccountAlertService {
 	return &AccountAlertService{
-		dingtalk:  NewDingtalkService(cfg),
+		dingtalk: NewDingtalkService(cfg),
 		lastSent: map[int64]time.Time{},
 	}
 }
@@ -94,7 +94,11 @@ func buildAccountErrorDingtalkMessage(account *Account, source string, reason st
 		return "Account Alert", "account is nil"
 	}
 
-	source = strings.TrimSpace(source)
+	// source and fields are intentionally ignored in the output:
+	// user requested removing "来源" and "维度" from the alert message.
+	_ = source
+	_ = fields
+
 	reason = strings.TrimSpace(reason)
 	if reason == "" {
 		reason = strings.TrimSpace(account.ErrorMessage)
@@ -109,39 +113,37 @@ func buildAccountErrorDingtalkMessage(account *Account, source string, reason st
 		name = "(unnamed)"
 	}
 
-	title = fmt.Sprintf("Account Alert: %s (#%d)", name, account.ID)
+	title = fmt.Sprintf("账号告警: %s (#%d)", name, account.ID)
 
 	sb := strings.Builder{}
-	sb.WriteString("### 账号状态异常\n\n")
-	sb.WriteString(fmt.Sprintf("- Time: %s\n", now.Format(time.RFC3339)))
-	if source != "" {
-		sb.WriteString(fmt.Sprintf("- Source: %s\n", escapeInlineMarkdown(source)))
-	}
-	sb.WriteString(fmt.Sprintf("- AccountID: %d\n", account.ID))
-	sb.WriteString(fmt.Sprintf("- Name: %s\n", escapeInlineMarkdown(name)))
-	if strings.TrimSpace(account.Platform) != "" {
-		sb.WriteString(fmt.Sprintf("- Platform: %s\n", escapeInlineMarkdown(account.Platform)))
-	}
-	if strings.TrimSpace(account.Type) != "" {
-		sb.WriteString(fmt.Sprintf("- Type: %s\n", escapeInlineMarkdown(account.Type)))
-	}
-	if strings.TrimSpace(account.Status) != "" {
-		sb.WriteString(fmt.Sprintf("- Status: %s\n", escapeInlineMarkdown(account.Status)))
-	}
+	sb.WriteString("### 【账号告警】账号状态异常\n\n")
 
-	if len(fields) > 0 {
-		for k, v := range fields {
-			k = strings.TrimSpace(k)
-			v = strings.TrimSpace(v)
-			if k == "" || v == "" {
-				continue
-			}
-			sb.WriteString(fmt.Sprintf("- %s: %s\n", escapeInlineMarkdown(k), escapeInlineMarkdown(v)))
-		}
-	}
+	// Use Markdown hard line-breaks (`two spaces + \n`) to keep the layout vertical
+	// across DingTalk clients (some treat single newlines as spaces).
+	sb.WriteString("**账号**：`")
+	sb.WriteString(escapeInlineCode(name))
+	sb.WriteString("` (#")
+	sb.WriteString(fmt.Sprintf("%d", account.ID))
+	sb.WriteString(")  \n")
+
+	sb.WriteString("**状态**：`")
+	sb.WriteString(escapeInlineCode(account.Status))
+	sb.WriteString("`  \n")
+
+	sb.WriteString("**平台**：`")
+	sb.WriteString(escapeInlineCode(account.Platform))
+	sb.WriteString("`  \n")
+
+	sb.WriteString("**类型**：`")
+	sb.WriteString(escapeInlineCode(account.Type))
+	sb.WriteString("`  \n")
+
+	sb.WriteString("**时间**：`")
+	sb.WriteString(escapeInlineCode(now.Format(time.RFC3339)))
+	sb.WriteString("`  \n")
 
 	if reason != "" {
-		sb.WriteString("\n**Reason**:\n")
+		sb.WriteString("\n\n**原因**\n")
 		sb.WriteString("```text\n")
 		sb.WriteString(reason)
 		sb.WriteString("\n```\n")
@@ -150,8 +152,7 @@ func buildAccountErrorDingtalkMessage(account *Account, source string, reason st
 	return title, sb.String()
 }
 
-// escapeInlineMarkdown does minimal escaping for DingTalk markdown list items.
-func escapeInlineMarkdown(s string) string {
+func escapeInlineCode(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return ""
@@ -159,7 +160,7 @@ func escapeInlineMarkdown(s string) string {
 	replacer := strings.NewReplacer(
 		"\r", " ",
 		"\n", " ",
-		"|", "\\|",
+		"`", "'",
 	)
 	return replacer.Replace(s)
 }

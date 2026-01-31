@@ -27,21 +27,22 @@ func TestBuildAccountErrorDingtalkMessage(t *testing.T) {
 		"status_code": "401",
 	}, now)
 
-	require.Contains(t, title, "Account Alert:")
+	require.Contains(t, title, "账号告警:")
 	require.Contains(t, title, "acc-openai-1")
 	require.Contains(t, title, "#123")
 
-	require.Contains(t, text, "账号状态异常")
-	require.Contains(t, text, "Time: 2026-01-31T12:34:56Z")
-	require.Contains(t, text, "Source: ratelimit")
-	require.Contains(t, text, "AccountID: 123")
-	require.Contains(t, text, "Name: acc-openai-1")
-	require.Contains(t, text, "Platform: openai")
-	require.Contains(t, text, "Type: oauth")
-	require.Contains(t, text, "Status: error")
-	require.Contains(t, text, "status_code: 401")
+	require.Contains(t, text, "【账号告警】账号状态异常")
+	require.Contains(t, text, "**账号**：`acc-openai-1`")
+	require.Contains(t, text, "(#123)")
+	require.Contains(t, text, "**状态**：`error`")
+	require.Contains(t, text, "**平台**：`openai`")
+	require.Contains(t, text, "**类型**：`oauth`")
+	require.Contains(t, text, "**时间**：`2026-01-31T12:34:56Z`")
 	require.Contains(t, text, "Authentication failed (401)")
+	require.Contains(t, text, "**原因**")
 	require.Contains(t, text, "```text")
+	require.NotContains(t, text, "ratelimit")
+	require.NotContains(t, text, "category")
 }
 
 func TestAccountAlertServiceAllowCooldown(t *testing.T) {
@@ -57,4 +58,3 @@ func TestAccountAlertServiceAllowCooldown(t *testing.T) {
 	require.False(t, svc.allow(1, now.Add(1*time.Minute)))
 	require.True(t, svc.allow(1, now.Add(accountAlertCooldown+time.Second)))
 }
-
