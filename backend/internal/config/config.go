@@ -524,6 +524,7 @@ type ReferralConfig struct {
 
 type DingtalkConfig struct {
 	Enabled              bool   `mapstructure:"enabled"`
+	Env                  string `mapstructure:"env"`
 	WebhookURL           string `mapstructure:"webhook_url"`
 	Secret               string `mapstructure:"secret"`
 	AtMobiles            string `mapstructure:"at_mobiles"` // comma separated
@@ -1026,6 +1027,7 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 
 	// Dingtalk
 	_ = v.BindEnv("dingtalk.enabled", "DINGTALK_ENABLED")
+	_ = v.BindEnv("dingtalk.env", "DINGTALK_ENV", "ALERT_ENV", "APP_ENV")
 	_ = v.BindEnv("dingtalk.webhook_url", "DINGTALK_WEBHOOK_URL")
 	_ = v.BindEnv("dingtalk.secret", "DINGTALK_SECRET")
 	_ = v.BindEnv("dingtalk.at_mobiles", "DINGTALK_AT_MOBILES")
@@ -1183,6 +1185,7 @@ func setDefaults() {
 
 	// Dingtalk
 	viper.SetDefault("dingtalk.enabled", false)
+	viper.SetDefault("dingtalk.env", "")
 	viper.SetDefault("dingtalk.webhook_url", "")
 	viper.SetDefault("dingtalk.secret", "")
 	viper.SetDefault("dingtalk.at_mobiles", "")

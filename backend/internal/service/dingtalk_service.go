@@ -72,6 +72,8 @@ func (s *DingtalkService) SendMarkdownWithConfig(ctx context.Context, cfg *confi
 		return nil
 	}
 
+	title, text = applyDingtalkEnvTag(cfg, title, text)
+
 	endpoint, err := signedDingtalkWebhookURL(strings.TrimSpace(cfg.WebhookURL), strings.TrimSpace(cfg.Secret))
 	if err != nil {
 		return err
@@ -116,6 +118,51 @@ func (s *DingtalkService) SendMarkdownWithConfig(ctx context.Context, cfg *confi
 		return fmt.Errorf("dingtalk webhook returned status %d", resp.StatusCode)
 	}
 	return nil
+}
+
+func applyDingtalkEnvTag(cfg *config.DingtalkConfig, title string, text string) (string, string) {
+	if cfg == nil {
+		return title, text
+	}
+
+	env := strings.TrimSpace(cfg.Env)
+	if env == "" {
+		return title, text
+	}
+	env = sanitizeDingtalkInlineCode(env)
+	if env == "" {
+		return title, text
+	}
+
+	trimmedTitle := strings.TrimSpace(title)
+	prefix := fmt.Sprintf("【%s】", env)
+	if trimmedTitle == "" {
+		title = prefix
+	} else if !strings.HasPrefix(trimmedTitle, prefix) {
+		title = prefix + trimmedTitle
+	}
+
+	envLine := fmt.Sprintf("**环境**：`%s`  \n\n", env)
+	if strings.TrimSpace(text) == "" {
+		text = envLine
+	} else if !strings.HasPrefix(text, envLine) {
+		text = envLine + text
+	}
+
+	return title, text
+}
+
+func sanitizeDingtalkInlineCode(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	replacer := strings.NewReplacer(
+		"\r", " ",
+		"\n", " ",
+		"`", "'",
+	)
+	return replacer.Replace(s)
 }
 
 func signedDingtalkWebhookURL(raw string, secret string) (string, error) {

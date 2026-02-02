@@ -138,6 +138,8 @@ Configure in `.env`:
 
 ```bash
 DINGTALK_ENABLED=true
+# Optional: environment label shown in DingTalk messages (e.g. prod/test/staging)
+DINGTALK_ENV=prod
 DINGTALK_WEBHOOK_URL=https://oapi.dingtalk.com/robot/send?access_token=...
 # Optional (only if robot security is set to "signature")
 DINGTALK_SECRET=
