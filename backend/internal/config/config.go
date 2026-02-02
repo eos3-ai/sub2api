@@ -523,11 +523,12 @@ type ReferralConfig struct {
 }
 
 type DingtalkConfig struct {
-	Enabled    bool   `mapstructure:"enabled"`
-	WebhookURL string `mapstructure:"webhook_url"`
-	Secret     string `mapstructure:"secret"`
-	AtMobiles  string `mapstructure:"at_mobiles"` // comma separated
-	AtAll      bool   `mapstructure:"at_all"`
+	Enabled              bool   `mapstructure:"enabled"`
+	WebhookURL           string `mapstructure:"webhook_url"`
+	Secret               string `mapstructure:"secret"`
+	AtMobiles            string `mapstructure:"at_mobiles"` // comma separated
+	AtAll                bool   `mapstructure:"at_all"`
+	PaymentNotifyEnabled bool   `mapstructure:"payment_notify_enabled"`
 }
 
 type DingtalkBotConfig struct {
@@ -1029,6 +1030,7 @@ func bindLegacyEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("dingtalk.secret", "DINGTALK_SECRET")
 	_ = v.BindEnv("dingtalk.at_mobiles", "DINGTALK_AT_MOBILES")
 	_ = v.BindEnv("dingtalk.at_all", "DINGTALK_AT_ALL")
+	_ = v.BindEnv("dingtalk.payment_notify_enabled", "DINGTALK_PAYMENT_NOTIFY_ENABLED")
 	// Dingtalk bot (incoming)
 	_ = v.BindEnv("dingtalk_bot.enabled", "DINGTALK_BOT_ENABLED")
 	_ = v.BindEnv("dingtalk_bot.access_token", "DINGTALK_BOT_ACCESS_TOKEN")
@@ -1185,6 +1187,7 @@ func setDefaults() {
 	viper.SetDefault("dingtalk.secret", "")
 	viper.SetDefault("dingtalk.at_mobiles", "")
 	viper.SetDefault("dingtalk.at_all", false)
+	viper.SetDefault("dingtalk.payment_notify_enabled", true)
 	// Dingtalk bot (incoming)
 	viper.SetDefault("dingtalk_bot.enabled", false)
 	viper.SetDefault("dingtalk_bot.access_token", "")

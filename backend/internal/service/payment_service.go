@@ -490,7 +490,7 @@ func (s *PaymentService) createActivityRechargeOrder(ctx context.Context, userID
 }
 
 func (s *PaymentService) notifyAsync(title string, text string) {
-	if s == nil || s.dingtalkService == nil || !s.dingtalkService.Enabled() {
+	if s == nil || s.dingtalkService == nil || !s.dingtalkService.EnabledForPayment() {
 		return
 	}
 	go func() {

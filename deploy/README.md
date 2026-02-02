@@ -144,6 +144,8 @@ DINGTALK_SECRET=
 # Optional mentions
 DINGTALK_AT_MOBILES=
 DINGTALK_AT_ALL=false
+# Optional: disable payment/recharge order notifications
+DINGTALK_PAYMENT_NOTIFY_ENABLED=true
 ```
 
 ## Gemini OAuth Configuration

@@ -44,6 +44,20 @@ func (s *DingtalkService) Enabled() bool {
 	return s.cfg != nil && s.cfg.Enabled && strings.TrimSpace(s.cfg.WebhookURL) != ""
 }
 
+// EnabledForPayment indicates whether payment/recharge order notifications should be sent.
+//
+// It is intentionally separate from Enabled(), so operational alerts can be enabled
+// while payment notifications are disabled.
+func (s *DingtalkService) EnabledForPayment() bool {
+	if s == nil {
+		return false
+	}
+	if !s.Enabled() {
+		return false
+	}
+	return s.cfg != nil && s.cfg.PaymentNotifyEnabled
+}
+
 func (s *DingtalkService) SendMarkdown(ctx context.Context, title string, text string) error {
 	if s == nil {
 		return nil
