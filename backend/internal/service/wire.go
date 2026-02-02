@@ -51,6 +51,18 @@ func ProvideTokenRefreshService(
 	return svc
 }
 
+// ProvideAnthropicAPIKeyMonitorService creates and starts AnthropicAPIKeyMonitorService.
+func ProvideAnthropicAPIKeyMonitorService(
+	accountRepo AccountRepository,
+	httpUpstream HTTPUpstream,
+	redisClient *redis.Client,
+	cfg *config.Config,
+) *AnthropicAPIKeyMonitorService {
+	svc := NewAnthropicAPIKeyMonitorService(accountRepo, httpUpstream, redisClient, cfg)
+	svc.Start()
+	return svc
+}
+
 // ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
 func ProvideDashboardAggregationService(repo DashboardAggregationRepository, timingWheel *TimingWheelService, cfg *config.Config) *DashboardAggregationService {
 	svc := NewDashboardAggregationService(repo, timingWheel, cfg)
@@ -296,4 +308,5 @@ var ProviderSet = wire.NewSet(
 	NewUserAttributeService,
 	NewUsageCache,
 	ProvidePaymentMaintenanceService,
+	ProvideAnthropicAPIKeyMonitorService,
 )

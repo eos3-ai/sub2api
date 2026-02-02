@@ -201,9 +201,10 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	opsCleanupService := service.ProvideOpsCleanupService(opsRepository, db, redisClient, configConfig)
 	opsScheduledReportService := service.ProvideOpsScheduledReportService(opsService, userService, emailService, redisClient, configConfig)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, compositeTokenCacheInvalidator, configConfig)
+	anthropicAPIKeyMonitorService := service.ProvideAnthropicAPIKeyMonitorService(accountRepository, httpUpstream, redisClient, configConfig)
 	accountExpiryService := service.ProvideAccountExpiryService(accountRepository)
 	paymentMaintenanceService := service.ProvidePaymentMaintenanceService(configConfig, paymentService)
-	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, schedulerSnapshotService, tokenRefreshService, accountExpiryService, usageCleanupService, pricingService, emailQueueService, billingCacheService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
+	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, schedulerSnapshotService, tokenRefreshService, anthropicAPIKeyMonitorService, accountExpiryService, usageCleanupService, pricingService, emailQueueService, billingCacheService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -235,6 +236,7 @@ func provideCleanup(
 	opsScheduledReport *service.OpsScheduledReportService,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
+	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
 	accountExpiry *service.AccountExpiryService,
 	usageCleanup *service.UsageCleanupService,
 	pricing *service.PricingService,
@@ -266,6 +268,12 @@ func provideCleanup(
 			}},
 			{"TokenRefreshService", func() error {
 				tokenRefresh.Stop()
+				return nil
+			}},
+			{"AnthropicAPIKeyMonitorService", func() error {
+				if anthropicAPIKeyMonitor != nil {
+					anthropicAPIKeyMonitor.Stop()
+				}
 				return nil
 			}},
 			{"AccountExpiryService", func() error {

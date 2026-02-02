@@ -357,6 +357,37 @@ type GatewaySchedulingConfig struct {
 	// 全量重建周期配置
 	// 全量重建周期（秒），0 表示禁用
 	FullRebuildIntervalSeconds int `mapstructure:"full_rebuild_interval_seconds"`
+
+	// AnthropicAPIKeyMonitor: Anthropic API-key 账号连通性监控（自动启停调度）
+	AnthropicAPIKeyMonitor AnthropicAPIKeyMonitorConfig `mapstructure:"anthropic_apikey_monitor"`
+}
+
+// AnthropicAPIKeyMonitorConfig controls the background connectivity monitor for Anthropic API-key accounts.
+//
+// When enabled, the service periodically performs a lightweight "test account connection" call against
+// the configured Anthropic upstream (account.credentials.base_url), and:
+// - disables scheduling after N consecutive failures
+// - re-enables scheduling after N consecutive successes
+type AnthropicAPIKeyMonitorConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval between checks. Recommended: 10s.
+	Interval time.Duration `mapstructure:"interval"`
+
+	// FailureThreshold: consecutive failures required to stop scheduling. Recommended: 6.
+	FailureThreshold int `mapstructure:"failure_threshold"`
+	// SuccessThreshold: consecutive successes required to resume scheduling. Recommended: 6.
+	SuccessThreshold int `mapstructure:"success_threshold"`
+
+	// RequestTimeout bounds a single upstream test request. Recommended: 8s.
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+
+	// MaxConcurrency limits concurrent upstream tests per cycle. 0 uses a safe default.
+	MaxConcurrency int `mapstructure:"max_concurrency"`
+
+	// ModelID optionally overrides the model used for the test request.
+	// Empty uses the backend default (claude.DefaultTestModel), then applies account model_mapping.
+	ModelID string `mapstructure:"model_id"`
 }
 
 func (s *ServerConfig) Address() string {
@@ -922,6 +953,15 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("usage_cleanup.worker_interval_seconds", "USAGE_CLEANUP_WORKER_INTERVAL_SECONDS")
 	_ = v.BindEnv("usage_cleanup.task_timeout_seconds", "USAGE_CLEANUP_TASK_TIMEOUT_SECONDS")
 
+	// Gateway scheduling monitor (Anthropic API-key health)
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.enabled", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_ENABLED")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.interval", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_INTERVAL")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.failure_threshold", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_FAILURE_THRESHOLD")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.success_threshold", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_SUCCESS_THRESHOLD")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.request_timeout", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_REQUEST_TIMEOUT")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.max_concurrency", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MAX_CONCURRENCY")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.model_id", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MODEL_ID")
+
 	// Gemini OAuth / Quota
 	_ = v.BindEnv("gemini.oauth.client_id", "GEMINI_OAUTH_CLIENT_ID")
 	_ = v.BindEnv("gemini.oauth.client_secret", "GEMINI_OAUTH_CLIENT_SECRET")
@@ -1326,6 +1366,14 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.outbox_lag_rebuild_failures", 3)
 	viper.SetDefault("gateway.scheduling.outbox_backlog_rebuild_rows", 10000)
 	viper.SetDefault("gateway.scheduling.full_rebuild_interval_seconds", 300)
+	// Anthropic API-key connectivity monitor (disabled by default)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.enabled", false)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.interval", 10*time.Second)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.failure_threshold", 6)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.success_threshold", 6)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.request_timeout", 8*time.Second)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.max_concurrency", 4)
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.model_id", "")
 	// TLS指纹伪装配置（默认关闭，需要账号级别单独启用）
 	viper.SetDefault("gateway.tls_fingerprint.enabled", true)
 	viper.SetDefault("concurrency.ping_interval", 10)
