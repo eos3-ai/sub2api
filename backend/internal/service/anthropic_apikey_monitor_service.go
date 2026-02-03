@@ -362,7 +362,7 @@ func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.C
 
 	modelID := s.effectiveModelID()
 	if modelID == "" {
-		modelID = claude.DefaultTestModel
+		modelID = claude.DefaultMonitorModel
 	}
 	// Apply account-level model mapping when configured.
 	modelID = account.GetMappedModel(modelID)

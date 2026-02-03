@@ -386,7 +386,7 @@ type AnthropicAPIKeyMonitorConfig struct {
 	MaxConcurrency int `mapstructure:"max_concurrency"`
 
 	// ModelID optionally overrides the model used for the test request.
-	// Empty uses the backend default (claude.DefaultTestModel), then applies account model_mapping.
+	// Empty uses the backend default (claude.DefaultMonitorModel), then applies account model_mapping.
 	ModelID string `mapstructure:"model_id"`
 }
 

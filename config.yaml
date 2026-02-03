@@ -193,7 +193,7 @@ gateway:
       success_threshold: 6
       request_timeout: 8s
       max_concurrency: 4
-      # Optional: override the model used for the test request (will apply model_mapping if configured)
+      # Optional: override the model used for the test request (default: claude-haiku-4-5-20251001; will apply model_mapping if configured)
       model_id: ""
 
 # =============================================================================
