@@ -358,11 +358,18 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	// Fallback cooldown when upstream does not provide a usable reset time.
+	fallbackMinutes := 5
+	if s.cfg != nil && s.cfg.RateLimit.FallbackCooldownMinutes > 0 {
+		fallbackMinutes = s.cfg.RateLimit.FallbackCooldownMinutes
+	}
+	fallbackResetAt := time.Now().Add(time.Duration(fallbackMinutes) * time.Minute)
+
 	// 解析重置时间戳
 	resetTimestamp := headers.Get("anthropic-ratelimit-unified-reset")
 	if resetTimestamp == "" {
-		// 没有重置时间，使用默认5分钟
-		resetAt := time.Now().Add(5 * time.Minute)
+		// 没有重置时间，使用兜底冷却时间
+		resetAt := fallbackResetAt
 		if s.shouldScopeClaudeSonnetRateLimit(account, responseBody) {
 			if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, modelRateLimitScopeClaudeSonnet, resetAt); err != nil {
 				slog.Warn("model_rate_limit_set_failed", "account_id", account.ID, "scope", modelRateLimitScopeClaudeSonnet, "error", err)
@@ -381,7 +388,7 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	ts, err := strconv.ParseInt(resetTimestamp, 10, 64)
 	if err != nil {
 		slog.Warn("rate_limit_reset_parse_failed", "reset_timestamp", resetTimestamp, "error", err)
-		resetAt := time.Now().Add(5 * time.Minute)
+		resetAt := fallbackResetAt
 		if s.shouldScopeClaudeSonnetRateLimit(account, responseBody) {
 			if err := s.accountRepo.SetModelRateLimit(ctx, account.ID, modelRateLimitScopeClaudeSonnet, resetAt); err != nil {
 				slog.Warn("model_rate_limit_set_failed", "account_id", account.ID, "scope", modelRateLimitScopeClaudeSonnet, "error", err)

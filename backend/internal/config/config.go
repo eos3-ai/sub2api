@@ -630,6 +630,11 @@ type StripeConfig struct {
 
 type RateLimitConfig struct {
 	OverloadCooldownMinutes int `mapstructure:"overload_cooldown_minutes"` // 529过载冷却时间(分钟)
+	// FallbackCooldownMinutes is the default cooldown (minutes) applied when an upstream 429 response
+	// does not provide a usable reset time (e.g. missing/invalid headers).
+	//
+	// <= 0 means use the built-in default (5 minutes).
+	FallbackCooldownMinutes int `mapstructure:"fallback_cooldown_minutes"` // 429兜底冷却时间(分钟)
 }
 
 // APIKeyAuthCacheConfig API Key 认证缓存配置
@@ -930,6 +935,10 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	// JWT
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
 	_ = v.BindEnv("jwt.expire_hour", "JWT_EXPIRE_HOUR")
+
+	// Rate limiting
+	_ = v.BindEnv("rate_limit.overload_cooldown_minutes", "RATE_LIMIT_OVERLOAD_COOLDOWN_MINUTES")
+	_ = v.BindEnv("rate_limit.fallback_cooldown_minutes", "RATE_LIMIT_FALLBACK_COOLDOWN_MINUTES")
 
 	// Security (admin read-only API key allowlist)
 	_ = v.BindEnv("security.admin_api_key_read_only.allowed_paths", "SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS")
@@ -1283,6 +1292,7 @@ func setDefaults() {
 
 	// RateLimit
 	viper.SetDefault("rate_limit.overload_cooldown_minutes", 10)
+	viper.SetDefault("rate_limit.fallback_cooldown_minutes", 5)
 
 	// Pricing - 从 price-mirror 分支同步，该分支维护了 sha256 哈希文件用于增量更新检查
 	viper.SetDefault("pricing.remote_url", "https://raw.githubusercontent.com/Wei-Shaw/claude-relay-service/price-mirror/model_prices_and_context_window.json")
