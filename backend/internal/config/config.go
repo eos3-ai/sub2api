@@ -971,6 +971,9 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.max_concurrency", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MAX_CONCURRENCY")
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.model_id", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MODEL_ID")
 
+	// Gateway TLS fingerprint simulation
+	_ = v.BindEnv("gateway.tls_fingerprint.enabled", "GATEWAY_TLS_FINGERPRINT_ENABLED")
+
 	// Gemini OAuth / Quota
 	_ = v.BindEnv("gemini.oauth.client_id", "GEMINI_OAUTH_CLIENT_ID")
 	_ = v.BindEnv("gemini.oauth.client_secret", "GEMINI_OAUTH_CLIENT_SECRET")

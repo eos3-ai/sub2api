@@ -410,7 +410,12 @@ func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.C
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, false)
+	enableTLSFingerprint := false
+	if s.cfg != nil {
+		enableTLSFingerprint = s.cfg.Gateway.TLSFingerprint.Enabled
+	}
+
+	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, enableTLSFingerprint)
 	if err != nil {
 		return false, fmt.Sprintf("Request failed: %s", err.Error()), time.Since(startedAt)
 	}

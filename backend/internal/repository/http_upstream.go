@@ -100,6 +100,11 @@ type httpUpstreamService struct {
 // 返回:
 //   - service.HTTPUpstream 接口实现
 func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
+	// Initialize the global TLS fingerprint registry once from config, so custom profiles
+	// are available before any upstream requests attempt to use TLS fingerprinting.
+	if cfg != nil {
+		_ = tlsfingerprint.InitGlobalRegistry(&cfg.Gateway.TLSFingerprint)
+	}
 	return &httpUpstreamService{
 		cfg:     cfg,
 		clients: make(map[string]*upstreamClientEntry),
@@ -167,6 +172,11 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 //   - 指纹模板根据 accountID % len(profiles) 自动选择
 //   - 支持直连、HTTP/HTTPS 代理、SOCKS5 代理三种场景
 func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, enableTLSFingerprint bool) (*http.Response, error) {
+	// Global gate: disable TLS fingerprinting when explicitly turned off in config.
+	if enableTLSFingerprint && s.cfg != nil && !s.cfg.Gateway.TLSFingerprint.Enabled {
+		enableTLSFingerprint = false
+	}
+
 	// 如果未启用 TLS 指纹，直接使用标准请求路径
 	if !enableTLSFingerprint {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
