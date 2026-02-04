@@ -237,6 +237,10 @@ gateway:
     # - 6 consecutive failures  -> set account.schedulable=false + DingTalk alert
     # - 6 consecutive successes -> set account.schedulable=true  + DingTalk recovery alert
     #
+    # Implementation:
+    # - Reuses the same request logic as the admin endpoint: POST /api/v1/admin/accounts/:id/test
+    # - Monitor mode overrides max_tokens=1 to keep it lightweight
+    #
     # Notes:
     # - Only affects accounts with platform=anthropic and type=apikey
     # - Recovery only auto-enables accounts previously auto-disabled by this monitor

@@ -1,12 +1,8 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -15,7 +11,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
-	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
@@ -25,10 +21,10 @@ const (
 )
 
 const (
-	anthropicAPIKeyMonitorExtraAutoDisabledKey  = "anthropic_apikey_monitor_auto_disabled"
-	anthropicAPIKeyMonitorExtraDisabledAtKey    = "anthropic_apikey_monitor_disabled_at"
-	anthropicAPIKeyMonitorExtraDisabledReasonKey = "anthropic_apikey_monitor_disabled_reason"
-	anthropicAPIKeyMonitorExtraRecoveredAtKey   = "anthropic_apikey_monitor_recovered_at"
+	anthropicAPIKeyMonitorExtraAutoDisabledKey    = "anthropic_apikey_monitor_auto_disabled"
+	anthropicAPIKeyMonitorExtraDisabledAtKey      = "anthropic_apikey_monitor_disabled_at"
+	anthropicAPIKeyMonitorExtraDisabledReasonKey  = "anthropic_apikey_monitor_disabled_reason"
+	anthropicAPIKeyMonitorExtraRecoveredAtKey     = "anthropic_apikey_monitor_recovered_at"
 	anthropicAPIKeyMonitorExtraRecoveredReasonKey = "anthropic_apikey_monitor_recovered_reason"
 )
 
@@ -37,6 +33,7 @@ type AnthropicAPIKeyMonitorService struct {
 	httpUpstream HTTPUpstream
 	redisClient  *redis.Client
 	cfg          *config.Config
+	testService  *AccountTestService
 
 	instanceID        string
 	distributedLockOn bool
@@ -78,21 +75,22 @@ func NewAnthropicAPIKeyMonitorService(
 ) *AnthropicAPIKeyMonitorService {
 	lockOn := cfg == nil || strings.TrimSpace(cfg.RunMode) != config.RunModeSimple
 	return &AnthropicAPIKeyMonitorService{
-		accountRepo:        accountRepo,
-		httpUpstream:       httpUpstream,
-		redisClient:        redisClient,
+		accountRepo:       accountRepo,
+		httpUpstream:      httpUpstream,
+		redisClient:       redisClient,
 		cfg:               cfg,
-		instanceID:         uuid.NewString(),
-		distributedLockOn:  lockOn,
-		warnNoRedisOnce:    sync.Once{},
-		startOnce:          sync.Once{},
-		stopOnce:           sync.Once{},
-		stopCtx:            nil,
-		stop:               nil,
-		wg:                 sync.WaitGroup{},
-		leader:             false,
-		state:              map[int64]*anthropicAPIKeyMonitorState{},
-		dingtalk:           NewDingtalkService(cfg),
+		testService:       NewAccountTestService(accountRepo, nil, nil, httpUpstream, cfg),
+		instanceID:        uuid.NewString(),
+		distributedLockOn: lockOn,
+		warnNoRedisOnce:   sync.Once{},
+		startOnce:         sync.Once{},
+		stopOnce:          sync.Once{},
+		stopCtx:           nil,
+		stop:              nil,
+		wg:                sync.WaitGroup{},
+		leader:            false,
+		state:             map[int64]*anthropicAPIKeyMonitorState{},
+		dingtalk:          NewDingtalkService(cfg),
 	}
 }
 
@@ -326,24 +324,6 @@ func (s *AnthropicAPIKeyMonitorService) effectiveModelID() string {
 	return strings.TrimSpace(s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ModelID)
 }
 
-func (s *AnthropicAPIKeyMonitorService) validateUpstreamBaseURL(raw string) (string, error) {
-	if s == nil || s.cfg == nil {
-		return "", fmt.Errorf("config is not available")
-	}
-	if !s.cfg.Security.URLAllowlist.Enabled {
-		return urlvalidator.ValidateURLFormat(raw, s.cfg.Security.URLAllowlist.AllowInsecureHTTP)
-	}
-	normalized, err := urlvalidator.ValidateHTTPSURL(raw, urlvalidator.ValidationOptions{
-		AllowedHosts:     s.cfg.Security.URLAllowlist.UpstreamHosts,
-		RequireAllowlist: true,
-		AllowPrivate:     s.cfg.Security.URLAllowlist.AllowPrivateHosts,
-	})
-	if err != nil {
-		return "", err
-	}
-	return normalized, nil
-}
-
 func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.Context, account *Account) (bool, string, time.Duration) {
 	if s == nil || account == nil {
 		return false, "nil account", 0
@@ -364,124 +344,28 @@ func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.C
 	if modelID == "" {
 		modelID = claude.DefaultMonitorModel
 	}
-	// Apply account-level model mapping when configured.
-	modelID = account.GetMappedModel(modelID)
-
-	apiKey := strings.TrimSpace(account.GetCredential("api_key"))
-	if apiKey == "" {
-		return false, "No API key available", time.Since(startedAt)
+	if s.testService == nil {
+		s.testService = NewAccountTestService(s.accountRepo, nil, nil, s.httpUpstream, s.cfg)
 	}
 
-	baseURL := strings.TrimSpace(account.GetBaseURL())
-	if baseURL == "" {
-		baseURL = "https://api.anthropic.com"
-	}
-	normalizedBaseURL, err := s.validateUpstreamBaseURL(baseURL)
-	if err != nil {
-		return false, fmt.Sprintf("Invalid base URL: %s", err.Error()), time.Since(startedAt)
-	}
+	// Reuse the same logic as the admin endpoint:
+	//   POST /api/v1/admin/accounts/:id/test
+	// but make it lightweight for monitoring by overriding max_tokens=1.
+	w := newLimitedResponseWriter(8 * 1024)
+	c, _ := gin.CreateTestContext(w)
+	req, _ := http.NewRequestWithContext(reqCtx, http.MethodPost, fmt.Sprintf("http://localhost/api/v1/admin/accounts/%d/test", account.ID), nil)
+	req.Header.Set("content-type", "application/json")
+	c.Request = req
 
-	apiURL := strings.TrimSuffix(normalizedBaseURL, "/") + "/v1/messages"
-
-	payload, err := createTestPayload(modelID)
-	if err != nil {
-		return false, "Failed to create test payload", time.Since(startedAt)
-	}
-	// Make the automated monitor lightweight: we only need to validate connectivity + auth.
-	payload["max_tokens"] = 1
-	payloadBytes, _ := json.Marshal(payload)
-
-	req, err := http.NewRequestWithContext(reqCtx, "POST", apiURL, bytes.NewReader(payloadBytes))
-	if err != nil {
-		return false, "Failed to create request", time.Since(startedAt)
-	}
-
-	// Match the admin "test account" headers (Claude Code style).
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("anthropic-version", "2023-06-01")
-	req.Header.Set("anthropic-beta", claude.DefaultBetaHeader)
-	for key, value := range claude.DefaultHeaders {
-		req.Header.Set(key, value)
-	}
-	req.Header.Set("x-api-key", apiKey)
-
-	proxyURL := ""
-	if account.ProxyID != nil && account.Proxy != nil {
-		proxyURL = account.Proxy.URL()
-	}
-
-	enableTLSFingerprint := false
-	if s.cfg != nil {
-		enableTLSFingerprint = s.cfg.Gateway.TLSFingerprint.Enabled
-	}
-
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, enableTLSFingerprint)
-	if err != nil {
-		return false, fmt.Sprintf("Request failed: %s", err.Error()), time.Since(startedAt)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != 200 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		msg := strings.TrimSpace(string(body))
+	if err := s.testService.testClaudeAccountConnection(c, account, modelID, 1); err != nil {
+		msg := strings.TrimSpace(err.Error())
 		if msg == "" {
-			msg = "(empty response)"
+			msg = "test failed"
 		}
-		return false, fmt.Sprintf("API returned %d: %s", resp.StatusCode, msg), time.Since(startedAt)
+		return false, msg, time.Since(startedAt)
 	}
 
-	ok, msg := consumeClaudeTestStream(resp.Body)
-	return ok, msg, time.Since(startedAt)
-}
-
-func consumeClaudeTestStream(body io.Reader) (bool, string) {
-	reader := bufio.NewReader(body)
-
-	for {
-		line, err := reader.ReadString('\n')
-		if err != nil {
-			if err == io.EOF {
-				return true, ""
-			}
-			return false, fmt.Sprintf("Stream read error: %s", err.Error())
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" || !sseDataPrefix.MatchString(line) {
-			continue
-		}
-
-		jsonStr := sseDataPrefix.ReplaceAllString(line, "")
-		if jsonStr == "[DONE]" {
-			return true, ""
-		}
-
-		var data map[string]any
-		if err := json.Unmarshal([]byte(jsonStr), &data); err != nil {
-			continue
-		}
-
-		eventType, _ := data["type"].(string)
-		switch eventType {
-		case "content_block_delta":
-			if delta, ok := data["delta"].(map[string]any); ok {
-				if text, ok := delta["text"].(string); ok && strings.TrimSpace(text) != "" {
-					// Success fast-path: any streamed content implies auth + model routing is working.
-					return true, ""
-				}
-			}
-		case "message_stop":
-			return true, ""
-		case "error":
-			errorMsg := "Unknown error"
-			if errData, ok := data["error"].(map[string]any); ok {
-				if msg, ok := errData["message"].(string); ok && strings.TrimSpace(msg) != "" {
-					errorMsg = strings.TrimSpace(msg)
-				}
-			}
-			return false, errorMsg
-		}
-	}
+	return true, "", time.Since(startedAt)
 }
 
 func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now time.Time, res anthropicAPIKeyMonitorResult) {
