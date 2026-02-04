@@ -2557,6 +2557,8 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 			if err != nil {
 				return nil, err
 			}
+			// 去掉结尾的斜杠，避免URL拼接时出现双斜杠
+			validatedURL = strings.TrimSuffix(validatedURL, "/")
 			targetURL = validatedURL + "/v1/messages"
 		}
 	}
@@ -2616,6 +2618,10 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	}
 	if req.Header.Get("anthropic-version") == "" {
 		req.Header.Set("anthropic-version", "2023-06-01")
+	}
+	// 为API key类型账号设置默认User-Agent（模仿Anthropic SDK）
+	if tokenType != "oauth" && req.Header.Get("user-agent") == "" {
+		req.Header.Set("user-agent", "anthropic-sdk-typescript/0.20.0")
 	}
 
 	// 处理anthropic-beta header（OAuth账号需要特殊处理）
@@ -3590,6 +3596,8 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 			if err != nil {
 				return nil, err
 			}
+			// 去掉结尾的斜杠，避免URL拼接时出现双斜杠
+			validatedURL = strings.TrimSuffix(validatedURL, "/")
 			targetURL = validatedURL + "/v1/messages/count_tokens"
 		}
 	}
