@@ -128,6 +128,8 @@ func (s *AnthropicAPIKeyMonitorService) StartWithContext(ctx context.Context) {
 			"success_threshold", s.effectiveSuccessThreshold(),
 			"request_timeout", s.effectiveRequestTimeout().String(),
 			"max_concurrency", s.effectiveMaxConcurrency(),
+			"include_account_ids", s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs,
+			"exclude_account_ids", s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs,
 		)
 	})
 }
@@ -193,21 +195,7 @@ func (s *AnthropicAPIKeyMonitorService) runOnce() {
 		return
 	}
 
-	targets := make([]Account, 0, len(accounts))
-	for i := range accounts {
-		acc := accounts[i]
-		if acc.Platform != PlatformAnthropic {
-			continue
-		}
-		if acc.Type != AccountTypeAPIKey {
-			continue
-		}
-		// Only active accounts; schedulable may be toggled by this monitor.
-		if acc.Status != StatusActive {
-			continue
-		}
-		targets = append(targets, acc)
-	}
+	targets := s.selectTargets(accounts)
 	if len(targets) == 0 {
 		return
 	}
@@ -261,6 +249,49 @@ func (s *AnthropicAPIKeyMonitorService) runOnce() {
 
 func (s *AnthropicAPIKeyMonitorService) resetState() {
 	s.state = map[int64]*anthropicAPIKeyMonitorState{}
+}
+
+func (s *AnthropicAPIKeyMonitorService) selectTargets(accounts []Account) []Account {
+	if s == nil {
+		return nil
+	}
+
+	includeIDs := map[int64]struct{}{}
+	excludeIDs := map[int64]struct{}{}
+	if s.cfg != nil {
+		for _, id := range s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs {
+			includeIDs[id] = struct{}{}
+		}
+		for _, id := range s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs {
+			excludeIDs[id] = struct{}{}
+		}
+	}
+	hasInclude := len(includeIDs) > 0
+
+	targets := make([]Account, 0, len(accounts))
+	for i := range accounts {
+		acc := accounts[i]
+		if acc.Platform != PlatformAnthropic {
+			continue
+		}
+		if acc.Type != AccountTypeAPIKey {
+			continue
+		}
+		// Only active accounts; schedulable may be toggled by this monitor.
+		if acc.Status != StatusActive {
+			continue
+		}
+		if hasInclude {
+			if _, ok := includeIDs[acc.ID]; !ok {
+				continue
+			}
+		}
+		if _, ok := excludeIDs[acc.ID]; ok {
+			continue
+		}
+		targets = append(targets, acc)
+	}
+	return targets
 }
 
 func (s *AnthropicAPIKeyMonitorService) effectiveInterval() time.Duration {

@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -388,6 +389,12 @@ type AnthropicAPIKeyMonitorConfig struct {
 	// ModelID optionally overrides the model used for the test request.
 	// Empty uses the backend default (claude.DefaultMonitorModel), then applies account model_mapping.
 	ModelID string `mapstructure:"model_id"`
+
+	// IncludeAccountIDs optionally restricts the monitor to specific account IDs.
+	// When non-empty, only matching Anthropic API-key active accounts will be tested.
+	IncludeAccountIDs []int64 `mapstructure:"include_account_ids"`
+	// ExcludeAccountIDs optionally skips specific account IDs from monitoring.
+	ExcludeAccountIDs []int64 `mapstructure:"exclude_account_ids"`
 }
 
 func (s *ServerConfig) Address() string {
@@ -783,6 +790,22 @@ func Load() (*Config, error) {
 		viper.Set("security.admin_api_key_read_only.allowed_path_prefixes", prefixes)
 	}
 
+	// Int64-slice env overrides (docker-friendly). Accepts JSON array ([1,2] or ["1","2"]) or CSV (1,2).
+	if raw := strings.TrimSpace(os.Getenv("GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")); raw != "" {
+		ids, err := parseInt64ListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS: %w", err)
+		}
+		viper.Set("gateway.scheduling.anthropic_apikey_monitor.include_account_ids", ids)
+	}
+	if raw := strings.TrimSpace(os.Getenv("GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")); raw != "" {
+		ids, err := parseInt64ListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS: %w", err)
+		}
+		viper.Set("gateway.scheduling.anthropic_apikey_monitor.exclude_account_ids", ids)
+	}
+
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
 			return nil, fmt.Errorf("read config error: %w", err)
@@ -814,6 +837,8 @@ func Load() (*Config, error) {
 	cfg.Security.CSP.Policy = strings.TrimSpace(cfg.Security.CSP.Policy)
 	cfg.Security.AdminAPIKeyReadOnly.AllowedPaths = normalizeStringSlice(cfg.Security.AdminAPIKeyReadOnly.AllowedPaths)
 	cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes = normalizeStringSlice(cfg.Security.AdminAPIKeyReadOnly.AllowedPathPrefixes)
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs)
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs)
 
 	if cfg.Server.Mode != "release" && cfg.JWT.Secret == "" {
 		secret, err := generateJWTSecret(64)
@@ -970,6 +995,8 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.request_timeout", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_REQUEST_TIMEOUT")
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.max_concurrency", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MAX_CONCURRENCY")
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.model_id", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MODEL_ID")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.include_account_ids", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.exclude_account_ids", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")
 
 	// Gateway TLS fingerprint simulation
 	_ = v.BindEnv("gateway.tls_fingerprint.enabled", "GATEWAY_TLS_FINGERPRINT_ENABLED")
@@ -1387,6 +1414,8 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.request_timeout", 8*time.Second)
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.max_concurrency", 4)
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.model_id", "")
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.include_account_ids", []int64{})
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.exclude_account_ids", []int64{})
 	// TLS指纹伪装配置（默认关闭，需要账号级别单独启用）
 	viper.SetDefault("gateway.tls_fingerprint.enabled", true)
 	viper.SetDefault("concurrency.ping_interval", 10)
@@ -1750,6 +1779,85 @@ func parseStringListEnv(raw string) ([]string, error) {
 		}
 	})
 	return normalizeStringSlice(parts), nil
+}
+
+func normalizeInt64Slice(values []int64) []int64 {
+	if len(values) == 0 {
+		return values
+	}
+	seen := make(map[int64]struct{}, len(values))
+	normalized := make([]int64, 0, len(values))
+	for _, v := range values {
+		if v <= 0 {
+			continue
+		}
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		normalized = append(normalized, v)
+	}
+	return normalized
+}
+
+func parseInt64ListEnv(raw string) ([]int64, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+
+	if strings.HasPrefix(raw, "[") {
+		var parsed []any
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+			return nil, err
+		}
+		out := make([]int64, 0, len(parsed))
+		for _, item := range parsed {
+			switch v := item.(type) {
+			case float64:
+				// JSON numbers decode to float64.
+				if v != float64(int64(v)) {
+					return nil, fmt.Errorf("non-integer value %v", v)
+				}
+				out = append(out, int64(v))
+			case string:
+				trimmed := strings.TrimSpace(v)
+				if trimmed == "" {
+					continue
+				}
+				n, err := strconv.ParseInt(trimmed, 10, 64)
+				if err != nil {
+					return nil, err
+				}
+				out = append(out, n)
+			default:
+				return nil, fmt.Errorf("invalid value type %T", item)
+			}
+		}
+		return normalizeInt64Slice(out), nil
+	}
+
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		switch r {
+		case ',', '\n', ';':
+			return true
+		default:
+			return false
+		}
+	})
+	out := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		n, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return normalizeInt64Slice(out), nil
 }
 
 func isWeakJWTSecret(secret string) bool {

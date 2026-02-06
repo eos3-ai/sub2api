@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -52,8 +53,8 @@ func newMonitorTestAccount() *Account {
 		Type:        AccountTypeAPIKey,
 		Concurrency: 1,
 		Credentials: map[string]any{
-			"api_key":   "sk-test",
-			"base_url":  "https://api.anthropic.com",
+			"api_key":  "sk-test",
+			"base_url": "https://api.anthropic.com",
 		},
 	}
 }
@@ -97,4 +98,91 @@ func TestAnthropicAPIKeyMonitor_DisablesTLSFingerprintWhenDisabled(t *testing.T)
 	if upstream.enableTLSFingerprint {
 		t.Fatalf("expected enableTLSFingerprint=false, got true")
 	}
+}
+
+func TestAnthropicAPIKeyMonitor_SelectTargets_Default(t *testing.T) {
+	cfg := newMonitorTestConfig()
+	svc := NewAnthropicAPIKeyMonitorService(nil, nil, nil, cfg)
+
+	accounts := []Account{
+		{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+		{ID: 2, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Status: StatusActive},
+		{ID: 3, Platform: PlatformOpenAI, Type: AccountTypeAPIKey, Status: StatusActive},
+		{ID: 4, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusDisabled},
+		{ID: 5, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+	}
+
+	targets := svc.selectTargets(accounts)
+	got := extractAccountIDs(targets)
+	want := []int64{1, 5}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("selectTargets IDs = %v, want %v", got, want)
+	}
+}
+
+func TestAnthropicAPIKeyMonitor_SelectTargets_IncludeIDs(t *testing.T) {
+	cfg := newMonitorTestConfig()
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs = []int64{2, 5, 999}
+	svc := NewAnthropicAPIKeyMonitorService(nil, nil, nil, cfg)
+
+	accounts := []Account{
+		{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+		{ID: 2, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Status: StatusActive},
+		{ID: 5, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+	}
+
+	targets := svc.selectTargets(accounts)
+	got := extractAccountIDs(targets)
+	want := []int64{5}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("selectTargets IDs = %v, want %v", got, want)
+	}
+}
+
+func TestAnthropicAPIKeyMonitor_SelectTargets_ExcludeIDs(t *testing.T) {
+	cfg := newMonitorTestConfig()
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs = []int64{1}
+	svc := NewAnthropicAPIKeyMonitorService(nil, nil, nil, cfg)
+
+	accounts := []Account{
+		{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+		{ID: 5, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+	}
+
+	targets := svc.selectTargets(accounts)
+	got := extractAccountIDs(targets)
+	want := []int64{5}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("selectTargets IDs = %v, want %v", got, want)
+	}
+}
+
+func TestAnthropicAPIKeyMonitor_SelectTargets_IncludeAndExclude(t *testing.T) {
+	cfg := newMonitorTestConfig()
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.IncludeAccountIDs = []int64{1, 5}
+	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs = []int64{5}
+	svc := NewAnthropicAPIKeyMonitorService(nil, nil, nil, cfg)
+
+	accounts := []Account{
+		{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+		{ID: 5, Platform: PlatformAnthropic, Type: AccountTypeAPIKey, Status: StatusActive},
+	}
+
+	targets := svc.selectTargets(accounts)
+	got := extractAccountIDs(targets)
+	want := []int64{1}
+	if fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("selectTargets IDs = %v, want %v", got, want)
+	}
+}
+
+func extractAccountIDs(accounts []Account) []int64 {
+	if len(accounts) == 0 {
+		return nil
+	}
+	out := make([]int64, 0, len(accounts))
+	for i := range accounts {
+		out = append(out, accounts[i].ID)
+	}
+	return out
 }
