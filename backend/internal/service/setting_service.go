@@ -60,6 +60,10 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	keys := []string{
 		SettingKeyRegistrationEnabled,
 		SettingKeyEmailVerifyEnabled,
+		SettingKeyPromoCodeEnabled,
+		SettingKeyPasswordResetEnabled,
+		SettingKeyInvitationCodeEnabled,
+		SettingKeyTotpEnabled,
 		SettingKeyTurnstileEnabled,
 		SettingKeyTurnstileSiteKey,
 		SettingKeySiteName,
@@ -69,6 +73,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		SettingKeyContactInfo,
 		SettingKeyDocURL,
 		SettingKeyHomeContent,
+		SettingKeyHideCcsImportButton,
+		SettingKeyPurchaseSubscriptionEnabled,
+		SettingKeyPurchaseSubscriptionURL,
 		SettingKeyLinuxDoConnectEnabled,
 	}
 
@@ -84,19 +91,30 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		linuxDoEnabled = s.cfg != nil && s.cfg.LinuxDo.Enabled
 	}
 
+	// Password reset requires email verification to be enabled
+	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
+	passwordResetEnabled := emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true"
+
 	return &PublicSettings{
-		RegistrationEnabled: settings[SettingKeyRegistrationEnabled] == "true",
-		EmailVerifyEnabled:  settings[SettingKeyEmailVerifyEnabled] == "true",
-		TurnstileEnabled:    settings[SettingKeyTurnstileEnabled] == "true",
-		TurnstileSiteKey:    settings[SettingKeyTurnstileSiteKey],
-		SiteName:            s.getStringOrDefault(settings, SettingKeySiteName, "Sub2API"),
-		SiteLogo:            settings[SettingKeySiteLogo],
-		SiteSubtitle:        s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
-		APIBaseURL:          settings[SettingKeyAPIBaseURL],
-		ContactInfo:         settings[SettingKeyContactInfo],
-		DocURL:              settings[SettingKeyDocURL],
-		HomeContent:         settings[SettingKeyHomeContent],
-		LinuxDoOAuthEnabled: linuxDoEnabled,
+		RegistrationEnabled:         settings[SettingKeyRegistrationEnabled] == "true",
+		EmailVerifyEnabled:          emailVerifyEnabled,
+		PromoCodeEnabled:            settings[SettingKeyPromoCodeEnabled] != "false", // 默认启用
+		PasswordResetEnabled:        passwordResetEnabled,
+		InvitationCodeEnabled:       settings[SettingKeyInvitationCodeEnabled] == "true",
+		TotpEnabled:                 settings[SettingKeyTotpEnabled] == "true",
+		TurnstileEnabled:            settings[SettingKeyTurnstileEnabled] == "true",
+		TurnstileSiteKey:            settings[SettingKeyTurnstileSiteKey],
+		SiteName:                    s.getStringOrDefault(settings, SettingKeySiteName, "Sub2API"),
+		SiteLogo:                    settings[SettingKeySiteLogo],
+		SiteSubtitle:                s.getStringOrDefault(settings, SettingKeySiteSubtitle, "Subscription to API Conversion Platform"),
+		APIBaseURL:                  settings[SettingKeyAPIBaseURL],
+		ContactInfo:                 settings[SettingKeyContactInfo],
+		DocURL:                      settings[SettingKeyDocURL],
+		HomeContent:                 settings[SettingKeyHomeContent],
+		HideCcsImportButton:         settings[SettingKeyHideCcsImportButton] == "true",
+		PurchaseSubscriptionEnabled: settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
+		PurchaseSubscriptionURL:     strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
+		LinuxDoOAuthEnabled:         linuxDoEnabled,
 	}, nil
 }
 
@@ -121,33 +139,47 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 
 	// Return a struct that matches the frontend's expected format
 	return &struct {
-		RegistrationEnabled bool   `json:"registration_enabled"`
-		EmailVerifyEnabled  bool   `json:"email_verify_enabled"`
-		TurnstileEnabled    bool   `json:"turnstile_enabled"`
-		TurnstileSiteKey    string `json:"turnstile_site_key,omitempty"`
-		SiteName            string `json:"site_name"`
-		SiteLogo            string `json:"site_logo,omitempty"`
-		SiteSubtitle        string `json:"site_subtitle,omitempty"`
-		APIBaseURL          string `json:"api_base_url,omitempty"`
-		ContactInfo         string `json:"contact_info,omitempty"`
-		DocURL              string `json:"doc_url,omitempty"`
-		HomeContent         string `json:"home_content,omitempty"`
-		LinuxDoOAuthEnabled bool   `json:"linuxdo_oauth_enabled"`
-		Version             string `json:"version,omitempty"`
+		RegistrationEnabled         bool   `json:"registration_enabled"`
+		EmailVerifyEnabled          bool   `json:"email_verify_enabled"`
+		PromoCodeEnabled            bool   `json:"promo_code_enabled"`
+		PasswordResetEnabled        bool   `json:"password_reset_enabled"`
+		InvitationCodeEnabled       bool   `json:"invitation_code_enabled"`
+		TotpEnabled                 bool   `json:"totp_enabled"`
+		TurnstileEnabled            bool   `json:"turnstile_enabled"`
+		TurnstileSiteKey            string `json:"turnstile_site_key,omitempty"`
+		SiteName                    string `json:"site_name"`
+		SiteLogo                    string `json:"site_logo,omitempty"`
+		SiteSubtitle                string `json:"site_subtitle,omitempty"`
+		APIBaseURL                  string `json:"api_base_url,omitempty"`
+		ContactInfo                 string `json:"contact_info,omitempty"`
+		DocURL                      string `json:"doc_url,omitempty"`
+		HomeContent                 string `json:"home_content,omitempty"`
+		HideCcsImportButton         bool   `json:"hide_ccs_import_button"`
+		PurchaseSubscriptionEnabled bool   `json:"purchase_subscription_enabled"`
+		PurchaseSubscriptionURL     string `json:"purchase_subscription_url,omitempty"`
+		LinuxDoOAuthEnabled         bool   `json:"linuxdo_oauth_enabled"`
+		Version                     string `json:"version,omitempty"`
 	}{
-		RegistrationEnabled: settings.RegistrationEnabled,
-		EmailVerifyEnabled:  settings.EmailVerifyEnabled,
-		TurnstileEnabled:    settings.TurnstileEnabled,
-		TurnstileSiteKey:    settings.TurnstileSiteKey,
-		SiteName:            settings.SiteName,
-		SiteLogo:            settings.SiteLogo,
-		SiteSubtitle:        settings.SiteSubtitle,
-		APIBaseURL:          settings.APIBaseURL,
-		ContactInfo:         settings.ContactInfo,
-		DocURL:              settings.DocURL,
-		HomeContent:         settings.HomeContent,
-		LinuxDoOAuthEnabled: settings.LinuxDoOAuthEnabled,
-		Version:             s.version,
+		RegistrationEnabled:         settings.RegistrationEnabled,
+		EmailVerifyEnabled:          settings.EmailVerifyEnabled,
+		PromoCodeEnabled:            settings.PromoCodeEnabled,
+		PasswordResetEnabled:        settings.PasswordResetEnabled,
+		InvitationCodeEnabled:       settings.InvitationCodeEnabled,
+		TotpEnabled:                 settings.TotpEnabled,
+		TurnstileEnabled:            settings.TurnstileEnabled,
+		TurnstileSiteKey:            settings.TurnstileSiteKey,
+		SiteName:                    settings.SiteName,
+		SiteLogo:                    settings.SiteLogo,
+		SiteSubtitle:                settings.SiteSubtitle,
+		APIBaseURL:                  settings.APIBaseURL,
+		ContactInfo:                 settings.ContactInfo,
+		DocURL:                      settings.DocURL,
+		HomeContent:                 settings.HomeContent,
+		HideCcsImportButton:         settings.HideCcsImportButton,
+		PurchaseSubscriptionEnabled: settings.PurchaseSubscriptionEnabled,
+		PurchaseSubscriptionURL:     settings.PurchaseSubscriptionURL,
+		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
+		Version:                     s.version,
 	}, nil
 }
 
@@ -158,6 +190,10 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	// 注册设置
 	updates[SettingKeyRegistrationEnabled] = strconv.FormatBool(settings.RegistrationEnabled)
 	updates[SettingKeyEmailVerifyEnabled] = strconv.FormatBool(settings.EmailVerifyEnabled)
+	updates[SettingKeyPromoCodeEnabled] = strconv.FormatBool(settings.PromoCodeEnabled)
+	updates[SettingKeyPasswordResetEnabled] = strconv.FormatBool(settings.PasswordResetEnabled)
+	updates[SettingKeyInvitationCodeEnabled] = strconv.FormatBool(settings.InvitationCodeEnabled)
+	updates[SettingKeyTotpEnabled] = strconv.FormatBool(settings.TotpEnabled)
 
 	// 邮件服务设置（只有非空才更新密码）
 	updates[SettingKeySMTPHost] = settings.SMTPHost
@@ -193,17 +229,13 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	updates[SettingKeyContactInfo] = settings.ContactInfo
 	updates[SettingKeyDocURL] = settings.DocURL
 	updates[SettingKeyHomeContent] = settings.HomeContent
+	updates[SettingKeyHideCcsImportButton] = strconv.FormatBool(settings.HideCcsImportButton)
+	updates[SettingKeyPurchaseSubscriptionEnabled] = strconv.FormatBool(settings.PurchaseSubscriptionEnabled)
+	updates[SettingKeyPurchaseSubscriptionURL] = strings.TrimSpace(settings.PurchaseSubscriptionURL)
 
 	// 默认配置
 	updates[SettingKeyDefaultConcurrency] = strconv.Itoa(settings.DefaultConcurrency)
 	updates[SettingKeyDefaultBalance] = strconv.FormatFloat(settings.DefaultBalance, 'f', 8, 64)
-
-	// Invoice configuration
-	itemName := strings.TrimSpace(settings.InvoiceDefaultItemName)
-	if itemName == "" {
-		itemName = "技术服务费"
-	}
-	updates[SettingKeyInvoiceDefaultItemName] = itemName
 
 	// Model fallback configuration
 	updates[SettingKeyEnableModelFallback] = strconv.FormatBool(settings.EnableModelFallback)
@@ -250,6 +282,53 @@ func (s *SettingService) IsEmailVerifyEnabled(ctx context.Context) bool {
 	return value == "true"
 }
 
+// IsPromoCodeEnabled 检查是否启用优惠码功能
+func (s *SettingService) IsPromoCodeEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyPromoCodeEnabled)
+	if err != nil {
+		return true // 默认启用
+	}
+	return value != "false"
+}
+
+// IsInvitationCodeEnabled 检查是否启用邀请码注册功能
+func (s *SettingService) IsInvitationCodeEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvitationCodeEnabled)
+	if err != nil {
+		return false // 默认关闭
+	}
+	return value == "true"
+}
+
+// IsPasswordResetEnabled 检查是否启用密码重置功能
+// 要求：必须同时开启邮件验证
+func (s *SettingService) IsPasswordResetEnabled(ctx context.Context) bool {
+	// Password reset requires email verification to be enabled
+	if !s.IsEmailVerifyEnabled(ctx) {
+		return false
+	}
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyPasswordResetEnabled)
+	if err != nil {
+		return false // 默认关闭
+	}
+	return value == "true"
+}
+
+// IsTotpEnabled 检查是否启用 TOTP 双因素认证功能
+func (s *SettingService) IsTotpEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyTotpEnabled)
+	if err != nil {
+		return false // 默认关闭
+	}
+	return value == "true"
+}
+
+// IsTotpEncryptionKeyConfigured 检查 TOTP 加密密钥是否已手动配置
+// 只有手动配置了密钥才允许在管理后台启用 TOTP 功能
+func (s *SettingService) IsTotpEncryptionKeyConfigured() bool {
+	return s.cfg.Totp.EncryptionKeyConfigured
+}
+
 // GetSiteName 获取网站名称
 func (s *SettingService) GetSiteName(ctx context.Context) string {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeySiteName)
@@ -283,19 +362,6 @@ func (s *SettingService) GetDefaultBalance(ctx context.Context) float64 {
 	return s.cfg.Default.UserBalance
 }
 
-// GetInvoiceDefaultItemName returns the default invoice item name (商品/服务名称).
-// Default: "技术服务费".
-func (s *SettingService) GetInvoiceDefaultItemName(ctx context.Context) string {
-	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvoiceDefaultItemName)
-	if err != nil {
-		return "技术服务费"
-	}
-	if strings.TrimSpace(value) == "" {
-		return "技术服务费"
-	}
-	return strings.TrimSpace(value)
-}
-
 // InitializeDefaultSettings 初始化默认设置
 func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 	// 检查是否已有设置
@@ -310,15 +376,17 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 	// 初始化默认设置
 	defaults := map[string]string{
-		SettingKeyRegistrationEnabled:    "true",
-		SettingKeyEmailVerifyEnabled:     "false",
-		SettingKeySiteName:               "Sub2API",
-		SettingKeySiteLogo:               "",
-		SettingKeyDefaultConcurrency:     strconv.Itoa(s.cfg.Default.UserConcurrency),
-		SettingKeyDefaultBalance:         strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
-		SettingKeyInvoiceDefaultItemName: "技术服务费",
-		SettingKeySMTPPort:               "587",
-		SettingKeySMTPUseTLS:             "false",
+		SettingKeyRegistrationEnabled:         "true",
+		SettingKeyEmailVerifyEnabled:          "false",
+		SettingKeyPromoCodeEnabled:            "true", // 默认启用优惠码功能
+		SettingKeySiteName:                    "Sub2API",
+		SettingKeySiteLogo:                    "",
+		SettingKeyPurchaseSubscriptionEnabled: "false",
+		SettingKeyPurchaseSubscriptionURL:     "",
+		SettingKeyDefaultConcurrency:          strconv.Itoa(s.cfg.Default.UserConcurrency),
+		SettingKeyDefaultBalance:              strconv.FormatFloat(s.cfg.Default.UserBalance, 'f', 8, 64),
+		SettingKeySMTPPort:                    "587",
+		SettingKeySMTPUseTLS:                  "false",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -341,9 +409,14 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 
 // parseSettings 解析设置到结构体
 func (s *SettingService) parseSettings(settings map[string]string) *SystemSettings {
+	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	result := &SystemSettings{
 		RegistrationEnabled:          settings[SettingKeyRegistrationEnabled] == "true",
-		EmailVerifyEnabled:           settings[SettingKeyEmailVerifyEnabled] == "true",
+		EmailVerifyEnabled:           emailVerifyEnabled,
+		PromoCodeEnabled:             settings[SettingKeyPromoCodeEnabled] != "false", // 默认启用
+		PasswordResetEnabled:         emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true",
+		InvitationCodeEnabled:        settings[SettingKeyInvitationCodeEnabled] == "true",
+		TotpEnabled:                  settings[SettingKeyTotpEnabled] == "true",
 		SMTPHost:                     settings[SettingKeySMTPHost],
 		SMTPUsername:                 settings[SettingKeySMTPUsername],
 		SMTPFrom:                     settings[SettingKeySMTPFrom],
@@ -360,6 +433,9 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 		ContactInfo:                  settings[SettingKeyContactInfo],
 		DocURL:                       settings[SettingKeyDocURL],
 		HomeContent:                  settings[SettingKeyHomeContent],
+		HideCcsImportButton:          settings[SettingKeyHideCcsImportButton] == "true",
+		PurchaseSubscriptionEnabled:  settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
+		PurchaseSubscriptionURL:      strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 	}
 
 	// 解析整数类型
@@ -381,9 +457,6 @@ func (s *SettingService) parseSettings(settings map[string]string) *SystemSettin
 	} else {
 		result.DefaultBalance = s.cfg.Default.UserBalance
 	}
-
-	// Invoice defaults
-	result.InvoiceDefaultItemName = s.getStringOrDefault(settings, SettingKeyInvoiceDefaultItemName, "技术服务费")
 
 	// 敏感信息直接返回，方便测试连接时使用
 	result.SMTPPassword = settings[SettingKeySMTPPassword]
@@ -528,52 +601,10 @@ func (s *SettingService) GenerateAdminAPIKey(ctx context.Context) (string, error
 	return key, nil
 }
 
-// GenerateAdminAPIKeyReadOnly 生成新的只读管理员 API Key（用于低权限集成）
-func (s *SettingService) GenerateAdminAPIKeyReadOnly(ctx context.Context) (string, error) {
-	// 生成 32 字节随机数 = 64 位十六进制字符
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", fmt.Errorf("generate random bytes: %w", err)
-	}
-
-	key := AdminAPIKeyReadOnlyPrefix + hex.EncodeToString(bytes)
-
-	// 存储到 settings 表
-	if err := s.settingRepo.Set(ctx, SettingKeyAdminAPIKeyReadOnly, key); err != nil {
-		return "", fmt.Errorf("save admin api key read-only: %w", err)
-	}
-
-	return key, nil
-}
-
 // GetAdminAPIKeyStatus 获取管理员 API Key 状态
 // 返回脱敏的 key、是否存在、错误
 func (s *SettingService) GetAdminAPIKeyStatus(ctx context.Context) (maskedKey string, exists bool, err error) {
 	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKey)
-	if err != nil {
-		if errors.Is(err, ErrSettingNotFound) {
-			return "", false, nil
-		}
-		return "", false, err
-	}
-	if key == "" {
-		return "", false, nil
-	}
-
-	// 脱敏：显示前 10 位和后 4 位
-	if len(key) > 14 {
-		maskedKey = key[:10] + "..." + key[len(key)-4:]
-	} else {
-		maskedKey = key
-	}
-
-	return maskedKey, true, nil
-}
-
-// GetAdminAPIKeyReadOnlyStatus 获取只读管理员 API Key 状态
-// 返回脱敏的 key、是否存在、错误
-func (s *SettingService) GetAdminAPIKeyReadOnlyStatus(ctx context.Context) (maskedKey string, exists bool, err error) {
-	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKeyReadOnly)
 	if err != nil {
 		if errors.Is(err, ErrSettingNotFound) {
 			return "", false, nil
@@ -607,15 +638,47 @@ func (s *SettingService) GetAdminAPIKey(ctx context.Context) (string, error) {
 	return key, nil
 }
 
-// GetAdminAPIKeyReadOnly 获取完整的只读管理员 API Key（仅供内部验证使用）
-// 如果未配置返回空字符串和 nil 错误，只有数据库错误时才返回 error
+// GetAdminAPIKeyReadOnly 获取只读管理员 API Key（仅供内部验证使用）
 func (s *SettingService) GetAdminAPIKeyReadOnly(ctx context.Context) (string, error) {
 	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKeyReadOnly)
 	if err != nil {
 		if errors.Is(err, ErrSettingNotFound) {
-			return "", nil // 未配置，返回空字符串
+			return "", nil
 		}
-		return "", err // 数据库错误
+		return "", err
+	}
+	return key, nil
+}
+
+// GetAdminAPIKeyReadOnlyStatus 获取只读管理员 API Key 状态
+func (s *SettingService) GetAdminAPIKeyReadOnlyStatus(ctx context.Context) (maskedKey string, exists bool, err error) {
+	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKeyReadOnly)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if key == "" {
+		return "", false, nil
+	}
+	if len(key) > 14 {
+		maskedKey = key[:10] + "..." + key[len(key)-4:]
+	} else {
+		maskedKey = key
+	}
+	return maskedKey, true, nil
+}
+
+// GenerateAdminAPIKeyReadOnly 生成新的只读管理员 API Key
+func (s *SettingService) GenerateAdminAPIKeyReadOnly(ctx context.Context) (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("generate random bytes: %w", err)
+	}
+	key := AdminAPIKeyReadOnlyPrefix + hex.EncodeToString(bytes)
+	if err := s.settingRepo.Set(ctx, SettingKeyAdminAPIKeyReadOnly, key); err != nil {
+		return "", fmt.Errorf("save admin api key read-only: %w", err)
 	}
 	return key, nil
 }
@@ -840,4 +903,13 @@ func (s *SettingService) SetStreamTimeoutSettings(ctx context.Context, settings 
 	}
 
 	return s.settingRepo.Set(ctx, SettingKeyStreamTimeoutSettings, string(data))
+}
+
+// GetInvoiceDefaultItemName 获取默认发票项目名称
+func (s *SettingService) GetInvoiceDefaultItemName(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvoiceDefaultItemName)
+	if err != nil || value == "" {
+		return ""
+	}
+	return value
 }

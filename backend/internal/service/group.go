@@ -13,8 +13,6 @@ type Group struct {
 	RateMultiplier float64
 	IsExclusive    bool
 	Status         string
-	ClaudeCodeOnly bool
-	FallbackGroupID *int64
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
 	SubscriptionType    string
@@ -28,11 +26,28 @@ type Group struct {
 	ImagePrice2K *float64
 	ImagePrice4K *float64
 
+	// Claude Code 客户端限制
+	ClaudeCodeOnly  bool
+	FallbackGroupID *int64
+	// 无效请求兜底分组（仅 anthropic 平台使用）
+	FallbackGroupIDOnInvalidRequest *int64
+
 	// 模型路由配置
 	// key: 模型匹配模式（支持 * 通配符，如 "claude-opus-*"）
 	// value: 优先账号 ID 列表
 	ModelRouting        map[string][]int64
 	ModelRoutingEnabled bool
+
+	// MCP XML 协议注入开关（仅 antigravity 平台使用）
+	MCPXMLInject bool
+
+	// 支持的模型系列（仅 antigravity 平台使用）
+	// 可选值: claude, gemini_text, gemini_image
+	SupportedModelScopes []string
+
+	// 分组排序
+	SortOrder int
+
 	CreatedAt time.Time
 	UpdatedAt time.Time
 

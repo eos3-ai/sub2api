@@ -648,7 +648,7 @@ import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { adminAPI } from '@/api/admin'
-import type { Proxy, Group } from '@/types'
+import type { Proxy, AdminGroup } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Select from '@/components/common/Select.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
@@ -659,7 +659,7 @@ interface Props {
   show: boolean
   accountIds: number[]
   proxies: Proxy[]
-  groups: Group[]
+  groups: AdminGroup[]
 }
 
 const props = defineProps<Props>()
@@ -707,6 +707,7 @@ const groupIds = ref<number[]>([])
 
 // All models list (combined Anthropic + OpenAI)
 const allModels = [
+  { value: 'claude-opus-4-6', label: 'Claude Opus 4.6' },
   { value: 'claude-opus-4-5-20251101', label: 'Claude Opus 4.5' },
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
   { value: 'claude-sonnet-4-5-20250929', label: 'Claude Sonnet 4.5' },
@@ -745,6 +746,13 @@ const presetMappings = [
     to: 'claude-opus-4-5-20251101',
     color:
       'bg-primary-100 text-primary-700 hover:bg-primary-200 dark:bg-primary-900/30 dark:text-primary-400'
+  },
+  {
+    label: 'Opus 4.6',
+    from: 'claude-opus-4-6',
+    to: 'claude-opus-4-6',
+    color:
+      'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-400'
   },
   {
     label: 'Opus->Sonnet',
@@ -917,9 +925,23 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
 
   if (enableModelRestriction.value) {
     const modelMapping = buildModelMappingObject()
-    if (modelMapping) {
-      credentials.model_mapping = modelMapping
-      credentialsChanged = true
+
+    // 统一使用 model_mapping 字段
+    if (modelRestrictionMode.value === 'whitelist') {
+      if (allowedModels.value.length > 0) {
+        // 白名单模式：将模型转换为 model_mapping 格式（key=value）
+        const mapping: Record<string, string> = {}
+        for (const m of allowedModels.value) {
+          mapping[m] = m
+        }
+        credentials.model_mapping = mapping
+        credentialsChanged = true
+      }
+    } else {
+      if (modelMapping) {
+        credentials.model_mapping = modelMapping
+        credentialsChanged = true
+      }
     }
   }
 

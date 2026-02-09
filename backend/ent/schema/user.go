@@ -2,6 +2,7 @@ package schema
 
 import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -42,7 +43,7 @@ func (User) Fields() []ent.Field {
 			NotEmpty(),
 		field.String("role").
 			MaxLen(20).
-			Default("user"),
+			Default(domain.RoleUser),
 		field.Float("balance").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0),
@@ -50,7 +51,7 @@ func (User) Fields() []ent.Field {
 			Default(5),
 		field.String("status").
 			MaxLen(20).
-			Default("active"),
+			Default(domain.StatusActive),
 
 		// Optional profile fields (added later; default '' in DB migration)
 		field.String("username").
@@ -60,6 +61,17 @@ func (User) Fields() []ent.Field {
 		field.String("notes").
 			SchemaType(map[string]string{dialect.Postgres: "text"}).
 			Default(""),
+
+		// TOTP 双因素认证字段
+		field.String("totp_secret_encrypted").
+			SchemaType(map[string]string{dialect.Postgres: "text"}).
+			Optional().
+			Nillable(),
+		field.Bool("totp_enabled").
+			Default(false),
+		field.Time("totp_enabled_at").
+			Optional().
+			Nillable(),
 	}
 }
 
@@ -69,6 +81,7 @@ func (User) Edges() []ent.Edge {
 		edge.To("redeem_codes", RedeemCode.Type),
 		edge.To("subscriptions", UserSubscription.Type),
 		edge.To("assigned_subscriptions", UserSubscription.Type),
+		edge.To("announcement_reads", AnnouncementRead.Type),
 		edge.To("allowed_groups", Group.Type).
 			Through("user_allowed_groups", UserAllowedGroup.Type),
 		edge.To("usage_logs", UsageLog.Type),

@@ -12,11 +12,14 @@ export interface SystemSettings {
   // Registration settings
   registration_enabled: boolean
   email_verify_enabled: boolean
+  promo_code_enabled: boolean
+  password_reset_enabled: boolean
+  invitation_code_enabled: boolean
+  totp_enabled: boolean // TOTP 双因素认证
+  totp_encryption_key_configured: boolean // TOTP 加密密钥是否已配置
   // Default settings
   default_balance: number
   default_concurrency: number
-  // Invoice settings
-  invoice_default_item_name: string
   // OEM settings
   site_name: string
   site_logo: string
@@ -25,6 +28,9 @@ export interface SystemSettings {
   contact_info: string
   doc_url: string
   home_content: string
+  hide_ccs_import_button: boolean
+  purchase_subscription_enabled: boolean
+  purchase_subscription_url: string
   // SMTP settings
   smtp_host: string
   smtp_port: number
@@ -38,24 +44,49 @@ export interface SystemSettings {
   turnstile_site_key: string
   turnstile_secret_key_configured: boolean
 
-  // Ops monitoring settings (optional; may not exist on older backends)
-  ops_monitoring_enabled?: boolean
-  ops_realtime_monitoring_enabled?: boolean
-  ops_query_mode_default?: string
+  // LinuxDo Connect OAuth settings
+  linuxdo_connect_enabled: boolean
+  linuxdo_connect_client_id: string
+  linuxdo_connect_client_secret_configured: boolean
+  linuxdo_connect_redirect_url: string
+
+  // Model fallback configuration
+  enable_model_fallback: boolean
+  fallback_model_anthropic: string
+  fallback_model_openai: string
+  fallback_model_gemini: string
+  fallback_model_antigravity: string
+
+  // Identity patch configuration (Claude -> Gemini)
+  enable_identity_patch: boolean
+  identity_patch_prompt: string
+
+  // Ops Monitoring (vNext)
+  ops_monitoring_enabled: boolean
+  ops_realtime_monitoring_enabled: boolean
+  ops_query_mode_default: 'auto' | 'raw' | 'preagg' | string
+  ops_metrics_interval_seconds: number
 }
 
 export interface UpdateSettingsRequest {
   registration_enabled?: boolean
   email_verify_enabled?: boolean
+  promo_code_enabled?: boolean
+  password_reset_enabled?: boolean
+  invitation_code_enabled?: boolean
+  totp_enabled?: boolean // TOTP 双因素认证
   default_balance?: number
   default_concurrency?: number
-  invoice_default_item_name?: string
   site_name?: string
   site_logo?: string
   site_subtitle?: string
   api_base_url?: string
   contact_info?: string
   doc_url?: string
+  home_content?: string
+  hide_ccs_import_button?: boolean
+  purchase_subscription_enabled?: boolean
+  purchase_subscription_url?: string
   smtp_host?: string
   smtp_port?: number
   smtp_username?: string
@@ -66,6 +97,21 @@ export interface UpdateSettingsRequest {
   turnstile_enabled?: boolean
   turnstile_site_key?: string
   turnstile_secret_key?: string
+  linuxdo_connect_enabled?: boolean
+  linuxdo_connect_client_id?: string
+  linuxdo_connect_client_secret?: string
+  linuxdo_connect_redirect_url?: string
+  enable_model_fallback?: boolean
+  fallback_model_anthropic?: string
+  fallback_model_openai?: string
+  fallback_model_gemini?: string
+  fallback_model_antigravity?: string
+  enable_identity_patch?: boolean
+  identity_patch_prompt?: string
+  ops_monitoring_enabled?: boolean
+  ops_realtime_monitoring_enabled?: boolean
+  ops_query_mode_default?: 'auto' | 'raw' | 'preagg' | string
+  ops_metrics_interval_seconds?: number
 }
 
 /**
@@ -153,15 +199,6 @@ export async function getAdminApiKey(): Promise<AdminApiKeyStatus> {
 }
 
 /**
- * Get read-only admin API key status
- * @returns Status indicating if key exists and masked version
- */
-export async function getAdminApiKeyReadOnly(): Promise<AdminApiKeyStatus> {
-  const { data } = await apiClient.get<AdminApiKeyStatus>('/admin/settings/admin-api-key-read-only')
-  return data
-}
-
-/**
  * Regenerate admin API key
  * @returns The new full API key (only shown once)
  */
@@ -171,33 +208,11 @@ export async function regenerateAdminApiKey(): Promise<{ key: string }> {
 }
 
 /**
- * Regenerate read-only admin API key
- * @returns The new full API key (only shown once)
- */
-export async function regenerateAdminApiKeyReadOnly(): Promise<{ key: string }> {
-  const { data } = await apiClient.post<{ key: string }>(
-    '/admin/settings/admin-api-key-read-only/regenerate'
-  )
-  return data
-}
-
-/**
  * Delete admin API key
  * @returns Success message
  */
 export async function deleteAdminApiKey(): Promise<{ message: string }> {
   const { data } = await apiClient.delete<{ message: string }>('/admin/settings/admin-api-key')
-  return data
-}
-
-/**
- * Delete read-only admin API key
- * @returns Success message
- */
-export async function deleteAdminApiKeyReadOnly(): Promise<{ message: string }> {
-  const { data } = await apiClient.delete<{ message: string }>(
-    '/admin/settings/admin-api-key-read-only'
-  )
   return data
 }
 
@@ -242,11 +257,8 @@ export const settingsAPI = {
   testSmtpConnection,
   sendTestEmail,
   getAdminApiKey,
-  getAdminApiKeyReadOnly,
   regenerateAdminApiKey,
-  regenerateAdminApiKeyReadOnly,
   deleteAdminApiKey,
-  deleteAdminApiKeyReadOnly,
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings
 }

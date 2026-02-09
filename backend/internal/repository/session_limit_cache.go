@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"log"
 	"strconv"
 	"time"
 
@@ -153,6 +154,21 @@ func NewSessionLimitCache(rdb *redis.Client, defaultIdleTimeoutMinutes int) serv
 	if defaultIdleTimeoutMinutes <= 0 {
 		defaultIdleTimeoutMinutes = 5 // 默认 5 分钟
 	}
+
+	// 预加载 Lua 脚本到 Redis，避免 Pipeline 中出现 NOSCRIPT 错误
+	ctx := context.Background()
+	scripts := []*redis.Script{
+		registerSessionScript,
+		refreshSessionScript,
+		getActiveSessionCountScript,
+		isSessionActiveScript,
+	}
+	for _, script := range scripts {
+		if err := script.Load(ctx, rdb).Err(); err != nil {
+			log.Printf("[SessionLimitCache] Failed to preload Lua script: %v", err)
+		}
+	}
+
 	return &sessionLimitCache{
 		rdb:                rdb,
 		defaultIdleTimeout: time.Duration(defaultIdleTimeoutMinutes) * time.Minute,
@@ -217,7 +233,7 @@ func (c *sessionLimitCache) GetActiveSessionCount(ctx context.Context, accountID
 }
 
 // GetActiveSessionCountBatch 批量获取多个账号的活跃会话数
-func (c *sessionLimitCache) GetActiveSessionCountBatch(ctx context.Context, accountIDs []int64) (map[int64]int, error) {
+func (c *sessionLimitCache) GetActiveSessionCountBatch(ctx context.Context, accountIDs []int64, idleTimeouts map[int64]time.Duration) (map[int64]int, error) {
 	if len(accountIDs) == 0 {
 		return make(map[int64]int), nil
 	}
@@ -226,11 +242,18 @@ func (c *sessionLimitCache) GetActiveSessionCountBatch(ctx context.Context, acco
 
 	// 使用 pipeline 批量执行
 	pipe := c.rdb.Pipeline()
-	idleTimeoutSeconds := int(c.defaultIdleTimeout.Seconds())
 
 	cmds := make(map[int64]*redis.Cmd, len(accountIDs))
 	for _, accountID := range accountIDs {
 		key := sessionLimitKey(accountID)
+		// 使用各账号自己的 idleTimeout，如果没有则用默认值
+		idleTimeout := c.defaultIdleTimeout
+		if idleTimeouts != nil {
+			if t, ok := idleTimeouts[accountID]; ok && t > 0 {
+				idleTimeout = t
+			}
+		}
+		idleTimeoutSeconds := int(idleTimeout.Seconds())
 		cmds[accountID] = getActiveSessionCountScript.Run(ctx, pipe, []string{key}, idleTimeoutSeconds)
 	}
 

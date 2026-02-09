@@ -20,8 +20,7 @@ import (
 // 用于隔离测试 APIKeyService.Delete 方法，避免依赖真实数据库。
 //
 // 设计说明：
-//   - ownerID: 模拟 GetOwnerID 返回的所有者 ID
-//   - ownerErr: 模拟 GetOwnerID 返回的错误（如 ErrAPIKeyNotFound）
+//   - apiKey/getByIDErr: 模拟 GetKeyAndOwnerID 返回的记录与错误
 //   - deleteErr: 模拟 Delete 返回的错误
 //   - deletedIDs: 记录被调用删除的 API Key ID，用于断言验证
 type apiKeyRepoStub struct {
@@ -38,6 +37,13 @@ func (s *apiKeyRepoStub) Create(ctx context.Context, key *APIKey) error {
 }
 
 func (s *apiKeyRepoStub) GetByID(ctx context.Context, id int64) (*APIKey, error) {
+	if s.getByIDErr != nil {
+		return nil, s.getByIDErr
+	}
+	if s.apiKey != nil {
+		clone := *s.apiKey
+		return &clone, nil
+	}
 	panic("unexpected GetByID call")
 }
 
@@ -53,6 +59,10 @@ func (s *apiKeyRepoStub) GetKeyAndOwnerID(ctx context.Context, id int64) (string
 
 func (s *apiKeyRepoStub) GetByKey(ctx context.Context, key string) (*APIKey, error) {
 	panic("unexpected GetByKey call")
+}
+
+func (s *apiKeyRepoStub) GetByKeyForAuth(ctx context.Context, key string) (*APIKey, error) {
+	panic("unexpected GetByKeyForAuth call")
 }
 
 func (s *apiKeyRepoStub) Update(ctx context.Context, key *APIKey) error {
@@ -98,6 +108,18 @@ func (s *apiKeyRepoStub) ClearGroupIDByGroupID(ctx context.Context, groupID int6
 
 func (s *apiKeyRepoStub) CountByGroupID(ctx context.Context, groupID int64) (int64, error) {
 	panic("unexpected CountByGroupID call")
+}
+
+func (s *apiKeyRepoStub) ListKeysByUserID(ctx context.Context, userID int64) ([]string, error) {
+	panic("unexpected ListKeysByUserID call")
+}
+
+func (s *apiKeyRepoStub) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
+	panic("unexpected ListKeysByGroupID call")
+}
+
+func (s *apiKeyRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) (float64, error) {
+	panic("unexpected IncrementQuotaUsed call")
 }
 
 // apiKeyCacheStub 是 APIKeyCache 接口的测试桩实现。
@@ -202,12 +224,12 @@ func TestApiKeyService_Delete_Success(t *testing.T) {
 
 // TestApiKeyService_Delete_NotFound 测试删除不存在的 API Key 时返回正确的错误。
 // 预期行为：
-//   - GetOwnerID 返回 ErrAPIKeyNotFound 错误
+//   - GetKeyAndOwnerID 返回 ErrAPIKeyNotFound 错误
 //   - 返回 ErrAPIKeyNotFound 错误（被 fmt.Errorf 包装）
 //   - Delete 方法不被调用
 //   - 缓存不被清除
 func TestApiKeyService_Delete_NotFound(t *testing.T) {
-	repo := &apiKeyRepoStub{ownerErr: ErrAPIKeyNotFound}
+	repo := &apiKeyRepoStub{getByIDErr: ErrAPIKeyNotFound}
 	cache := &apiKeyCacheStub{}
 	svc := &APIKeyService{apiKeyRepo: repo, cache: cache}
 

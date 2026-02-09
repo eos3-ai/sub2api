@@ -21,6 +21,12 @@
           <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
         </template>
 
+        <template #cell-reasoning_effort="{ row }">
+          <span class="text-sm text-gray-900 dark:text-white">
+            {{ formatReasoningEffort(row.reasoning_effort) }}
+          </span>
+        </template>
+
         <template #cell-group="{ row }">
           <span v-if="row.group" class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
             {{ row.group.name }}
@@ -35,7 +41,16 @@
         </template>
 
         <template #cell-tokens="{ row }">
-          <div class="flex items-center gap-1.5">
+          <!-- 图片生成请求 -->
+          <div v-if="row.image_count > 0" class="flex items-center gap-1.5">
+            <svg class="h-4 w-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            <span class="font-medium text-gray-900 dark:text-white">{{ row.image_count }}{{ t('usage.imageUnit') }}</span>
+            <span class="text-gray-400">({{ row.image_size || '2K' }})</span>
+          </div>
+          <!-- Token 请求 -->
+          <div v-else class="flex items-center gap-1.5">
             <div class="space-y-1 text-sm">
               <div class="flex items-center gap-2">
                 <div class="inline-flex items-center gap-1">
@@ -92,12 +107,6 @@
           </div>
         </template>
 
-        <template #cell-billing_type="{ row }">
-          <span class="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium" :class="row.billing_type === 1 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'">
-            {{ row.billing_type === 1 ? t('admin.usage.billingTypeSubscription') : t('admin.usage.billingTypeBalance') }}
-          </span>
-        </template>
-
         <template #cell-first_token="{ row }">
           <span v-if="row.first_token_ms != null" class="text-sm text-gray-600 dark:text-gray-400">{{ formatDuration(row.first_token_ms) }}</span>
           <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
@@ -111,15 +120,14 @@
           <span class="text-sm text-gray-600 dark:text-gray-400">{{ formatDateTime(value) }}</span>
         </template>
 
-        <template #cell-request_id="{ row }">
-          <div v-if="row.request_id" class="flex items-center gap-1.5 max-w-[120px]">
-            <span class="font-mono text-xs text-gray-500 dark:text-gray-400 truncate" :title="row.request_id">{{ row.request_id }}</span>
-            <button @click="copyRequestId(row.request_id)" class="flex-shrink-0 rounded p-0.5 transition-colors hover:bg-gray-100 dark:hover:bg-dark-700" :class="copiedRequestId === row.request_id ? 'text-green-500' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'" :title="copiedRequestId === row.request_id ? t('keys.copied') : t('keys.copyToClipboard')">
-              <svg v-if="copiedRequestId === row.request_id" class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
-              <Icon v-else name="copy" size="sm" class="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <span v-else class="text-gray-400 dark:text-gray-500">-</span>
+        <template #cell-user_agent="{ row }">
+          <span v-if="row.user_agent" class="text-sm text-gray-600 dark:text-gray-400 max-w-[150px] truncate block" :title="row.user_agent">{{ formatUserAgent(row.user_agent) }}</span>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
+        </template>
+
+        <template #cell-ip_address="{ row }">
+          <span v-if="row.ip_address" class="text-sm font-mono text-gray-600 dark:text-gray-400">{{ row.ip_address }}</span>
+          <span v-else class="text-sm text-gray-400 dark:text-gray-500">-</span>
         </template>
 
         <template #empty><EmptyState :message="t('usage.noRecords')" /></template>
@@ -233,40 +241,40 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatDateTime } from '@/utils/format'
-import { useAppStore } from '@/stores/app'
+import { formatDateTime, formatReasoningEffort } from '@/utils/format'
 import DataTable from '@/components/common/DataTable.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
-import type { UsageLog } from '@/types'
+import type { AdminUsageLog } from '@/types'
 
 defineProps(['data', 'loading'])
 const { t } = useI18n()
-const appStore = useAppStore()
-const copiedRequestId = ref<string | null>(null)
 
+// Tooltip state - cost
 const tooltipVisible = ref(false)
 const tooltipPosition = ref({ x: 0, y: 0 })
-const tooltipData = ref<UsageLog | null>(null)
+const tooltipData = ref<AdminUsageLog | null>(null)
 
+// Tooltip state - token
 const tokenTooltipVisible = ref(false)
 const tokenTooltipPosition = ref({ x: 0, y: 0 })
-const tokenTooltipData = ref<UsageLog | null>(null)
+const tokenTooltipData = ref<AdminUsageLog | null>(null)
 
 const cols = computed(() => [
   { key: 'user', label: t('admin.usage.user'), sortable: false },
   { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
   { key: 'account', label: t('admin.usage.account'), sortable: false },
   { key: 'model', label: t('usage.model'), sortable: true },
+  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
   { key: 'group', label: t('admin.usage.group'), sortable: false },
   { key: 'stream', label: t('usage.type'), sortable: false },
   { key: 'tokens', label: t('usage.tokens'), sortable: false },
   { key: 'cost', label: t('usage.cost'), sortable: false },
-  { key: 'billing_type', label: t('usage.billingType'), sortable: false },
   { key: 'first_token', label: t('usage.firstToken'), sortable: false },
   { key: 'duration', label: t('usage.duration'), sortable: false },
   { key: 'created_at', label: t('usage.time'), sortable: true },
-  { key: 'request_id', label: t('admin.usage.requestId'), sortable: false }
+  { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
+  { key: 'ip_address', label: t('admin.usage.ipAddress'), sortable: false }
 ])
 
 const formatCacheTokens = (tokens: number): string => {
@@ -275,27 +283,29 @@ const formatCacheTokens = (tokens: number): string => {
   return tokens.toString()
 }
 
+const formatUserAgent = (ua: string): string => {
+  // 提取主要客户端标识
+  if (ua.includes('claude-cli')) return ua.match(/claude-cli\/[\d.]+/)?.[0] || 'Claude CLI'
+  if (ua.includes('Cursor')) return 'Cursor'
+  if (ua.includes('VSCode') || ua.includes('vscode')) return 'VS Code'
+  if (ua.includes('Continue')) return 'Continue'
+  if (ua.includes('Cline')) return 'Cline'
+  if (ua.includes('OpenAI')) return 'OpenAI SDK'
+  if (ua.includes('anthropic')) return 'Anthropic SDK'
+  // 截断过长的 UA
+  return ua.length > 30 ? ua.substring(0, 30) + '...' : ua
+}
+
 const formatDuration = (ms: number | null | undefined): string => {
   if (ms == null) return '-'
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
 }
 
-const copyRequestId = async (requestId: string) => {
-  try {
-    await navigator.clipboard.writeText(requestId)
-    copiedRequestId.value = requestId
-    appStore.showSuccess(t('admin.usage.requestIdCopied'))
-    setTimeout(() => { copiedRequestId.value = null }, 2000)
-  } catch {
-    appStore.showError(t('common.copyFailed'))
-  }
-}
-
-const showTooltip = (event: MouseEvent, row: UsageLog) => {
+// Cost tooltip functions
+const showTooltip = (event: MouseEvent, row: AdminUsageLog) => {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
-
   tooltipData.value = row
   tooltipPosition.value.x = rect.right + 8
   tooltipPosition.value.y = rect.top + rect.height / 2
@@ -307,10 +317,10 @@ const hideTooltip = () => {
   tooltipData.value = null
 }
 
-const showTokenTooltip = (event: MouseEvent, row: UsageLog) => {
+// Token tooltip functions
+const showTokenTooltip = (event: MouseEvent, row: AdminUsageLog) => {
   const target = event.currentTarget as HTMLElement
   const rect = target.getBoundingClientRect()
-
   tokenTooltipData.value = row
   tokenTooltipPosition.value.x = rect.right + 8
   tokenTooltipPosition.value.y = rect.top + rect.height / 2

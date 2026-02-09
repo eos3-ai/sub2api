@@ -123,7 +123,7 @@ func createTestPayload(modelID string) (map[string]any, error) {
 		"system": []map[string]any{
 			{
 				"type": "text",
-				"text": "You are Claude Code, Anthropic's official CLI for Claude.",
+				"text": claudeCodeSystemPrompt,
 				"cache_control": map[string]string{
 					"type": "ephemeral",
 				},
@@ -248,7 +248,6 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	// Set common headers
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-version", "2023-06-01")
-	req.Header.Set("anthropic-beta", claude.DefaultBetaHeader)
 
 	// Apply Claude Code client headers
 	for key, value := range claude.DefaultHeaders {
@@ -257,8 +256,10 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 
 	// Set authentication header
 	if useBearer {
+		req.Header.Set("anthropic-beta", claude.DefaultBetaHeader)
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	} else {
+		req.Header.Set("anthropic-beta", claude.APIKeyBetaHeader)
 		req.Header.Set("x-api-key", authToken)
 	}
 

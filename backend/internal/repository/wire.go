@@ -61,6 +61,8 @@ var ProviderSet = wire.NewSet(
 	NewReferralRepository,
 	NewPaymentOrderRepository,
 	NewInvoiceRepository,
+	NewAnnouncementRepository,
+	NewAnnouncementReadRepository,
 	NewUsageLogRepository,
 	NewUsageCleanupRepository,
 	NewDashboardAggregationRepository,
@@ -69,6 +71,8 @@ var ProviderSet = wire.NewSet(
 	NewUserSubscriptionRepository,
 	NewUserAttributeDefinitionRepository,
 	NewUserAttributeValueRepository,
+	NewUserGroupRateRepository,
+	NewErrorPassthroughRepository,
 
 	// Cache implementations
 	NewGatewayCache,
@@ -90,6 +94,12 @@ var ProviderSet = wire.NewSet(
 	NewSchedulerCache,
 	NewSchedulerOutboxRepository,
 	NewProxyLatencyCache,
+	NewTotpCache,
+	NewRefreshTokenCache,
+	NewErrorPassthroughCache,
+
+	// Encryptors
+	NewAESEncryptor,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,

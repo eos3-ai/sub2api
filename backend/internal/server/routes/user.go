@@ -23,39 +23,16 @@ func RegisterUserRoutes(
 			user.PUT("/password", h.User.ChangePassword)
 			user.PUT("", h.User.UpdateProfile)
 
-			// 活动优惠（用户端）
-			promotion := user.Group("/promotion")
+			// TOTP 双因素认证
+			totp := user.Group("/totp")
 			{
-				promotion.GET("/status", h.Promotion.GetStatus)
+				totp.GET("/status", h.Totp.GetStatus)
+				totp.GET("/verification-method", h.Totp.GetVerificationMethod)
+				totp.POST("/send-code", h.Totp.SendVerifyCode)
+				totp.POST("/setup", h.Totp.InitiateSetup)
+				totp.POST("/enable", h.Totp.Enable)
+				totp.POST("/disable", h.Totp.Disable)
 			}
-
-			// 邀请返利（用户端）
-			referral := user.Group("/referral")
-			{
-				referral.GET("/info", h.Referral.GetInfo)
-				referral.GET("/invitees", h.Referral.ListInvitees)
-			}
-		}
-
-		// 支付/充值
-		payment := authenticated.Group("/payment")
-		{
-			payment.GET("/plans", h.Payment.GetPlans)
-			payment.POST("/orders", h.Payment.CreateOrder)
-			payment.GET("/orders", h.Payment.ListMyOrders)
-			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
-		}
-
-		// 发票/开票申请
-		invoices := authenticated.Group("/invoices")
-		{
-			invoices.GET("/eligible-orders", h.Invoice.ListEligibleOrders)
-			invoices.GET("/profile", h.Invoice.GetProfile)
-			invoices.PUT("/profile", h.Invoice.UpdateProfile)
-			invoices.POST("", h.Invoice.CreateInvoiceRequest)
-			invoices.GET("", h.Invoice.ListMyInvoiceRequests)
-			invoices.GET("/:id", h.Invoice.GetMyInvoiceRequest)
-			invoices.POST("/:id/cancel", h.Invoice.CancelInvoiceRequest)
 		}
 
 		// API Key管理
@@ -72,6 +49,7 @@ func RegisterUserRoutes(
 		groups := authenticated.Group("/groups")
 		{
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
+			groups.GET("/rates", h.APIKey.GetUserGroupRates)
 		}
 
 		// 使用记录
@@ -85,6 +63,13 @@ func RegisterUserRoutes(
 			usage.GET("/dashboard/trend", h.Usage.DashboardTrend)
 			usage.GET("/dashboard/models", h.Usage.DashboardModels)
 			usage.POST("/dashboard/api-keys-usage", h.Usage.DashboardAPIKeysUsage)
+		}
+
+		// 公告（用户可见）
+		announcements := authenticated.Group("/announcements")
+		{
+			announcements.GET("", h.Announcement.List)
+			announcements.POST("/:id/read", h.Announcement.MarkRead)
 		}
 
 		// 卡密兑换

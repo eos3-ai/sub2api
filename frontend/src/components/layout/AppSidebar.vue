@@ -17,6 +17,8 @@
           <span class="text-lg font-bold text-gray-900 dark:text-white">
             {{ siteName }}
           </span>
+          <!-- Version Badge -->
+          <VersionBadge :version="siteVersion" />
         </div>
       </transition>
     </div>
@@ -52,8 +54,7 @@
           </router-link>
         </div>
 
-        <div v-if="!sidebarCollapsed" class="mx-3 my-2 h-px bg-gray-200 dark:bg-dark-700"></div>
-
+        <!-- Personal Section for Admin (hidden in simple mode) -->
         <div v-if="!authStore.isSimpleMode" class="sidebar-section">
           <div v-if="!sidebarCollapsed" class="sidebar-section-title">
             {{ t('nav.myAccount') }}
@@ -143,10 +144,11 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, h, onMounted, ref, watch } from 'vue'
-	import { useRoute } from 'vue-router'
-	import { useI18n } from 'vue-i18n'
-	import { useAppStore, useAuthStore, useOnboardingStore, useAdminSettingsStore } from '@/stores'
+import { computed, h, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } from '@/stores'
+import VersionBadge from '@/components/common/VersionBadge.vue'
 
 const { t } = useI18n()
 
@@ -164,6 +166,7 @@ const isDark = ref(document.documentElement.classList.contains('dark'))
 // Site settings from appStore (cached, no flicker)
 const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
+const siteVersion = computed(() => appStore.siteVersion)
 
 // SVG Icon Components
 const DashboardIcon = {
@@ -206,6 +209,21 @@ const ChartIcon = {
           'stroke-linecap': 'round',
           'stroke-linejoin': 'round',
           d: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'
+        })
+      ]
+    )
+}
+
+const GiftIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z'
         })
       ]
     )
@@ -301,6 +319,36 @@ const ServerIcon = {
     )
 }
 
+const BellIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9a6 6 0 10-12 0v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0'
+        })
+      ]
+    )
+}
+
+const TicketIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'M16.5 6v.75m0 3v.75m0 3v.75m0 3V18m-9-5.25h5.25M7.5 15h3M3.375 5.25c-.621 0-1.125.504-1.125 1.125v3.026a2.999 2.999 0 010 5.198v3.026c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125v-3.026a2.999 2.999 0 010-5.198V6.375c0-.621-.504-1.125-1.125-1.125H3.375z'
+        })
+      ]
+    )
+}
+
 const CogIcon = {
   render: () =>
     h(
@@ -383,20 +431,48 @@ const ChevronDoubleRightIcon = {
 
 // User navigation items (for regular users)
 const userNavItems = computed(() => {
-	const items = [
-	    { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
-	    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
-	    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
-	    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
-	    { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
-	    { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
-	    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-	    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
-	  ]
+  const items = [
+    { path: '/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    ...(appStore.cachedPublicSettings?.purchase_subscription_enabled
+      ? [
+          {
+            path: '/purchase',
+            label: t('nav.buySubscription'),
+            icon: CreditCardIcon,
+            hideInSimpleMode: true
+          }
+        ]
+      : []),
+    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
+  ]
   return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
 })
 
-const personalNavItems = computed(() => userNavItems.value)
+// Personal navigation items (for admin's "My Account" section, without Dashboard)
+const personalNavItems = computed(() => {
+  const items = [
+    { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
+    { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
+    ...(appStore.cachedPublicSettings?.purchase_subscription_enabled
+      ? [
+          {
+            path: '/purchase',
+            label: t('nav.buySubscription'),
+            icon: CreditCardIcon,
+            hideInSimpleMode: true
+          }
+        ]
+      : []),
+    { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/profile', label: t('nav.profile'), icon: UserIcon }
+  ]
+  return authStore.isSimpleMode ? items.filter(item => !item.hideInSimpleMode) : items
+})
 
 // Admin navigation items
 const adminNavItems = computed(() => {
@@ -408,16 +484,18 @@ const adminNavItems = computed(() => {
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },
     { path: '/admin/subscriptions', label: t('nav.subscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
-    { path: '/admin/payment-orders', label: t('nav.rechargeRecords'), icon: CreditCardIcon },
-    { path: '/admin/invoices', label: t('nav.invoiceManagement'), icon: CreditCardIcon },
     { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
     { path: '/admin/proxies', label: t('nav.proxies'), icon: ServerIcon },
+    { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
+    { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
   ]
 
-  // 简单模式下仅保留管理功能入口
+  // 简单模式下，在系统设置前插入 API密钥
   if (authStore.isSimpleMode) {
     const filtered = baseItems.filter(item => !item.hideInSimpleMode)
+    filtered.push({ path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon })
     filtered.push({ path: '/admin/settings', label: t('nav.settings'), icon: CogIcon })
     return filtered
   }

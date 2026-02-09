@@ -1,4 +1,4 @@
-import { defineConfig, Plugin } from 'vite'
+import { defineConfig, loadEnv, Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import checker from 'vite-plugin-checker'
 import { resolve } from 'path'
@@ -7,9 +7,7 @@ import { resolve } from 'path'
  * Vite 插件：开发模式下注入公开配置到 index.html
  * 与生产模式的后端注入行为保持一致，消除闪烁
  */
-function injectPublicSettings(): Plugin {
-  const backendUrl = process.env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
-
+function injectPublicSettings(backendUrl: string): Plugin {
   return {
     name: 'inject-public-settings',
     transformIndexHtml: {
@@ -35,21 +33,26 @@ function injectPublicSettings(): Plugin {
   }
 }
 
-export default defineConfig({
-  plugins: [
-    vue(),
-    checker({
-      typescript: true,
-      vueTsc: true
-    }),
-    injectPublicSettings()
-  ],
+export default defineConfig(({ mode }) => {
+  // 加载环境变量
+  const env = loadEnv(mode, process.cwd(), '')
+  const backendUrl = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
+  const devPort = Number(env.VITE_DEV_PORT || 3000)
+
+  return {
+    plugins: [
+      vue(),
+      checker({
+        typescript: true,
+        vueTsc: true
+      }),
+      injectPublicSettings(backendUrl)
+    ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
-      // 注释掉 runtime-only 版本，使用完整版 vue-i18n 以支持运行时消息编译
-      // 这样可以处理包含插值的翻译字符串（如 {n} / {max}）
-      // 'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js'
+      '@': resolve(__dirname, 'src'),
+      // 使用 vue-i18n 运行时版本，避免 CSP unsafe-eval 问题
+      'vue-i18n': 'vue-i18n/dist/vue-i18n.runtime.esm-bundler.js'
     }
   },
   define: {
@@ -103,8 +106,19 @@ export default defineConfig({
       }
     }
   },
-  server: {
-    host: '0.0.0.0',
-    port: 3000
+    server: {
+      host: '0.0.0.0',
+      port: devPort,
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true
+        },
+        '/setup': {
+          target: backendUrl,
+          changeOrigin: true
+        }
+      }
+    }
   }
 })

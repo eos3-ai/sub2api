@@ -15,6 +15,7 @@ func ProvideAdminHandlers(
 	accountHandler *admin.AccountHandler,
 	paymentOrdersHandler *admin.PaymentOrdersHandler,
 	invoiceHandler *admin.InvoiceHandler,
+	announcementHandler *admin.AnnouncementHandler,
 	oauthHandler *admin.OAuthHandler,
 	openaiOAuthHandler *admin.OpenAIOAuthHandler,
 	geminiOAuthHandler *admin.GeminiOAuthHandler,
@@ -28,6 +29,7 @@ func ProvideAdminHandlers(
 	subscriptionHandler *admin.SubscriptionHandler,
 	usageHandler *admin.UsageHandler,
 	userAttributeHandler *admin.UserAttributeHandler,
+	errorPassthroughHandler *admin.ErrorPassthroughHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:        dashboardHandler,
@@ -36,6 +38,7 @@ func ProvideAdminHandlers(
 		Account:          accountHandler,
 		PaymentOrders:    paymentOrdersHandler,
 		Invoices:         invoiceHandler,
+		Announcement:     announcementHandler,
 		OAuth:            oauthHandler,
 		OpenAIOAuth:      openaiOAuthHandler,
 		GeminiOAuth:      geminiOAuthHandler,
@@ -49,6 +52,7 @@ func ProvideAdminHandlers(
 		Subscription:     subscriptionHandler,
 		Usage:            usageHandler,
 		UserAttribute:    userAttributeHandler,
+		ErrorPassthrough: errorPassthroughHandler,
 	}
 }
 
@@ -74,11 +78,13 @@ func ProvideHandlers(
 	invoiceHandler *InvoiceHandler,
 	promotionHandler *PromotionHandler,
 	referralHandler *ReferralHandler,
+	announcementHandler *AnnouncementHandler,
 	adminHandlers *AdminHandlers,
 	gatewayHandler *GatewayHandler,
 	openaiGatewayHandler *OpenAIGatewayHandler,
 	settingHandler *SettingHandler,
 	dingtalkBotHandler *DingtalkBotHandler,
+	totpHandler *TotpHandler,
 ) *Handlers {
 	return &Handlers{
 		Auth:          authHandler,
@@ -91,11 +97,13 @@ func ProvideHandlers(
 		Invoice:       invoiceHandler,
 		Promotion:     promotionHandler,
 		Referral:      referralHandler,
+		Announcement:  announcementHandler,
 		Admin:         adminHandlers,
 		Gateway:       gatewayHandler,
 		OpenAIGateway: openaiGatewayHandler,
 		Setting:       settingHandler,
 		DingtalkBot:   dingtalkBotHandler,
+		Totp:          totpHandler,
 	}
 }
 
@@ -112,9 +120,11 @@ var ProviderSet = wire.NewSet(
 	NewInvoiceHandler,
 	NewPromotionHandler,
 	NewReferralHandler,
+	NewAnnouncementHandler,
 	NewGatewayHandler,
 	NewOpenAIGatewayHandler,
 	NewDingtalkBotHandler,
+	NewTotpHandler,
 	ProvideSettingHandler,
 
 	// Admin handlers
@@ -124,6 +134,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewAccountHandler,
 	admin.NewPaymentOrdersHandler,
 	admin.NewInvoiceHandler,
+	admin.NewAnnouncementHandler,
 	admin.NewOAuthHandler,
 	admin.NewOpenAIOAuthHandler,
 	admin.NewGeminiOAuthHandler,
@@ -137,6 +148,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewSubscriptionHandler,
 	admin.NewUsageHandler,
 	admin.NewUserAttributeHandler,
+	admin.NewErrorPassthroughHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

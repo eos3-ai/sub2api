@@ -12,6 +12,7 @@ type AdminHandlers struct {
 	Account          *admin.AccountHandler
 	PaymentOrders    *admin.PaymentOrdersHandler
 	Invoices         *admin.InvoiceHandler
+	Announcement     *admin.AnnouncementHandler
 	OAuth            *admin.OAuthHandler
 	OpenAIOAuth      *admin.OpenAIOAuthHandler
 	GeminiOAuth      *admin.GeminiOAuthHandler
@@ -25,6 +26,7 @@ type AdminHandlers struct {
 	Subscription     *admin.SubscriptionHandler
 	Usage            *admin.UsageHandler
 	UserAttribute    *admin.UserAttributeHandler
+	ErrorPassthrough *admin.ErrorPassthroughHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -39,11 +41,13 @@ type Handlers struct {
 	Invoice       *InvoiceHandler
 	Promotion     *PromotionHandler
 	Referral      *ReferralHandler
+	Announcement  *AnnouncementHandler
 	Admin         *AdminHandlers
 	Gateway       *GatewayHandler
 	OpenAIGateway *OpenAIGatewayHandler
 	Setting       *SettingHandler
 	DingtalkBot   *DingtalkBotHandler
+	Totp          *TotpHandler
 }
 
 // BuildInfo contains build-time information

@@ -3,6 +3,8 @@ package schema
 import (
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/domain"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
@@ -39,13 +41,13 @@ func (RedeemCode) Fields() []ent.Field {
 			Unique(),
 		field.String("type").
 			MaxLen(20).
-			Default("balance"),
+			Default(domain.RedeemTypeBalance),
 		field.Float("value").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0),
 		field.String("status").
 			MaxLen(20).
-			Default("unused"),
+			Default(domain.StatusUnused),
 		field.Int64("used_by").
 			Optional().
 			Nillable(),

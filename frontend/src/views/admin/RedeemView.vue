@@ -1,34 +1,18 @@
 <template>
   <AppLayout>
     <TablePageLayout>
-      <template #actions>
-        <div class="flex justify-end gap-3">
-          <button
-          @click="loadCodes"
-          :disabled="loading"
-          class="btn btn-secondary"
-          :title="t('common.refresh')"
-        >
-          <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-        </button>
-        <button @click="showGenerateDialog = true" class="btn btn-primary">
-          {{ t('admin.redeem.generateCodes') }}
-        </button>
-        </div>
-      </template>
-
       <template #filters>
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div class="max-w-md flex-1">
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="t('admin.redeem.searchCodes')"
-            class="input"
-            @input="handleSearch"
-          />
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Left: Search + Filters -->
+          <div class="flex-1 sm:max-w-64">
+            <input
+              v-model="searchQuery"
+              type="text"
+              :placeholder="t('admin.redeem.searchCodes')"
+              class="input"
+              @input="handleSearch"
+            />
           </div>
-          <div class="flex gap-2">
           <Select
             v-model="filters.type"
             :options="filterTypeOptions"
@@ -41,9 +25,23 @@
             class="w-36"
             @change="loadCodes"
           />
-          <button @click="handleExportCodes" class="btn btn-secondary">
-            {{ t('admin.redeem.exportCsv') }}
-          </button>
+
+          <!-- Right: Action buttons -->
+          <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+            <button
+              @click="loadCodes"
+              :disabled="loading"
+              class="btn btn-secondary"
+              :title="t('common.refresh')"
+            >
+              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+            </button>
+            <button @click="handleExportCodes" class="btn btn-secondary">
+              {{ t('admin.redeem.exportCsv') }}
+            </button>
+            <button @click="showGenerateDialog = true" class="btn btn-primary">
+              {{ t('admin.redeem.generateCodes') }}
+            </button>
           </div>
         </div>
       </template>
@@ -213,7 +211,7 @@
               <Select v-model="generateForm.type" :options="typeOptions" />
             </div>
             <!-- 余额/并发类型：显示数值输入 -->
-            <div v-if="generateForm.type !== 'subscription'">
+            <div v-if="generateForm.type !== 'subscription' && generateForm.type !== 'invitation'">
               <label class="input-label">
                 {{
                   generateForm.type === 'balance'
@@ -230,6 +228,12 @@
                 class="input"
               />
             </div>
+            <!-- 邀请码类型：显示提示信息 -->
+            <div v-if="generateForm.type === 'invitation'" class="rounded-lg bg-blue-50 p-3 dark:bg-blue-900/20">
+              <p class="text-sm text-blue-700 dark:text-blue-300">
+                {{ t('admin.redeem.invitationHint') }}
+              </p>
+            </div>
             <!-- 订阅类型：显示分组选择和有效天数 -->
             <template v-if="generateForm.type === 'subscription'">
               <div>
@@ -238,7 +242,30 @@
                   v-model="generateForm.group_id"
                   :options="subscriptionGroupOptions"
                   :placeholder="t('admin.redeem.selectGroupPlaceholder')"
-                />
+                >
+                  <template #selected="{ option }">
+                    <GroupBadge
+                      v-if="option"
+                      :name="(option as unknown as GroupOption).label"
+                      :platform="(option as unknown as GroupOption).platform"
+                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                      :rate-multiplier="(option as unknown as GroupOption).rate"
+                    />
+                    <span v-else class="text-gray-400">{{
+                      t('admin.redeem.selectGroupPlaceholder')
+                    }}</span>
+                  </template>
+                  <template #option="{ option, selected }">
+                    <GroupOptionItem
+                      :name="(option as unknown as GroupOption).label"
+                      :platform="(option as unknown as GroupOption).platform"
+                      :subscription-type="(option as unknown as GroupOption).subscriptionType"
+                      :rate-multiplier="(option as unknown as GroupOption).rate"
+                      :description="(option as unknown as GroupOption).description"
+                      :selected="selected"
+                    />
+                  </template>
+                </Select>
               </div>
               <div>
                 <label class="input-label">{{ t('admin.redeem.validityDays') }}</label>
@@ -364,13 +391,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
 import { formatDateTime } from '@/utils/format'
-import type { RedeemCode, RedeemCodeType, Group } from '@/types'
+import type { RedeemCode, RedeemCodeType, Group, GroupPlatform, SubscriptionType } from '@/types'
 import type { Column } from '@/components/common/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
@@ -378,11 +405,22 @@ import DataTable from '@/components/common/DataTable.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
 import Icon from '@/components/icons/Icon.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
+
+interface GroupOption {
+  value: number
+  label: string
+  description: string | null
+  platform: GroupPlatform
+  subscriptionType: SubscriptionType
+  rate: number
+}
 
 const showGenerateDialog = ref(false)
 const showResultDialog = ref(false)
@@ -395,7 +433,11 @@ const subscriptionGroupOptions = computed(() => {
     .filter((g) => g.subscription_type === 'subscription')
     .map((g) => ({
       value: g.id,
-      label: g.name
+      label: g.name,
+      description: g.description,
+      platform: g.platform,
+      subscriptionType: g.subscription_type,
+      rate: g.rate_multiplier
     }))
 })
 
@@ -461,14 +503,16 @@ const columns = computed<Column[]>(() => [
 const typeOptions = computed(() => [
   { value: 'balance', label: t('admin.redeem.balance') },
   { value: 'concurrency', label: t('admin.redeem.concurrency') },
-  { value: 'subscription', label: t('admin.redeem.subscription') }
+  { value: 'subscription', label: t('admin.redeem.subscription') },
+  { value: 'invitation', label: t('admin.redeem.invitation') }
 ])
 
 const filterTypeOptions = computed(() => [
   { value: '', label: t('admin.redeem.allTypes') },
   { value: 'balance', label: t('admin.redeem.balance') },
   { value: 'concurrency', label: t('admin.redeem.concurrency') },
-  { value: 'subscription', label: t('admin.redeem.subscription') }
+  { value: 'subscription', label: t('admin.redeem.subscription') },
+  { value: 'invitation', label: t('admin.redeem.invitation') }
 ])
 
 const filterStatusOptions = computed(() => [
@@ -507,6 +551,18 @@ const generateForm = reactive({
   group_id: null as number | null,
   validity_days: 30
 })
+
+// 监听类型变化，邀请码类型时自动设置 value 为 0
+watch(
+  () => generateForm.type,
+  (newType) => {
+    if (newType === 'invitation') {
+      generateForm.value = 0
+    } else if (generateForm.value === 0) {
+      generateForm.value = 10
+    }
+  }
+)
 
 const loadCodes = async () => {
   if (abortController) {

@@ -2,6 +2,7 @@ package schema
 
 import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -48,15 +49,15 @@ func (Group) Fields() []ent.Field {
 			Default(false),
 		field.String("status").
 			MaxLen(20).
-			Default("active"),
+			Default(domain.StatusActive),
 
 		// Subscription-related fields (added by migration 003)
 		field.String("platform").
 			MaxLen(50).
-			Default("anthropic"),
+			Default(domain.PlatformAnthropic),
 		field.String("subscription_type").
 			MaxLen(20).
-			Default("standard"),
+			Default(domain.SubscriptionTypeStandard),
 		field.Float("daily_limit_usd").
 			Optional().
 			Nillable().
@@ -94,6 +95,10 @@ func (Group) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Comment("非 Claude Code 请求降级使用的分组 ID"),
+		field.Int64("fallback_group_id_on_invalid_request").
+			Optional().
+			Nillable().
+			Comment("无效请求兜底使用的分组 ID"),
 
 		// 模型路由配置 (added by migration 040)
 		field.JSON("model_routing", map[string][]int64{}).
@@ -105,6 +110,22 @@ func (Group) Fields() []ent.Field {
 		field.Bool("model_routing_enabled").
 			Default(false).
 			Comment("是否启用模型路由配置"),
+
+		// MCP XML 协议注入开关 (added by migration 042)
+		field.Bool("mcp_xml_inject").
+			Default(true).
+			Comment("是否注入 MCP XML 调用协议提示词（仅 antigravity 平台）"),
+
+		// 支持的模型系列 (added by migration 046)
+		field.JSON("supported_model_scopes", []string{}).
+			Default([]string{"claude", "gemini_text", "gemini_image"}).
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}).
+			Comment("支持的模型系列：claude, gemini_text, gemini_image"),
+
+		// 分组排序 (added by migration 052)
+		field.Int("sort_order").
+			Default(0).
+			Comment("分组显示排序，数值越小越靠前"),
 	}
 }
 
@@ -133,5 +154,6 @@ func (Group) Indexes() []ent.Index {
 		index.Fields("subscription_type"),
 		index.Fields("is_exclusive"),
 		index.Fields("deleted_at"),
+		index.Fields("sort_order"),
 	}
 }

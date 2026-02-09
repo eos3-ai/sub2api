@@ -364,6 +364,120 @@
         </div>
       </div>
 
+      <!-- Upstream fields (only for upstream type) -->
+      <div v-if="account.type === 'upstream'" class="space-y-4">
+        <div>
+          <label class="input-label">{{ t('admin.accounts.upstream.baseUrl') }}</label>
+          <input
+            v-model="editBaseUrl"
+            type="text"
+            class="input"
+            placeholder="https://s.konstants.xyz"
+          />
+          <p class="input-hint">{{ t('admin.accounts.upstream.baseUrlHint') }}</p>
+        </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.upstream.apiKey') }}</label>
+          <input
+            v-model="editApiKey"
+            type="password"
+            class="input font-mono"
+            placeholder="sk-..."
+          />
+          <p class="input-hint">{{ t('admin.accounts.leaveEmptyToKeep') }}</p>
+        </div>
+      </div>
+
+      <!-- Antigravity model restriction (applies to all antigravity types) -->
+      <!-- Antigravity 只支持模型映射模式，不支持白名单模式 -->
+      <div v-if="account.platform === 'antigravity'" class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <label class="input-label">{{ t('admin.accounts.modelRestriction') }}</label>
+
+        <!-- Mapping Mode Only (no toggle for Antigravity) -->
+        <div>
+          <div class="mb-3 rounded-lg bg-purple-50 p-3 dark:bg-purple-900/20">
+            <p class="text-xs text-purple-700 dark:text-purple-400">{{ t('admin.accounts.mapRequestModels') }}</p>
+          </div>
+
+          <div v-if="antigravityModelMappings.length > 0" class="mb-3 space-y-2">
+            <div
+              v-for="(mapping, index) in antigravityModelMappings"
+              :key="index"
+              class="space-y-1"
+            >
+              <div class="flex items-center gap-2">
+                <input
+                  v-model="mapping.from"
+                  type="text"
+                  :class="[
+                    'input flex-1',
+                    !isValidWildcardPattern(mapping.from) ? 'border-red-500 dark:border-red-500' : '',
+                    mapping.to.includes('*') ? '' : ''
+                  ]"
+                  :placeholder="t('admin.accounts.requestModel')"
+                />
+                <svg class="h-4 w-4 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                </svg>
+                <input
+                  v-model="mapping.to"
+                  type="text"
+                  :class="[
+                    'input flex-1',
+                    mapping.to.includes('*') ? 'border-red-500 dark:border-red-500' : ''
+                  ]"
+                  :placeholder="t('admin.accounts.actualModel')"
+                />
+                <button
+                  type="button"
+                  @click="removeAntigravityModelMapping(index)"
+                  class="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
+                >
+                  <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <!-- 校验错误提示 -->
+              <p v-if="!isValidWildcardPattern(mapping.from)" class="text-xs text-red-500">
+                {{ t('admin.accounts.wildcardOnlyAtEnd') }}
+              </p>
+              <p v-if="mapping.to.includes('*')" class="text-xs text-red-500">
+                {{ t('admin.accounts.targetNoWildcard') }}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            @click="addAntigravityModelMapping"
+            class="mb-3 w-full rounded-lg border-2 border-dashed border-gray-300 px-4 py-2 text-gray-600 transition-colors hover:border-gray-400 hover:text-gray-700 dark:border-dark-500 dark:text-gray-400 dark:hover:border-dark-400 dark:hover:text-gray-300"
+          >
+            <svg class="mr-1 inline h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            {{ t('admin.accounts.addMapping') }}
+          </button>
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="preset in antigravityPresetMappings"
+              :key="preset.label"
+              type="button"
+              @click="addAntigravityPresetMapping(preset.from, preset.to)"
+              :class="['rounded-lg px-3 py-1 text-xs transition-colors', preset.color]"
+            >
+              + {{ preset.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Temp Unschedulable Rules -->
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <div class="mb-3 flex items-center justify-between">
@@ -875,6 +989,18 @@
       </div>
     </template>
   </BaseDialog>
+
+  <!-- Mixed Channel Warning Dialog -->
+  <ConfirmDialog
+    :show="showMixedChannelWarning"
+    :title="t('admin.accounts.mixedChannelWarningTitle')"
+    :message="mixedChannelWarningDetails ? t('admin.accounts.mixedChannelWarning', mixedChannelWarningDetails) : ''"
+    :confirm-text="t('common.confirm')"
+    :cancel-text="t('common.cancel')"
+    :danger="true"
+    @confirm="handleMixedChannelConfirm"
+    @cancel="handleMixedChannelCancel"
+  />
 </template>
 
 <script setup lang="ts">
@@ -883,8 +1009,9 @@ import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
-import type { Account, Proxy, Group } from '@/types'
+import type { Account, Proxy, AdminGroup } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ProxySelector from '@/components/common/ProxySelector.vue'
@@ -894,14 +1021,15 @@ import { formatDateTimeLocalInput, parseDateTimeLocalInput } from '@/utils/forma
 import {
   getPresetMappingsByPlatform,
   commonErrorCodes,
-  buildModelMappingObject
+  buildModelMappingObject,
+  isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
 
 interface Props {
   show: boolean
   account: Account | null
   proxies: Proxy[]
-  groups: Group[]
+  groups: AdminGroup[]
 }
 
 const props = defineProps<Props>()
@@ -921,6 +1049,8 @@ const baseUrlHint = computed(() => {
   if (props.account.platform === 'gemini') return t('admin.accounts.gemini.baseUrlHint')
   return t('admin.accounts.baseUrlHint')
 })
+
+const antigravityPresetMappings = computed(() => getPresetMappingsByPlatform('antigravity'))
 
 // Model mapping type
 interface ModelMapping {
@@ -948,8 +1078,16 @@ const customErrorCodeInput = ref<number | null>(null)
 const interceptWarmupRequests = ref(false)
 const autoPauseOnExpired = ref(false)
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
+const antigravityModelRestrictionMode = ref<'whitelist' | 'mapping'>('whitelist')
+const antigravityWhitelistModels = ref<string[]>([])
+const antigravityModelMappings = ref<ModelMapping[]>([])
 const tempUnschedEnabled = ref(false)
 const tempUnschedRules = ref<TempUnschedRuleForm[]>([])
+
+// Mixed channel warning dialog state
+const showMixedChannelWarning = ref(false)
+const mixedChannelWarningDetails = ref<{ groupName: string; currentPlatform: string; otherPlatform: string } | null>(null)
+const pendingUpdatePayload = ref<Record<string, unknown> | null>(null)
 
 // Quota control state (Anthropic OAuth/SetupToken only)
 const windowCostEnabled = ref(false)
@@ -1048,6 +1186,38 @@ watch(
       const extra = newAccount.extra as Record<string, unknown> | undefined
       mixedScheduling.value = extra?.mixed_scheduling === true
 
+      // Load antigravity model mapping (Antigravity 只支持映射模式)
+      if (newAccount.platform === 'antigravity') {
+        const credentials = newAccount.credentials as Record<string, unknown> | undefined
+
+        // Antigravity 始终使用映射模式
+        antigravityModelRestrictionMode.value = 'mapping'
+        antigravityWhitelistModels.value = []
+
+        // 从 model_mapping 读取映射配置
+        const rawAgMapping = credentials?.model_mapping as Record<string, string> | undefined
+        if (rawAgMapping && typeof rawAgMapping === 'object') {
+          const entries = Object.entries(rawAgMapping)
+          // 无论是白名单样式(key===value)还是真正的映射，都统一转换为映射列表
+          antigravityModelMappings.value = entries.map(([from, to]) => ({ from, to }))
+        } else {
+          // 兼容旧数据：从 model_whitelist 读取，转换为映射格式
+          const rawWhitelist = credentials?.model_whitelist
+          if (Array.isArray(rawWhitelist) && rawWhitelist.length > 0) {
+            antigravityModelMappings.value = rawWhitelist
+              .map((v) => String(v).trim())
+              .filter((v) => v.length > 0)
+              .map((m) => ({ from: m, to: m }))
+          } else {
+            antigravityModelMappings.value = []
+          }
+        }
+      } else {
+        antigravityModelRestrictionMode.value = 'mapping'
+        antigravityWhitelistModels.value = []
+        antigravityModelMappings.value = []
+      }
+
       // Load quota control settings (Anthropic OAuth/SetupToken only)
       loadQuotaControlSettings(newAccount)
 
@@ -1098,6 +1268,9 @@ watch(
         } else {
           selectedErrorCodes.value = []
         }
+      } else if (newAccount.type === 'upstream' && newAccount.credentials) {
+        const credentials = newAccount.credentials as Record<string, unknown>
+        editBaseUrl.value = (credentials.base_url as string) || ''
       } else {
         const platformDefaultUrl =
           newAccount.platform === 'openai'
@@ -1134,6 +1307,23 @@ const addPresetMapping = (from: string, to: string) => {
     return
   }
   modelMappings.value.push({ from, to })
+}
+
+const addAntigravityModelMapping = () => {
+  antigravityModelMappings.value.push({ from: '', to: '' })
+}
+
+const removeAntigravityModelMapping = (index: number) => {
+  antigravityModelMappings.value.splice(index, 1)
+}
+
+const addAntigravityPresetMapping = (from: string, to: string) => {
+  const exists = antigravityModelMappings.value.some((m) => m.from === from)
+  if (exists) {
+    appStore.showInfo(t('admin.accounts.mappingExists', { model: from }))
+    return
+  }
+  antigravityModelMappings.value.push({ from, to })
 }
 
 // Error code toggle helper
@@ -1363,8 +1553,8 @@ const handleSubmit = async () => {
   if (!props.account) return
 
   submitting.value = true
+  const updatePayload: Record<string, unknown> = { ...form }
   try {
-    const updatePayload: Record<string, unknown> = { ...form }
     // 后端期望 proxy_id: 0 表示清除代理，而不是 null
     if (updatePayload.proxy_id === null) {
       updatePayload.proxy_id = 0
@@ -1420,6 +1610,22 @@ const handleSubmit = async () => {
       }
 
       updatePayload.credentials = newCredentials
+    } else if (props.account.type === 'upstream') {
+      const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
+      const newCredentials: Record<string, unknown> = { ...currentCredentials }
+
+      newCredentials.base_url = editBaseUrl.value.trim()
+
+      if (editApiKey.value.trim()) {
+        newCredentials.api_key = editApiKey.value.trim()
+      }
+
+      if (!applyTempUnschedConfig(newCredentials)) {
+        submitting.value = false
+        return
+      }
+
+      updatePayload.credentials = newCredentials
     } else {
       // For oauth/setup-token types, only update intercept_warmup_requests if changed
       const currentCredentials = (props.account.credentials as Record<string, unknown>) || {}
@@ -1438,6 +1644,30 @@ const handleSubmit = async () => {
       if (!applyTempUnschedConfig(newCredentials)) {
         submitting.value = false
         return
+      }
+
+      updatePayload.credentials = newCredentials
+    }
+
+    // Antigravity: persist model mapping to credentials (applies to all antigravity types)
+    // Antigravity 只支持映射模式
+    if (props.account.platform === 'antigravity') {
+      const currentCredentials = (updatePayload.credentials as Record<string, unknown>) ||
+        ((props.account.credentials as Record<string, unknown>) || {})
+      const newCredentials: Record<string, unknown> = { ...currentCredentials }
+
+      // 移除旧字段
+      delete newCredentials.model_whitelist
+      delete newCredentials.model_mapping
+
+      // 只使用映射模式
+      const antigravityModelMapping = buildModelMappingObject(
+        'mapping',
+        [],
+        antigravityModelMappings.value
+      )
+      if (antigravityModelMapping) {
+        newCredentials.model_mapping = antigravityModelMapping
       }
 
       updatePayload.credentials = newCredentials
@@ -1500,9 +1730,47 @@ const handleSubmit = async () => {
     emit('updated')
     handleClose()
   } catch (error: any) {
-    appStore.showError(error.response?.data?.message || error.response?.data?.detail || t('admin.accounts.failedToUpdate'))
+    // Handle 409 mixed_channel_warning - show confirmation dialog
+    if (error.response?.status === 409 && error.response?.data?.error === 'mixed_channel_warning') {
+      const details = error.response.data.details || {}
+      mixedChannelWarningDetails.value = {
+        groupName: details.group_name || 'Unknown',
+        currentPlatform: details.current_platform || 'Unknown',
+        otherPlatform: details.other_platform || 'Unknown'
+      }
+      pendingUpdatePayload.value = updatePayload
+      showMixedChannelWarning.value = true
+    } else {
+      appStore.showError(error.response?.data?.message || error.response?.data?.detail || t('admin.accounts.failedToUpdate'))
+    }
   } finally {
     submitting.value = false
   }
+}
+
+// Handle mixed channel warning confirmation
+const handleMixedChannelConfirm = async () => {
+  showMixedChannelWarning.value = false
+  if (pendingUpdatePayload.value && props.account) {
+    pendingUpdatePayload.value.confirm_mixed_channel_risk = true
+    submitting.value = true
+    try {
+      await adminAPI.accounts.update(props.account.id, pendingUpdatePayload.value)
+      appStore.showSuccess(t('admin.accounts.accountUpdated'))
+      emit('updated')
+      handleClose()
+    } catch (error: any) {
+      appStore.showError(error.response?.data?.message || error.response?.data?.detail || t('admin.accounts.failedToUpdate'))
+    } finally {
+      submitting.value = false
+      pendingUpdatePayload.value = null
+    }
+  }
+}
+
+const handleMixedChannelCancel = () => {
+  showMixedChannelWarning.value = false
+  pendingUpdatePayload.value = null
+  mixedChannelWarningDetails.value = null
 }
 </script>

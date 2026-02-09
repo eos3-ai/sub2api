@@ -10,31 +10,100 @@ export default {
     login: 'Login',
     getStarted: 'Get Started',
     goToDashboard: 'Go to Dashboard',
+    // User-focused value proposition
+    heroSubtitle: 'One Key, All AI Models',
+    heroDescription: 'No need to manage multiple subscriptions. Access Claude, GPT, Gemini and more with a single API key',
     tags: {
       subscriptionToApi: 'Subscription to API',
-      stickySession: 'Sticky Session',
-      realtimeBilling: 'Real-time Billing'
+      stickySession: 'Session Persistence',
+      realtimeBilling: 'Pay As You Go'
+    },
+    // Pain points section
+    painPoints: {
+      title: 'Sound Familiar?',
+      items: {
+        expensive: {
+          title: 'High Subscription Costs',
+          desc: 'Paying for multiple AI subscriptions that add up every month'
+        },
+        complex: {
+          title: 'Account Chaos',
+          desc: 'Managing scattered accounts and API keys across different platforms'
+        },
+        unstable: {
+          title: 'Service Interruptions',
+          desc: 'Single accounts hitting rate limits and disrupting your workflow'
+        },
+        noControl: {
+          title: 'No Usage Control',
+          desc: "Can't track where your money goes or limit team member usage"
+        }
+      }
+    },
+    // Solutions section
+    solutions: {
+      title: 'We Solve These Problems',
+      subtitle: 'Three simple steps to stress-free AI access'
     },
     features: {
-      unifiedGateway: 'Unified API Gateway',
-      unifiedGatewayDesc:
-        'Convert Claude subscriptions to API endpoints. Access AI capabilities through standard /v1/messages interface.',
-      multiAccount: 'Multi-Account Pool',
-      multiAccountDesc:
-        'Manage multiple upstream accounts with smart load balancing. Support OAuth and API Key authentication.',
-      balanceQuota: 'Balance & Quota',
-      balanceQuotaDesc:
-        'Token-based billing with precise usage tracking. Manage quotas and recharge with redeem codes.'
+      unifiedGateway: 'One-Click Access',
+      unifiedGatewayDesc: 'Get a single API key to call all connected AI models. No separate applications needed.',
+      multiAccount: 'Always Reliable',
+      multiAccountDesc: 'Smart routing across multiple upstream accounts with automatic failover. Say goodbye to errors.',
+      balanceQuota: 'Pay What You Use',
+      balanceQuotaDesc: 'Usage-based billing with quota limits. Full visibility into team consumption.'
+    },
+    // Comparison section
+    comparison: {
+      title: 'Why Choose Us?',
+      headers: {
+        feature: 'Comparison',
+        official: 'Official Subscriptions',
+        us: 'Our Platform'
+      },
+      items: {
+        pricing: {
+          feature: 'Pricing',
+          official: 'Fixed monthly fee, pay even if unused',
+          us: 'Pay only for what you use'
+        },
+        models: {
+          feature: 'Model Selection',
+          official: 'Single provider only',
+          us: 'Switch between models freely'
+        },
+        management: {
+          feature: 'Account Management',
+          official: 'Manage each service separately',
+          us: 'Unified key, one dashboard'
+        },
+        stability: {
+          feature: 'Stability',
+          official: 'Single account rate limits',
+          us: 'Multi-account pool, auto-failover'
+        },
+        control: {
+          feature: 'Usage Control',
+          official: 'Not available',
+          us: 'Quotas & detailed analytics'
+        }
+      }
     },
     providers: {
-      title: 'Supported Providers',
-      description: 'Unified API interface for AI services',
+      title: 'Supported AI Models',
+      description: 'One API, Multiple Choices',
       supported: 'Supported',
       soon: 'Soon',
       claude: 'Claude',
       gemini: 'Gemini',
       antigravity: 'Antigravity',
       more: 'More'
+    },
+    // CTA section
+    cta: {
+      title: 'Ready to Get Started?',
+      description: 'Sign up now and get free trial credits to experience seamless AI access',
+      button: 'Sign Up Free'
     },
     footer: {
       allRightsReserved: 'All rights reserved.'
@@ -69,7 +138,9 @@ export default {
       port: 'Port',
       password: 'Password (optional)',
       database: 'Database',
-      passwordPlaceholder: 'Password'
+      passwordPlaceholder: 'Password',
+      enableTls: 'Enable TLS',
+      enableTlsHint: 'Use TLS when connecting to Redis (public CA certs)'
     },
     admin: {
       title: 'Admin Account',
@@ -148,7 +219,10 @@ export default {
     copy: 'Copy',
     details: 'Details',
     copiedToClipboard: 'Copied to clipboard',
+    copied: 'Copied',
     copyFailed: 'Failed to copy',
+    verifying: 'Verifying...',
+    processing: 'Processing...',
     contactSupport: 'Contact Support',
     add: 'Add',
     invalidEmail: 'Please enter a valid email address',
@@ -162,7 +236,7 @@ export default {
     selectedCount: '({count} selected)',
     refresh: 'Refresh',
     settings: 'Settings',
-    stettings: 'Settings',
+    chooseFile: 'Choose File',
     notAvailable: 'N/A',
     now: 'Now',
     unknown: 'Unknown',
@@ -174,13 +248,20 @@ export default {
       justNow: 'Just now',
       minutesAgo: '{n}m ago',
       hoursAgo: '{n}h ago',
-      daysAgo: '{n}d ago'
+      daysAgo: '{n}d ago',
+      countdown: {
+        daysHours: '{d}d {h}h',
+        hoursMinutes: '{h}h {m}m',
+        minutes: '{m}m',
+        withSuffix: '{time} to lift'
+      }
     }
   },
 
   // Navigation
   nav: {
     dashboard: 'Dashboard',
+    announcements: 'Announcements',
     apiKeys: 'API Keys',
     usage: 'Usage',
     payment: 'Online Recharge',
@@ -207,6 +288,7 @@ export default {
     logout: 'Logout',
     github: 'GitHub',
     mySubscriptions: 'My Subscriptions',
+    buySubscription: 'Purchase Subscription',
     docs: 'Docs'
   },
 
@@ -521,6 +603,13 @@ export default {
     promoCodeAlreadyUsed: 'You have already used this promo code',
     promoCodeValidating: 'Promo code is being validated, please wait',
     promoCodeInvalidCannotRegister: 'Invalid promo code. Please check and try again or clear the promo code field',
+    invitationCodeLabel: 'Invitation Code',
+    invitationCodePlaceholder: 'Enter invitation code',
+    invitationCodeRequired: 'Invitation code is required',
+    invitationCodeValid: 'Invitation code is valid',
+    invitationCodeInvalid: 'Invalid or used invitation code',
+    invitationCodeValidating: 'Validating invitation code...',
+    invitationCodeInvalidCannotRegister: 'Invalid invitation code. Please check and try again',
     linuxdo: {
       signIn: 'Continue with Linux.do',
       orContinue: 'or continue with email',
@@ -534,7 +623,36 @@ export default {
       code: 'Code',
       state: 'State',
       fullUrl: 'Full URL'
-    }
+    },
+    // Forgot password
+    forgotPassword: 'Forgot password?',
+    forgotPasswordTitle: 'Reset Your Password',
+    forgotPasswordHint: 'Enter your email address and we will send you a link to reset your password.',
+    sendResetLink: 'Send Reset Link',
+    sendingResetLink: 'Sending...',
+    sendResetLinkFailed: 'Failed to send reset link. Please try again.',
+    resetEmailSent: 'Reset Link Sent',
+    resetEmailSentHint: 'If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.',
+    backToLogin: 'Back to Login',
+    rememberedPassword: 'Remembered your password?',
+    // Reset password
+    resetPasswordTitle: 'Set New Password',
+    resetPasswordHint: 'Enter your new password below.',
+    newPassword: 'New Password',
+    newPasswordPlaceholder: 'Enter your new password',
+    confirmPassword: 'Confirm Password',
+    confirmPasswordPlaceholder: 'Confirm your new password',
+    confirmPasswordRequired: 'Please confirm your password',
+    passwordsDoNotMatch: 'Passwords do not match',
+    resetPassword: 'Reset Password',
+    resettingPassword: 'Resetting...',
+    resetPasswordFailed: 'Failed to reset password. Please try again.',
+    passwordResetSuccess: 'Password Reset Successful',
+    passwordResetSuccessHint: 'Your password has been reset. You can now sign in with your new password.',
+    invalidResetLink: 'Invalid Reset Link',
+    invalidResetLinkHint: 'This password reset link is invalid or has expired. Please request a new one.',
+    requestNewResetLink: 'Request New Reset Link',
+    invalidOrExpiredToken: 'The password reset link is invalid or has expired. Please request a new one.'
   },
 
   // Dashboard
@@ -631,6 +749,7 @@ export default {
     total: 'Total',
     rateMultiplierNotice:
       'Rate multiplier note: The multiplier represents the actual settlement price. For example, 2x means the settlement unit price is converted at 2 CNY ~ 1 USD. Final billing is subject to the system display.',
+    quota: 'Quota',
     useKey: 'Use Key',
     useKeyModal: {
       title: 'Use API Key',
@@ -694,6 +813,33 @@ export default {
       geminiCli: 'Gemini CLI',
       geminiCliDesc: 'Import as Gemini CLI configuration',
     },
+    // Quota and expiration
+    quotaLimit: 'Quota Limit',
+    quotaAmount: 'Quota Amount (USD)',
+    quotaAmountPlaceholder: 'Enter quota limit in USD',
+    quotaAmountHint: 'Set the maximum amount this key can spend. 0 = unlimited.',
+    quotaUsed: 'Quota Used',
+    reset: 'Reset',
+    resetQuotaUsed: 'Reset used quota to 0',
+    resetQuotaTitle: 'Confirm Reset Quota',
+    resetQuotaConfirmMessage: 'Are you sure you want to reset the used quota (${used}) for key "{name}" to 0? This action cannot be undone.',
+    quotaResetSuccess: 'Quota reset successfully',
+    failedToResetQuota: 'Failed to reset quota',
+    expiration: 'Expiration',
+    expiresInDays: '{days} days',
+    extendDays: '+{days} days',
+    customDate: 'Custom',
+    expirationDate: 'Expiration Date',
+    expirationDateHint: 'Select when this API key should expire.',
+    currentExpiration: 'Current expiration',
+    expiresAt: 'Expires',
+    noExpiration: 'Never',
+    status: {
+      active: 'Active',
+      inactive: 'Inactive',
+      quota_exhausted: 'Quota Exhausted',
+      expired: 'Expired',
+    },
   },
 
   // Usage
@@ -726,6 +872,7 @@ export default {
     exporting: 'Exporting...',
     preparingExport: 'Preparing export...',
     model: 'Model',
+    reasoningEffort: 'Reasoning Effort',
     type: 'Type',
     tokens: 'Tokens',
     cost: 'Cost',
@@ -823,7 +970,46 @@ export default {
     passwordsNotMatch: 'New passwords do not match',
     passwordTooShort: 'Password must be at least 8 characters long',
     passwordChangeSuccess: 'Password changed successfully',
-    passwordChangeFailed: 'Failed to change password'
+    passwordChangeFailed: 'Failed to change password',
+    // TOTP 2FA
+    totp: {
+      title: 'Two-Factor Authentication (2FA)',
+      description: 'Enhance account security with Google Authenticator or similar apps',
+      enabled: 'Enabled',
+      enabledAt: 'Enabled at',
+      notEnabled: 'Not Enabled',
+      notEnabledHint: 'Enable two-factor authentication to enhance account security',
+      enable: 'Enable',
+      disable: 'Disable',
+      featureDisabled: 'Feature Unavailable',
+      featureDisabledHint: 'Two-factor authentication has not been enabled by the administrator',
+      setupTitle: 'Set Up Two-Factor Authentication',
+      setupStep1: 'Scan the QR code below with your authenticator app',
+      setupStep2: 'Enter the 6-digit code from your app',
+      manualEntry: "Can't scan? Enter the key manually:",
+      enterCode: 'Enter 6-digit code',
+      verify: 'Verify',
+      setupFailed: 'Failed to get setup information',
+      verifyFailed: 'Invalid code, please try again',
+      enableSuccess: 'Two-factor authentication enabled',
+      disableTitle: 'Disable Two-Factor Authentication',
+      disableWarning: 'After disabling, you will no longer need a verification code to log in. This may reduce your account security.',
+      enterPassword: 'Enter your current password to confirm',
+      confirmDisable: 'Confirm Disable',
+      disableSuccess: 'Two-factor authentication disabled',
+      disableFailed: 'Failed to disable, please check your password',
+      loginTitle: 'Two-Factor Authentication',
+      loginHint: 'Enter the 6-digit code from your authenticator app',
+      loginFailed: 'Verification failed, please try again',
+      // New translations for email verification
+      verifyEmailFirst: 'Please verify your email first',
+      verifyPasswordFirst: 'Please verify your identity first',
+      emailCode: 'Email Verification Code',
+      enterEmailCode: 'Enter 6-digit code',
+      sendCode: 'Send Code',
+      codeSent: 'Verification code sent to your email',
+      sendCodeFailed: 'Failed to send verification code'
+    }
   },
 
   // Empty States
@@ -1052,6 +1238,16 @@ export default {
       allowedGroupsUpdated: 'Allowed groups updated successfully',
       failedToLoadGroups: 'Failed to load groups',
       failedToUpdateAllowedGroups: 'Failed to update allowed groups',
+      // User Group Configuration
+      groupConfig: 'User Group Configuration',
+      groupConfigHint: 'Configure custom rate multipliers for user {email} (overrides group defaults)',
+      exclusiveGroups: 'Exclusive Groups',
+      publicGroups: 'Public Groups (Default Available)',
+      defaultRate: 'Default Rate',
+      customRate: 'Custom Rate',
+      useDefaultRate: 'Use Default',
+      customRatePlaceholder: 'Leave empty for default',
+      groupConfigUpdated: 'Group configuration updated successfully',
       deposit: 'Deposit',
       withdraw: 'Withdraw',
       depositAmount: 'Deposit Amount',
@@ -1074,6 +1270,20 @@ export default {
       failedToDeposit: 'Failed to deposit',
       failedToWithdraw: 'Failed to withdraw',
       useDepositWithdrawButtons: 'Please use deposit/withdraw buttons to adjust balance',
+      // Balance History
+      balanceHistory: 'Recharge History',
+      balanceHistoryTip: 'Click to open recharge history',
+      balanceHistoryTitle: 'User Recharge & Concurrency History',
+      noBalanceHistory: 'No records found for this user',
+      allTypes: 'All Types',
+      typeBalance: 'Balance (Redeem)',
+      typeAdminBalance: 'Balance (Admin)',
+      typeConcurrency: 'Concurrency (Redeem)',
+      typeAdminConcurrency: 'Concurrency (Admin)',
+      typeSubscription: 'Subscription',
+      failedToLoadBalanceHistory: 'Failed to load balance history',
+      createdAt: 'Created',
+      totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
         user: 'User'
@@ -1151,6 +1361,10 @@ export default {
       createGroup: 'Create Group',
       editGroup: 'Edit Group',
       deleteGroup: 'Delete Group',
+      sortOrder: 'Sort',
+      sortOrderHint: 'Drag groups to adjust display order, groups at the top will be displayed first',
+      sortOrderUpdated: 'Sort order updated',
+      failedToUpdateSortOrder: 'Failed to update sort order',
       allPlatforms: 'All Platforms',
       allStatus: 'All Status',
       allGroups: 'All Groups',
@@ -1247,6 +1461,19 @@ export default {
         fallbackHint: 'Non-Claude Code requests will use this group. Leave empty to reject directly.',
         noFallback: 'No Fallback (Reject)'
       },
+      invalidRequestFallback: {
+        title: 'Invalid Request Fallback Group',
+        hint: 'Triggered only when upstream explicitly returns prompt too long. Leave empty to disable fallback.',
+        noFallback: 'No Fallback'
+      },
+      copyAccounts: {
+        title: 'Copy Accounts from Groups',
+        tooltip: 'Select one or more groups of the same platform. After creation, all accounts from these groups will be automatically bound to the new group (deduplicated).',
+        tooltipEdit: 'Select one or more groups of the same platform. After saving, current group accounts will be replaced with accounts from these groups (deduplicated).',
+        selectPlaceholder: 'Select groups to copy accounts from...',
+        hint: 'Multiple groups can be selected, accounts will be deduplicated',
+        hintEdit: '⚠️ Warning: This will replace all existing account bindings'
+      },
       modelRouting: {
         title: 'Model Routing',
         tooltip: 'Configure specific model requests to be routed to designated accounts. Supports wildcard matching, e.g., claude-opus-* matches all opus models.',
@@ -1266,6 +1493,20 @@ export default {
         noRulesHint: 'Add routing rules to route specific model requests to designated accounts',
         searchAccountPlaceholder: 'Search accounts...',
         accountsHint: 'Select accounts to prioritize for this model pattern'
+      },
+      mcpXml: {
+        title: 'MCP XML Protocol Injection',
+        tooltip: 'When enabled, if the request contains MCP tools, an XML format call protocol prompt will be injected into the system prompt. Disable this to avoid interference with certain clients.',
+        enabled: 'Enabled',
+        disabled: 'Disabled'
+      },
+      supportedScopes: {
+        title: 'Supported Model Families',
+        tooltip: 'Select the model families this group supports. Unchecked families will not be routed to this group.',
+        claude: 'Claude',
+        geminiText: 'Gemini Text',
+        geminiImage: 'Gemini Image',
+        hint: 'Select at least one model family'
       }
     },
 
@@ -1274,7 +1515,7 @@ export default {
       title: 'Subscription Management',
       description: 'Manage user subscriptions and quota limits',
       assignSubscription: 'Assign Subscription',
-      extendSubscription: 'Extend Subscription',
+      adjustSubscription: 'Adjust Subscription',
       revokeSubscription: 'Revoke Subscription',
       allStatus: 'All Status',
       allGroups: 'All Groups',
@@ -1289,6 +1530,7 @@ export default {
       resetInHoursMinutes: 'Resets in {hours}h {minutes}m',
       resetInDaysHours: 'Resets in {days}d {hours}h',
       daysRemaining: 'days remaining',
+      remainingDays: 'Remaining days',
       noExpiration: 'No expiration',
       status: {
         active: 'Active',
@@ -1307,28 +1549,32 @@ export default {
         user: 'User',
         group: 'Subscription Group',
         validityDays: 'Validity (Days)',
-        extendDays: 'Extend by (Days)'
+        adjustDays: 'Adjust by (Days)'
       },
       selectUser: 'Select a user',
       selectGroup: 'Select a subscription group',
       groupHint: 'Only groups with subscription billing type are shown',
       validityHint: 'Number of days the subscription will be valid',
-      extendingFor: 'Extending subscription for',
+      adjustingFor: 'Adjusting subscription for',
       currentExpiration: 'Current expiration',
+      adjustDaysPlaceholder: 'Positive to extend, negative to shorten',
+      adjustHint: 'Enter positive number to extend, negative to shorten (remaining days must be > 0)',
       assign: 'Assign',
       assigning: 'Assigning...',
-      extend: 'Extend',
-      extending: 'Extending...',
+      adjust: 'Adjust',
+      adjusting: 'Adjusting...',
       revoke: 'Revoke',
       noSubscriptionsYet: 'No subscriptions yet',
       assignFirstSubscription: 'Assign a subscription to get started.',
       subscriptionAssigned: 'Subscription assigned successfully',
-      subscriptionExtended: 'Subscription extended successfully',
+      subscriptionAdjusted: 'Subscription adjusted successfully',
       subscriptionRevoked: 'Subscription revoked successfully',
       failedToLoad: 'Failed to load subscriptions',
       failedToAssign: 'Failed to assign subscription',
-      failedToExtend: 'Failed to extend subscription',
+      failedToAdjust: 'Failed to adjust subscription',
       failedToRevoke: 'Failed to revoke subscription',
+      adjustWouldExpire: 'Remaining days after adjustment must be greater than 0',
+      adjustOutOfRange: 'Adjustment days must be between -36500 and 36500',
       pleaseSelectUser: 'Please select a user',
       pleaseSelectGroup: 'Please select a group',
       validityDaysRequired: 'Please enter a valid number of days (at least 1)',
@@ -1341,7 +1587,36 @@ export default {
       title: 'Account Management',
       description: 'Manage AI platform accounts and credentials',
       createAccount: 'Create Account',
+      autoRefresh: 'Auto Refresh',
+      enableAutoRefresh: 'Enable auto refresh',
+      refreshInterval5s: '5 seconds',
+      refreshInterval10s: '10 seconds',
+      refreshInterval15s: '15 seconds',
+      refreshInterval30s: '30 seconds',
+      autoRefreshCountdown: 'Auto refresh: {seconds}s',
       syncFromCrs: 'Sync from CRS',
+      dataExport: 'Export',
+      dataExportSelected: 'Export Selected',
+      dataExportIncludeProxies: 'Include proxies linked to the exported accounts',
+      dataImport: 'Import',
+      dataExportConfirmMessage: 'The exported data contains sensitive account and proxy information. Store it securely.',
+      dataExportConfirm: 'Confirm Export',
+      dataExported: 'Data exported successfully',
+      dataExportFailed: 'Failed to export data',
+      dataImportTitle: 'Import Data',
+      dataImportHint: 'Upload the exported JSON file to import accounts and proxies.',
+      dataImportWarning: 'Import will create new accounts/proxies; groups must be bound manually. Ensure existing data does not conflict.',
+      dataImportFile: 'Data file',
+      dataImportButton: 'Start Import',
+      dataImporting: 'Importing...',
+      dataImportSelectFile: 'Please select a data file',
+      dataImportParseFailed: 'Failed to parse data file',
+      dataImportFailed: 'Data import failed',
+      dataImportResult: 'Import Result',
+      dataImportResultSummary: 'Proxies created {proxy_created}, reused {proxy_reused}, failed {proxy_failed}; Accounts created {account_created}, failed {account_failed}',
+      dataImportErrors: 'Error Details',
+      dataImportSuccess: 'Import completed: accounts {account_created}, failed {account_failed}',
+      dataImportCompletedWithErrors: 'Import completed with errors: account failed {account_failed}, proxy failed {proxy_failed}',
       syncFromCrsTitle: 'Sync Accounts from CRS',
       syncFromCrsDesc:
         'Sync accounts from claude-relay-service (CRS) into this system (CRS is called server-to-server).',
@@ -1393,7 +1668,9 @@ export default {
         responsesApi: 'Responses API',
         googleOauth: 'Google OAuth',
         codeAssist: 'Code Assist',
-        antigravityOauth: 'Antigravity OAuth'
+        antigravityOauth: 'Antigravity OAuth',
+        upstream: 'Upstream',
+        upstreamDesc: 'Connect via Base URL + API Key'
       },
       status: {
         active: 'Active',
@@ -1402,8 +1679,11 @@ export default {
         cooldown: 'Cooldown',
         paused: 'Paused',
         limited: 'Limited',
+        rateLimited: 'Rate Limited',
+        overloaded: 'Overloaded',
         tempUnschedulable: 'Temp Unschedulable',
         rateLimitedUntil: 'Rate limited until {time}',
+        modelRateLimitedUntil: '{model} rate limited until {time}',
         overloadedUntil: 'Overloaded until {time}',
         viewTempUnschedDetails: 'View temp unschedulable details'
       },
@@ -1559,6 +1839,8 @@ export default {
       actualModel: 'Actual model',
       addMapping: 'Add Mapping',
       mappingExists: 'Mapping for {model} already exists',
+      wildcardOnlyAtEnd: 'Wildcard * can only be at the end',
+      targetNoWildcard: 'Target model cannot contain wildcard *',
       searchModels: 'Search models...',
       noMatchingModels: 'No matching models',
       fillRelatedModels: 'Fill related models',
@@ -1640,10 +1922,21 @@ export default {
       accountUpdated: 'Account updated successfully',
       failedToCreate: 'Failed to create account',
       failedToUpdate: 'Failed to update account',
+      mixedChannelWarningTitle: 'Mixed Channel Warning',
+      mixedChannelWarning: 'Warning: Group "{groupName}" contains both {currentPlatform} and {otherPlatform} accounts. Mixing different channels may cause thinking block signature validation issues, which will fallback to non-thinking mode. Are you sure you want to continue?',
       pleaseEnterAccountName: 'Please enter account name',
       pleaseEnterApiKey: 'Please enter API Key',
       apiKeyIsRequired: 'API Key is required',
       leaveEmptyToKeep: 'Leave empty to keep current key',
+      // Upstream type
+      upstream: {
+        baseUrl: 'Upstream Base URL',
+        baseUrlHint: 'The address of the upstream Antigravity service, e.g., https://s.konstants.xyz',
+        apiKey: 'Upstream API Key',
+        apiKeyHint: 'API Key for the upstream service',
+        pleaseEnterBaseUrl: 'Please enter upstream Base URL',
+        pleaseEnterApiKey: 'Please enter upstream API Key'
+      },
       // OAuth flow
       oauth: {
         title: 'Claude Account Authorization',
@@ -1691,6 +1984,9 @@ export default {
         cookieAuthFailed: 'Cookie authorization failed',
         keyAuthFailed: 'Key {index}: {error}',
         successCreated: 'Successfully created {count} account(s)',
+        batchSuccess: 'Successfully created {count} account(s)',
+        batchPartialSuccess: 'Partial success: {success} succeeded, {failed} failed',
+        batchFailed: 'Batch creation failed',
         // OpenAI specific
         openai: {
           title: 'OpenAI Account Authorization',
@@ -1709,7 +2005,14 @@ export default {
           authCodePlaceholder:
             'Option 1: Copy the complete URL\n(http://localhost:xxx/auth/callback?code=...)\nOption 2: Copy only the code parameter value',
           authCodeHint:
-            'You can copy the entire URL or just the code parameter value, the system will auto-detect'
+            'You can copy the entire URL or just the code parameter value, the system will auto-detect',
+          // Refresh Token auth
+          refreshTokenAuth: 'Manual RT Input',
+          refreshTokenDesc: 'Enter your existing OpenAI Refresh Token(s). Supports batch input (one per line). The system will automatically validate and create accounts.',
+          refreshTokenPlaceholder: 'Paste your OpenAI Refresh Token...\nSupports multiple, one per line',
+          validating: 'Validating...',
+          validateAndCreate: 'Validate & Create Account',
+          pleaseEnterRefreshToken: 'Please enter Refresh Token'
         },
         // Gemini specific
 	        gemini: {
@@ -2013,6 +2316,27 @@ export default {
       createProxy: 'Create Proxy',
       editProxy: 'Edit Proxy',
       deleteProxy: 'Delete Proxy',
+      dataImport: 'Import',
+      dataExportSelected: 'Export Selected',
+      dataImportTitle: 'Import Proxies',
+      dataImportHint: 'Upload the exported proxy JSON file to import proxies in bulk.',
+      dataImportWarning: 'Import will create or reuse proxies, keep their status, and trigger latency checks after completion.',
+      dataImportFile: 'Data File',
+      dataImportButton: 'Start Import',
+      dataImporting: 'Importing...',
+      dataImportSelectFile: 'Please select a data file',
+      dataImportParseFailed: 'Failed to parse data',
+      dataImportFailed: 'Failed to import data',
+      dataImportResult: 'Import Result',
+      dataImportResultSummary: 'Created {proxy_created}, reused {proxy_reused}, failed {proxy_failed}',
+      dataImportErrors: 'Failure Details',
+      dataImportSuccess: 'Import completed: created {proxy_created}, reused {proxy_reused}',
+      dataImportCompletedWithErrors: 'Import completed with errors: failed {proxy_failed}',
+      dataExport: 'Export',
+      dataExportConfirmMessage: 'The exported data contains sensitive proxy information. Store it securely.',
+      dataExportConfirm: 'Confirm Export',
+      dataExported: 'Data exported successfully',
+      dataExportFailed: 'Failed to export data',
       searchProxies: 'Search proxies...',
       allProtocols: 'All Protocols',
       allStatus: 'All Status',
@@ -2121,6 +2445,8 @@ export default {
       balance: 'Balance',
       concurrency: 'Concurrency',
       subscription: 'Subscription',
+      invitation: 'Invitation',
+      invitationHint: 'Invitation codes are used to restrict user registration. They are automatically marked as used after use.',
       unused: 'Unused',
       used: 'Used',
       columns: {
@@ -2167,6 +2493,7 @@ export default {
         balance: 'Balance',
         concurrency: 'Concurrency',
         subscription: 'Subscription',
+        invitation: 'Invitation',
         // Admin adjustment types (created when admin modifies user balance/concurrency)
         admin_balance: 'Balance (Admin)',
         admin_concurrency: 'Concurrency (Admin)'
@@ -2182,6 +2509,73 @@ export default {
         expired: 'Expired',
         disabled: 'Disabled'
       }
+    },
+
+    // Announcements
+    announcements: {
+      title: 'Announcements',
+      description: 'Create announcements and target by conditions',
+      createAnnouncement: 'Create Announcement',
+      editAnnouncement: 'Edit Announcement',
+      deleteAnnouncement: 'Delete Announcement',
+      searchAnnouncements: 'Search announcements...',
+      status: 'Status',
+      allStatus: 'All Status',
+      columns: {
+        title: 'Title',
+        status: 'Status',
+        targeting: 'Targeting',
+        timeRange: 'Schedule',
+        createdAt: 'Created At',
+        actions: 'Actions'
+      },
+      statusLabels: {
+        draft: 'Draft',
+        active: 'Active',
+        archived: 'Archived'
+      },
+      form: {
+        title: 'Title',
+        content: 'Content (Markdown supported)',
+        status: 'Status',
+        startsAt: 'Starts At',
+        endsAt: 'Ends At',
+        startsAtHint: 'Leave empty to start immediately',
+        endsAtHint: 'Leave empty to never expire',
+        targetingMode: 'Targeting',
+        targetingAll: 'All users',
+        targetingCustom: 'Custom rules',
+        addOrGroup: 'Add OR group',
+        addAndCondition: 'Add AND condition',
+        conditionType: 'Condition type',
+        conditionSubscription: 'Subscription',
+        conditionBalance: 'Balance',
+        operator: 'Operator',
+        balanceValue: 'Balance threshold',
+        selectPackages: 'Select packages'
+      },
+      operators: {
+        gt: '>',
+        gte: '≥',
+        lt: '<',
+        lte: '≤',
+        eq: '='
+      },
+      targetingSummaryAll: 'All users',
+      targetingSummaryCustom: 'Custom ({groups} groups)',
+      timeImmediate: 'Immediate',
+      timeNever: 'Never',
+      readStatus: 'Read Status',
+      eligible: 'Eligible',
+      readAt: 'Read at',
+      unread: 'Unread',
+      searchUsers: 'Search users...',
+      failedToLoad: 'Failed to load announcements',
+      failedToCreate: 'Failed to create announcement',
+      failedToUpdate: 'Failed to update announcement',
+      failedToDelete: 'Failed to delete announcement',
+      failedToLoadReadStatus: 'Failed to load read status',
+      deleteConfirm: 'Are you sure you want to delete this announcement? This action cannot be undone.'
     },
 
     // Promo Codes
@@ -2329,6 +2723,7 @@ export default {
       waiting: 'waiting',
       conns: 'conns',
       queue: 'queue',
+      accountSwitches: 'Account switches',
       ok: 'ok',
       lastRun: 'last_run:',
       lastSuccess: 'last_success:',
@@ -2377,6 +2772,7 @@ export default {
       failedToLoadData: 'Failed to load ops data.',
       failedToLoadOverview: 'Failed to load overview',
       failedToLoadThroughputTrend: 'Failed to load throughput trend',
+      failedToLoadSwitchTrend: 'Failed to load avg account switches trend',
       failedToLoadLatencyHistogram: 'Failed to load request duration histogram',
       failedToLoadErrorTrend: 'Failed to load error trend',
       failedToLoadErrorDistribution: 'Failed to load error distribution',
@@ -2385,9 +2781,11 @@ export default {
       tpsK: 'TPS (K)',
       top: 'Top:',
       throughputTrend: 'Throughput Trend',
+      switchRateTrend: 'Avg Account Switches',
       latencyHistogram: 'Request Duration Histogram',
       errorTrend: 'Error Trend',
       errorDistribution: 'Error Distribution',
+      switchRate: 'Avg switches',
       // Health Score & Diagnosis
       health: 'Health',
       healthCondition: 'Health Condition',
@@ -2955,6 +3353,8 @@ export default {
         ignoreContextCanceledHint: 'When enabled, client disconnect (context canceled) errors will not be written to the error log.',
         ignoreNoAvailableAccounts: 'Ignore no available accounts errors',
         ignoreNoAvailableAccountsHint: 'When enabled, "No available accounts" errors will not be written to the error log (not recommended; usually a config issue).',
+        ignoreInvalidApiKeyErrors: 'Ignore invalid API key errors',
+        ignoreInvalidApiKeyErrorsHint: 'When enabled, invalid or missing API key errors (INVALID_API_KEY, API_KEY_REQUIRED) will not be written to the error log.',
         autoRefresh: 'Auto Refresh',
         enableAutoRefresh: 'Enable auto refresh',
         enableAutoRefreshHint: 'Automatically refresh dashboard data at a fixed interval.',
@@ -2977,6 +3377,10 @@ export default {
         byPlatform: 'By Platform',
         byGroup: 'By Group',
         byAccount: 'By Account',
+        byUser: 'By User',
+        showByUserTooltip: 'Switch to user view to see concurrency usage per user',
+        switchToUser: 'Switch to user view',
+        switchToPlatform: 'Switch to platform view',
         totalRows: '{count} rows',
         disabledHint: 'Realtime monitoring is disabled in settings.',
         empty: 'No data',
@@ -3007,6 +3411,7 @@ export default {
       tooltips: {
         totalRequests: 'Total number of requests (including both successful and failed requests) in the selected time window.',
         throughputTrend: 'Requests/QPS + Tokens/TPS in the selected window.',
+        switchRateTrend: 'Trend of account switches / total requests over the last 5 hours (avg switches).',
         latencyHistogram: 'Request duration distribution (ms) for successful requests.',
         errorTrend: 'Error counts over time (SLA scope excludes business limits; upstream excludes 429/529).',
         errorDistribution: 'Error distribution by status code.',
@@ -3046,7 +3451,17 @@ export default {
         enableRegistration: 'Enable Registration',
         enableRegistrationHint: 'Allow new users to register',
         emailVerification: 'Email Verification',
-        emailVerificationHint: 'Require email verification for new registrations'
+        emailVerificationHint: 'Require email verification for new registrations',
+        promoCode: 'Promo Code',
+        promoCodeHint: 'Allow users to use promo codes during registration',
+        invitationCode: 'Invitation Code Registration',
+        invitationCodeHint: 'When enabled, users must enter a valid invitation code to register',
+        passwordReset: 'Password Reset',
+        passwordResetHint: 'Allow users to reset their password via email',
+        totp: 'Two-Factor Authentication (2FA)',
+        totpHint: 'Allow users to use authenticator apps like Google Authenticator',
+        totpKeyNotConfigured:
+          'Please configure TOTP_ENCRYPTION_KEY in environment variables first. Generate a key with: openssl rand -hex 32'
       },
       turnstile: {
         title: 'Cloudflare Turnstile',
@@ -3103,7 +3518,20 @@ export default {
         homeContent: 'Home Page Content',
         homeContentPlaceholder: 'Enter custom content for the home page. Supports Markdown & HTML. If a URL is entered, it will be displayed as an iframe.',
         homeContentHint: 'Customize the home page content. Supports Markdown/HTML. If you enter a URL (starting with http:// or https://), it will be used as an iframe src to embed an external page. When set, the default status information will no longer be displayed.',
-        homeContentIframeWarning: '⚠️ iframe mode note: Some websites have X-Frame-Options or CSP security policies that prevent embedding in iframes. If the page appears blank or shows an error, please verify the target website allows embedding, or consider using HTML mode to build your own content.'
+        homeContentIframeWarning: '⚠️ iframe mode note: Some websites have X-Frame-Options or CSP security policies that prevent embedding in iframes. If the page appears blank or shows an error, please verify the target website allows embedding, or consider using HTML mode to build your own content.',
+        hideCcsImportButton: 'Hide CCS Import Button',
+        hideCcsImportButtonHint: 'When enabled, the "Import to CCS" button will be hidden on the API Keys page'
+      },
+      purchase: {
+        title: 'Purchase Page',
+        description: 'Show a "Purchase Subscription" entry in the sidebar and open the configured URL in an iframe',
+        enabled: 'Show Purchase Entry',
+        enabledHint: 'Only shown in standard mode (not simple mode)',
+        url: 'Purchase URL',
+        urlPlaceholder: 'https://example.com/purchase',
+        urlHint: 'Must be an absolute http(s) URL',
+        iframeWarning:
+          '⚠️ iframe note: Some websites block embedding via X-Frame-Options or CSP (frame-ancestors). If the page is blank, provide an "Open in new tab" alternative.'
       },
       smtp: {
         title: 'SMTP Settings',
@@ -3228,6 +3656,80 @@ export default {
       failedToSave: 'Failed to save settings',
       failedToTestSmtp: 'SMTP connection test failed',
       failedToSendTestEmail: 'Failed to send test email'
+    },
+
+    // Error Passthrough Rules
+    errorPassthrough: {
+      title: 'Error Passthrough Rules',
+      description: 'Configure how upstream errors are returned to clients',
+      createRule: 'Create Rule',
+      editRule: 'Edit Rule',
+      deleteRule: 'Delete Rule',
+      noRules: 'No rules configured',
+      createFirstRule: 'Create your first error passthrough rule',
+      allPlatforms: 'All Platforms',
+      passthrough: 'Passthrough',
+      custom: 'Custom',
+      code: 'Code',
+      body: 'Body',
+
+      // Columns
+      columns: {
+        priority: 'Priority',
+        name: 'Name',
+        conditions: 'Conditions',
+        platforms: 'Platforms',
+        behavior: 'Behavior',
+        status: 'Status',
+        actions: 'Actions'
+      },
+
+      // Match Mode
+      matchMode: {
+        any: 'Code OR Keyword',
+        all: 'Code AND Keyword',
+        anyHint: 'Status code matches any error code, OR message contains any keyword',
+        allHint: 'Status code matches any error code, AND message contains any keyword'
+      },
+
+      // Form
+      form: {
+        name: 'Rule Name',
+        namePlaceholder: 'e.g., Context Limit Passthrough',
+        priority: 'Priority',
+        priorityHint: 'Lower values have higher priority',
+        description: 'Description',
+        descriptionPlaceholder: 'Describe the purpose of this rule...',
+        matchConditions: 'Match Conditions',
+        errorCodes: 'Error Codes',
+        errorCodesPlaceholder: '422, 400, 429',
+        errorCodesHint: 'Separate multiple codes with commas',
+        keywords: 'Keywords',
+        keywordsPlaceholder: 'One keyword per line\ncontext limit\nmodel not supported',
+        keywordsHint: 'One keyword per line, case-insensitive',
+        matchMode: 'Match Mode',
+        platforms: 'Platforms',
+        platformsHint: 'Leave empty to apply to all platforms',
+        responseBehavior: 'Response Behavior',
+        passthroughCode: 'Passthrough upstream status code',
+        responseCode: 'Custom status code',
+        passthroughBody: 'Passthrough upstream error message',
+        customMessage: 'Custom error message',
+        customMessagePlaceholder: 'Error message to return to client...',
+        enabled: 'Enable this rule'
+      },
+
+      // Messages
+      nameRequired: 'Please enter rule name',
+      conditionsRequired: 'Please configure at least one error code or keyword',
+      ruleCreated: 'Rule created successfully',
+      ruleUpdated: 'Rule updated successfully',
+      ruleDeleted: 'Rule deleted successfully',
+      deleteConfirm: 'Are you sure you want to delete rule "{name}"?',
+      failedToLoad: 'Failed to load rules',
+      failedToSave: 'Failed to save rule',
+      failedToDelete: 'Failed to delete rule',
+      failedToToggle: 'Failed to toggle status'
     }
   },
 
@@ -3270,6 +3772,42 @@ export default {
     restartNow: 'Restart Now',
     restarting: 'Restarting...',
     retry: 'Retry'
+  },
+
+  // Purchase Subscription Page
+  purchase: {
+    title: 'Purchase Subscription',
+    description: 'Purchase a subscription via the embedded page',
+    openInNewTab: 'Open in new tab',
+    notEnabledTitle: 'Feature not enabled',
+    notEnabledDesc: 'The administrator has not enabled the purchase page. Please contact admin.',
+    notConfiguredTitle: 'Purchase URL not configured',
+    notConfiguredDesc:
+      'The administrator enabled the entry but has not configured a purchase URL. Please contact admin.'
+  },
+
+  // Announcements Page
+  announcements: {
+    title: 'Announcements',
+    description: 'View system announcements',
+    unreadOnly: 'Show unread only',
+    markRead: 'Mark as read',
+    markAllRead: 'Mark all as read',
+    viewAll: 'View all announcements',
+    markedAsRead: 'Marked as read',
+    allMarkedAsRead: 'All announcements marked as read',
+    newCount: '{count} new announcement | {count} new announcements',
+    readAt: 'Read at',
+    read: 'Read',
+    unread: 'Unread',
+    startsAt: 'Starts at',
+    endsAt: 'Ends at',
+    empty: 'No announcements',
+    emptyUnread: 'No unread announcements',
+    total: 'announcements',
+    emptyDescription: 'There are no system announcements at this time',
+    readStatus: 'You have read this announcement',
+    markReadHint: 'Click "Mark as read" to mark this announcement'
   },
 
   // User Subscriptions Page
