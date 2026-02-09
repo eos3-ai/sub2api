@@ -33,6 +33,40 @@ func RegisterUserRoutes(
 				totp.POST("/enable", h.Totp.Enable)
 				totp.POST("/disable", h.Totp.Disable)
 			}
+
+			// 活动优惠（用户端）
+			promotion := user.Group("/promotion")
+			{
+				promotion.GET("/status", h.Promotion.GetStatus)
+			}
+
+			// 邀请返利（用户端）
+			referral := user.Group("/referral")
+			{
+				referral.GET("/info", h.Referral.GetInfo)
+				referral.GET("/invitees", h.Referral.ListInvitees)
+			}
+		}
+
+		// 支付/充值
+		payment := authenticated.Group("/payment")
+		{
+			payment.GET("/plans", h.Payment.GetPlans)
+			payment.POST("/orders", h.Payment.CreateOrder)
+			payment.GET("/orders", h.Payment.ListMyOrders)
+			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
+		}
+
+		// 发票/开票申请
+		invoices := authenticated.Group("/invoices")
+		{
+			invoices.GET("/eligible-orders", h.Invoice.ListEligibleOrders)
+			invoices.GET("/profile", h.Invoice.GetProfile)
+			invoices.PUT("/profile", h.Invoice.UpdateProfile)
+			invoices.POST("", h.Invoice.CreateInvoiceRequest)
+			invoices.GET("", h.Invoice.ListMyInvoiceRequests)
+			invoices.GET("/:id", h.Invoice.GetMyInvoiceRequest)
+			invoices.POST("/:id/cancel", h.Invoice.CancelInvoiceRequest)
 		}
 
 		// API Key管理
