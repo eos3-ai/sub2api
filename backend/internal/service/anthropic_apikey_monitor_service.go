@@ -382,6 +382,7 @@ func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.C
 	// Reuse the same logic as the admin endpoint:
 	//   POST /api/v1/admin/accounts/:id/test
 	// but make it lightweight for monitoring by overriding max_tokens=1.
+	gin.SetMode(gin.TestMode)
 	w := newLimitedResponseWriter(8 * 1024)
 	c, _ := gin.CreateTestContext(w)
 	req, _ := http.NewRequestWithContext(reqCtx, http.MethodPost, fmt.Sprintf("http://localhost/api/v1/admin/accounts/%d/test", account.ID), nil)

@@ -639,6 +639,7 @@ func (s *OpsService) executeWithAccount(ctx context.Context, reqType opsRetryReq
 }
 
 func newOpsRetryContext(ctx context.Context, errorLog *OpsErrorLogDetail) (*gin.Context, *limitedResponseWriter) {
+	gin.SetMode(gin.TestMode)
 	w := newLimitedResponseWriter(opsRetryCaptureBytesLimit)
 	c, _ := gin.CreateTestContext(w)
 

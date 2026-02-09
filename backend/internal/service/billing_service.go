@@ -141,7 +141,8 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 
 	// 按模型系列匹配
 	if strings.Contains(modelLower, "opus") {
-		if strings.Contains(modelLower, "4.5") || strings.Contains(modelLower, "4-5") {
+		if strings.Contains(modelLower, "4.6") || strings.Contains(modelLower, "4-6") ||
+			strings.Contains(modelLower, "4.5") || strings.Contains(modelLower, "4-5") {
 			return s.fallbackPrices["claude-opus-4.5"]
 		}
 		return s.fallbackPrices["claude-3-opus"]
