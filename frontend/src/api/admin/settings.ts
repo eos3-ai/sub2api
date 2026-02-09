@@ -216,6 +216,25 @@ export async function deleteAdminApiKey(): Promise<{ message: string }> {
   return data
 }
 
+export async function getAdminApiKeyReadOnly(): Promise<AdminApiKeyStatus> {
+  const { data } = await apiClient.get<AdminApiKeyStatus>('/admin/settings/admin-api-key-read-only')
+  return data
+}
+
+export async function regenerateAdminApiKeyReadOnly(): Promise<{ key: string }> {
+  const { data } = await apiClient.post<{ key: string }>(
+    '/admin/settings/admin-api-key-read-only/regenerate'
+  )
+  return data
+}
+
+export async function deleteAdminApiKeyReadOnly(): Promise<{ message: string }> {
+  const { data } = await apiClient.delete<{ message: string }>(
+    '/admin/settings/admin-api-key-read-only'
+  )
+  return data
+}
+
 /**
  * Stream timeout settings interface
  */
@@ -259,6 +278,9 @@ export const settingsAPI = {
   getAdminApiKey,
   regenerateAdminApiKey,
   deleteAdminApiKey,
+  getAdminApiKeyReadOnly,
+  regenerateAdminApiKeyReadOnly,
+  deleteAdminApiKeyReadOnly,
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings
 }
