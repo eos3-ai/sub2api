@@ -236,6 +236,22 @@ gateway:
     outbox_backlog_rebuild_rows: 10000
     # 全量重建周期（秒），0 表示禁用
     full_rebuild_interval_seconds: 300
+
+    # Anthropic API-key connectivity monitor (auto pause/resume scheduling)
+    # Anthropic API-key 连通性监控（自动停/启用调度）
+    anthropic_apikey_monitor:
+      enabled: false
+      interval: 10s
+      failure_threshold: 6
+      success_threshold: 6
+      request_timeout: 8s
+      max_concurrency: 4
+      # Optional: override the model used for the test request (default: claude-haiku-4-5-20251001)
+      model_id: ""
+      # Optional: only monitor these account IDs (empty = all)
+      include_account_ids: []
+      # Optional: skip these account IDs
+      exclude_account_ids: []
   # TLS fingerprint simulation / TLS 指纹伪装
   # Default profile "claude_cli_v2" simulates Node.js 20.x
   # 默认模板 "claude_cli_v2" 模拟 Node.js 20.x 指纹
@@ -515,6 +531,33 @@ rate_limit:
   # Deprecated: minutes-based fallback cooldown (kept for compatibility)
   # 已废弃：分钟单位兜底冷却时间（仅兼容历史配置）
   # fallback_cooldown_minutes: 5
+
+# =============================================================================
+# DingTalk Alerts (Optional)
+# 钉钉告警（可选）
+# =============================================================================
+dingtalk:
+  # Enable DingTalk notifications
+  # 启用钉钉告警
+  enabled: false
+  # Optional environment label (e.g. prod/test/staging)
+  # 可选环境标记（如 prod/test/staging）
+  env: ""
+  # DingTalk robot webhook URL
+  # 钉钉机器人 webhook 地址
+  webhook_url: ""
+  # Optional robot sign secret
+  # 可选机器人签名密钥
+  secret: ""
+  # Comma-separated mobile numbers to @
+  # @手机号列表（逗号分隔）
+  at_mobiles: ""
+  # @all switch
+  # 是否 @所有人
+  at_all: false
+  # Payment notification switch
+  # 充值/支付通知开关
+  payment_notify_enabled: true
 
 # =============================================================================
 # Pricing Data Source (Optional)

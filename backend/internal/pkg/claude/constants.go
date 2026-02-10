@@ -103,6 +103,11 @@ func DefaultModelIDs() []string {
 // DefaultTestModel 测试时使用的默认模型
 const DefaultTestModel = "claude-sonnet-4-5-20250929"
 
+// DefaultMonitorModel is the default model used by background monitoring jobs.
+//
+// Keep this lightweight/low-cost. Callers may still override via config.
+const DefaultMonitorModel = "claude-haiku-4-5-20251001"
+
 // ModelIDOverrides Claude OAuth 请求需要的模型 ID 映射
 var ModelIDOverrides = map[string]string{
 	"claude-sonnet-4-5": "claude-sonnet-4-5-20250929",

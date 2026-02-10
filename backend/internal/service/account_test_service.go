@@ -163,11 +163,11 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 		return s.testAntigravityAccountConnection(c, account, modelID)
 	}
 
-	return s.testClaudeAccountConnection(c, account, modelID)
+	return s.testClaudeAccountConnection(c, account, modelID, 0)
 }
 
 // testClaudeAccountConnection tests an Anthropic Claude account's connection
-func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account *Account, modelID string) error {
+func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account *Account, modelID string, maxTokensOverride int) error {
 	ctx := c.Request.Context()
 
 	// Determine the model to use
@@ -232,6 +232,9 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 	if err != nil {
 		return s.sendErrorAndEnd(c, "Failed to create test payload")
 	}
+	if maxTokensOverride > 0 {
+		payload["max_tokens"] = maxTokensOverride
+	}
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event
@@ -266,7 +269,7 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 		proxyURL = account.Proxy.URL()
 	}
 
-	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, account.IsTLSFingerprintEnabled())
+	resp, err := s.httpUpstream.DoWithTLS(req, proxyURL, account.ID, account.Concurrency, s.enableTLSFingerprintForClaudeAccount(account))
 	if err != nil {
 		return s.sendErrorAndEnd(c, fmt.Sprintf("Request failed: %s", err.Error()))
 	}
@@ -279,6 +282,27 @@ func (s *AccountTestService) testClaudeAccountConnection(c *gin.Context, account
 
 	// Process SSE stream
 	return s.processClaudeStream(c, resp.Body)
+}
+
+// enableTLSFingerprintForClaudeAccount returns whether we should enable TLS fingerprint simulation
+// when testing Anthropic Claude accounts.
+//
+// Policy:
+// - Global switch: cfg.Gateway.TLSFingerprint.Enabled must be true
+// - OAuth/SetupToken accounts: additionally require account-level enable_tls_fingerprint
+// - API-key accounts: no per-account switch (monitor/UI test should follow the global switch)
+func (s *AccountTestService) enableTLSFingerprintForClaudeAccount(account *Account) bool {
+	if s == nil || s.cfg == nil || !s.cfg.Gateway.TLSFingerprint.Enabled {
+		return false
+	}
+	if account == nil {
+		return false
+	}
+	if account.IsAnthropicOAuthOrSetupToken() {
+		return account.IsTLSFingerprintEnabled()
+	}
+	// For API-key accounts, use the global switch.
+	return true
 }
 
 // testOpenAIAccountConnection tests an OpenAI account's connection

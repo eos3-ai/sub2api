@@ -18,6 +18,7 @@ type TokenRefreshService struct {
 	refreshers       []TokenRefresher
 	cfg              *config.TokenRefreshConfig
 	cacheInvalidator TokenCacheInvalidator
+	accountAlert     *AccountAlertService
 	schedulerCache   SchedulerCache // 用于同步更新调度器缓存，解决 token 刷新后缓存不一致问题
 
 	stopCh chan struct{}
@@ -39,6 +40,7 @@ func NewTokenRefreshService(
 		accountRepo:      accountRepo,
 		cfg:              &cfg.TokenRefresh,
 		cacheInvalidator: cacheInvalidator,
+		accountAlert:     NewAccountAlertService(cfg),
 		schedulerCache:   schedulerCache,
 		stopCh:           make(chan struct{}),
 	}
@@ -218,6 +220,12 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 			errorMsg := fmt.Sprintf("Token refresh failed (non-retryable): %v", err)
 			if setErr := s.accountRepo.SetError(ctx, account.ID, errorMsg); setErr != nil {
 				log.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, setErr)
+			} else if s.accountAlert != nil {
+				account.Status = StatusError
+				account.ErrorMessage = errorMsg
+				s.accountAlert.NotifyAccountStatusError(account, "token_refresh", errorMsg, map[string]string{
+					"category": "non_retryable",
+				})
 			}
 			return err
 		}
@@ -242,6 +250,13 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 		errorMsg := fmt.Sprintf("Token refresh failed after %d retries: %v", s.cfg.MaxRetries, lastErr)
 		if err := s.accountRepo.SetError(ctx, account.ID, errorMsg); err != nil {
 			log.Printf("[TokenRefresh] Failed to set error status for account %d: %v", account.ID, err)
+		} else if s.accountAlert != nil {
+			account.Status = StatusError
+			account.ErrorMessage = errorMsg
+			s.accountAlert.NotifyAccountStatusError(account, "token_refresh", errorMsg, map[string]string{
+				"category":    "retries_exhausted",
+				"max_retries": fmt.Sprintf("%d", s.cfg.MaxRetries),
+			})
 		}
 	}
 
