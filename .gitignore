@@ -85,6 +85,10 @@ temp/
 .cache/
 .dev/
 .serena/
+.pnpm-store/*
+.remote-verify/*
+artifacts/*
+backend/.gomodcache/*
 
 # ===================
 # 构建产物

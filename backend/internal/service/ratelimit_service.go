@@ -369,6 +369,18 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 // handle429 处理429限流错误
 // 解析响应头获取重置时间，标记账号为限流状态
 func (s *RateLimitService) handle429(ctx context.Context, account *Account, headers http.Header, responseBody []byte) {
+	// Fallback cooldown when upstream does not provide a usable reset time.
+	fallbackSeconds := 300
+	if s.cfg != nil {
+		if s.cfg.RateLimit.FallbackCooldownSeconds > 0 {
+			fallbackSeconds = s.cfg.RateLimit.FallbackCooldownSeconds
+		} else if s.cfg.RateLimit.FallbackCooldownMinutes > 0 {
+			// Backward compatibility for old minutes-based config.
+			fallbackSeconds = s.cfg.RateLimit.FallbackCooldownMinutes * 60
+		}
+	}
+	fallbackCooldown := time.Duration(fallbackSeconds) * time.Second
+
 	// 1. OpenAI 平台：优先尝试解析 x-codex-* 响应头（用于 rate_limit_exceeded）
 	if account.Platform == PlatformOpenAI {
 		if resetAt := s.calculateOpenAI429ResetTime(headers); resetAt != nil {
@@ -411,9 +423,9 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 			}
 		}
 
-		// 没有重置时间，使用默认5分钟
-		resetAt := time.Now().Add(5 * time.Minute)
-		slog.Warn("rate_limit_no_reset_time", "account_id", account.ID, "platform", account.Platform, "using_default", "5m")
+		// 没有重置时间，使用可配置兜底冷却时间
+		resetAt := time.Now().Add(fallbackCooldown)
+		slog.Warn("rate_limit_no_reset_time", "account_id", account.ID, "platform", account.Platform, "using_default", fallbackCooldown.String())
 		if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
 			slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
 		}
@@ -424,7 +436,7 @@ func (s *RateLimitService) handle429(ctx context.Context, account *Account, head
 	ts, err := strconv.ParseInt(resetTimestamp, 10, 64)
 	if err != nil {
 		slog.Warn("rate_limit_reset_parse_failed", "reset_timestamp", resetTimestamp, "error", err)
-		resetAt := time.Now().Add(5 * time.Minute)
+		resetAt := time.Now().Add(fallbackCooldown)
 		if err := s.accountRepo.SetRateLimited(ctx, account.ID, resetAt); err != nil {
 			slog.Warn("rate_limit_set_failed", "account_id", account.ID, "error", err)
 		}

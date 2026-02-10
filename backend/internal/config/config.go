@@ -513,6 +513,13 @@ type DefaultConfig struct {
 
 type RateLimitConfig struct {
 	OverloadCooldownMinutes int `mapstructure:"overload_cooldown_minutes"` // 529过载冷却时间(分钟)
+	// FallbackCooldownSeconds is the default cooldown (seconds) applied when an upstream 429 response
+	// does not provide a usable reset time (e.g. missing/invalid headers).
+	//
+	// <= 0 means use the built-in default (300 seconds).
+	FallbackCooldownSeconds int `mapstructure:"fallback_cooldown_seconds"` // 429兜底冷却时间(秒)
+	// FallbackCooldownMinutes is deprecated and kept only for backward compatibility.
+	FallbackCooldownMinutes int `mapstructure:"fallback_cooldown_minutes"` // deprecated: 429兜底冷却时间(分钟)
 }
 
 // APIKeyAuthCacheConfig API Key 认证缓存配置
@@ -829,6 +836,8 @@ func setDefaults() {
 
 	// RateLimit
 	viper.SetDefault("rate_limit.overload_cooldown_minutes", 10)
+	viper.SetDefault("rate_limit.fallback_cooldown_minutes", 5)   // deprecated compatibility
+	viper.SetDefault("rate_limit.fallback_cooldown_seconds", 300)
 
 	// Pricing - 从 price-mirror 分支同步，该分支维护了 sha256 哈希文件用于增量更新检查
 	viper.SetDefault("pricing.remote_url", "https://raw.githubusercontent.com/Wei-Shaw/claude-relay-service/price-mirror/model_prices_and_context_window.json")
