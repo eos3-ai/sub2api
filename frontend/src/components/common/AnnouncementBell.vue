@@ -454,6 +454,13 @@ watch([isModalOpen, detailModalOpen], ([modal, detail]) => {
     document.body.style.overflow = ''
   }
 })
+
+// 暴露方法供外部调用（用于自动弹窗）
+defineExpose({
+  openModal,
+  closeModal,
+  loadAnnouncements
+})
 </script>
 
 <style scoped>

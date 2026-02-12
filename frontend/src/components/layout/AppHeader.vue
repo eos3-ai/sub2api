@@ -24,7 +24,7 @@
       <!-- Right: Announcements + Docs + Language + Subscriptions + Balance + User Dropdown -->
       <div class="flex items-center gap-3">
         <!-- Announcement Bell -->
-        <AnnouncementBell v-if="user" />
+        <AnnouncementBell v-if="user" ref="announcementBellRef" />
 
         <!-- Docs Link -->
         <a
@@ -209,6 +209,7 @@ const onboardingStore = useOnboardingStore()
 const user = computed(() => authStore.user)
 const dropdownOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
+const announcementBellRef = ref<InstanceType<typeof AnnouncementBell> | null>(null)
 const contactInfo = computed(() => appStore.contactInfo)
 const docUrl = computed(() => appStore.docUrl)
 
@@ -292,6 +293,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside)
+})
+
+// 暴露方法供 AppLayout 调用（用于自动弹窗功能）
+defineExpose({
+  openAnnouncementModal: () => announcementBellRef.value?.openModal()
 })
 </script>
 

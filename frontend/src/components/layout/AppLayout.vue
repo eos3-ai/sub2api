@@ -12,7 +12,7 @@
       :class="[sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-64']"
     >
       <!-- Header -->
-      <AppHeader />
+      <AppHeader ref="appHeaderRef" />
 
       <!-- Main Content -->
       <main class="relative p-4 md:p-6 lg:p-8">
@@ -28,10 +28,11 @@
 
 <script setup lang="ts">
 import '@/styles/onboarding.css'
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useAppStore } from '@/stores'
 import { useAuthStore } from '@/stores/auth'
 import { useOnboardingTour } from '@/composables/useOnboardingTour'
+import { useAnnouncementAutoPopup } from '@/composables/useAnnouncementAutoPopup'
 import { useOnboardingStore } from '@/stores/onboarding'
 import AppSidebar from './AppSidebar.vue'
 import AppHeader from './AppHeader.vue'
@@ -41,12 +42,23 @@ const authStore = useAuthStore()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
+// AppHeader ref (用于访问公告弹窗)
+const appHeaderRef = ref<InstanceType<typeof AppHeader> | null>(null)
+
 const { replayTour } = useOnboardingTour({
   storageKey: isAdmin.value ? 'admin_guide' : 'user_guide',
   autoStart: true
 })
 
 const onboardingStore = useOnboardingStore()
+
+// 公告自动弹窗（延迟 1.5 秒，避免与新手引导冲突）
+useAnnouncementAutoPopup({
+  delay: 1500,
+  onShowAnnouncements: () => {
+    appHeaderRef.value?.openAnnouncementModal()
+  }
+})
 
 onMounted(() => {
   onboardingStore.setReplayCallback(replayTour)
