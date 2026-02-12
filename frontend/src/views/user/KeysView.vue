@@ -175,7 +175,7 @@
               </button>
               <!-- Import to CC Switch Button -->
               <button
-                v-if="!publicSettings?.hide_ccs_import_button"
+                v-if="showCcsImportButton && !publicSettings?.hide_ccs_import_button"
                 @click="importToCcswitch(row)"
                 class="flex flex-col items-center gap-0.5 rounded-lg p-1.5 text-gray-500 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
               >
@@ -730,6 +730,7 @@ interface GroupOption {
 const appStore = useAppStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
+const showCcsImportButton = false
 
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
