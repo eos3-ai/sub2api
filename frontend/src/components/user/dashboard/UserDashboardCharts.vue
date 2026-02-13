@@ -37,7 +37,7 @@
                   <th class="pb-2 text-right">{{ t('dashboard.requests') }}</th>
                   <th class="pb-2 text-right">{{ t('dashboard.tokens') }}</th>
                   <th class="pb-2 text-right">{{ t('dashboard.actual') }}</th>
-                  <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th>
+                  <!-- <th class="pb-2 text-right">{{ t('dashboard.standard') }}</th> -->
                 </tr>
               </thead>
               <tbody>
@@ -46,7 +46,7 @@
                   <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatNumber(model.requests) }}</td>
                   <td class="py-1.5 text-right text-gray-600 dark:text-gray-400">{{ formatTokens(model.total_tokens) }}</td>
                   <td class="py-1.5 text-right text-green-600 dark:text-green-400">${{ formatCost(model.actual_cost) }}</td>
-                  <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">${{ formatCost(model.cost) }}</td>
+                  <!-- <td class="py-1.5 text-right text-gray-400 dark:text-gray-500">${{ formatCost(model.cost) }}</td> -->
                 </tr>
               </tbody>
             </table>

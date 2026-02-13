@@ -449,10 +449,10 @@
               >{{ (tooltipData?.rate_multiplier || 1).toFixed(2) }}x</span
             >
           </div>
-          <div class="flex items-center justify-between gap-6">
+          <!-- <div class="flex items-center justify-between gap-6">
             <span class="text-gray-400">{{ t('usage.original') }}</span>
             <span class="font-medium text-white">${{ tooltipData?.total_cost.toFixed(6) }}</span>
-          </div>
+          </div> -->
           <div class="flex items-center justify-between gap-6 border-t border-gray-700 pt-1.5">
             <span class="text-gray-400">{{ t('usage.billed') }}</span>
             <span class="font-semibold text-green-400"
