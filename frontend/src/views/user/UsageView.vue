@@ -126,6 +126,29 @@
               <button @click="resetFilters" class="btn btn-secondary">
                 {{ t('common.reset') }}
               </button>
+              <button @click="exportBillingToCSV" :disabled="exportingBilling" class="btn btn-secondary">
+                <svg
+                  v-if="exportingBilling"
+                  class="-ml-1 mr-2 h-4 w-4 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                  ></circle>
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  ></path>
+                </svg>
+                {{ exportingBilling ? t('usage.exportingBilling') : t('usage.exportBilling') }}
+              </button>
               <button @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
                 <svg
                   v-if="exporting"
@@ -521,6 +544,7 @@ const usageLogs = ref<UsageLog[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const loading = ref(false)
 const exporting = ref(false)
+const exportingBilling = ref(false)
 
 const apiKeyOptions = computed(() => {
   return [
@@ -815,6 +839,104 @@ const exportToCSV = async () => {
     console.error('CSV Export failed:', error)
   } finally {
     exporting.value = false
+  }
+}
+
+const exportBillingToCSV = async () => {
+  if (pagination.total === 0) {
+    appStore.showWarning(t('usage.noDataToExport'))
+    return
+  }
+
+  exportingBilling.value = true
+  appStore.showInfo(t('usage.preparingBillingExport'))
+
+  try {
+    const allLogs: UsageLog[] = []
+    const pageSize = 100 // Use a larger page size for export to reduce requests
+    const totalRequests = Math.ceil(pagination.total / pageSize)
+
+    for (let page = 1; page <= totalRequests; page++) {
+      const params: UsageQueryParams = {
+        page: page,
+        page_size: pageSize,
+        ...filters.value
+      }
+      const response = await usageAPI.query(params)
+      allLogs.push(...response.items)
+    }
+
+    if (allLogs.length === 0) {
+      appStore.showWarning(t('usage.noDataToExport'))
+      return
+    }
+
+    // Group by model and aggregate
+    interface ModelBilling {
+      model: string
+      totalCost: number
+      totalTokens: number
+      totalRequests: number
+    }
+
+    const modelMap = new Map<string, ModelBilling>()
+
+    allLogs.forEach((log) => {
+      const existing = modelMap.get(log.model)
+      const totalTokens = log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
+
+      if (existing) {
+        existing.totalCost += log.actual_cost
+        existing.totalTokens += totalTokens
+        existing.totalRequests += 1
+      } else {
+        modelMap.set(log.model, {
+          model: log.model,
+          totalCost: log.actual_cost,
+          totalTokens: totalTokens,
+          totalRequests: 1
+        })
+      }
+    })
+
+    // Convert to array and sort by cost (descending)
+    const billingData = Array.from(modelMap.values()).sort((a, b) => b.totalCost - a.totalCost)
+
+    const headers = [
+      'Model',
+      'Billed Cost',
+      'Total Tokens',
+      'Total Requests'
+    ]
+
+    const rows = billingData.map((item) =>
+      [
+        item.model,
+        item.totalCost.toFixed(8),
+        item.totalTokens,
+        item.totalRequests
+      ].map(escapeCSVValue)
+    )
+
+    const csvContent = [
+      headers.map(escapeCSVValue).join(','),
+      ...rows.map((row) => row.join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `billing_${filters.value.start_date}_to_${filters.value.end_date}.csv`
+    link.click()
+    window.URL.revokeObjectURL(url)
+
+    appStore.showSuccess(t('usage.billingExportSuccess'))
+  } catch (error) {
+    appStore.showError(t('usage.billingExportFailed'))
+    console.error('Billing CSV Export failed:', error)
+  } finally {
+    exportingBilling.value = false
   }
 }
 
