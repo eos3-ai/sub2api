@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -417,6 +418,44 @@ func TestAntigravityGatewayService_ForwardGemini_StickySessionForceCacheBilling(
 	require.True(t, failoverErr.ForceCacheBilling, "ForceCacheBilling should be true for sticky session switch")
 }
 
+// TestStreamUpstreamResponse_UsageAndFirstToken
+// 验证：usage 字段可被累积/覆盖更新，并且能记录首 token 时间
+func TestStreamUpstreamResponse_UsageAndFirstToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newAntigravityTestService(&config.Config{
+		Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize},
+	})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+
+	pr, pw := io.Pipe()
+	resp := &http.Response{StatusCode: http.StatusOK, Header: http.Header{}, Body: pr}
+
+	go func() {
+		defer func() { _ = pw.Close() }()
+		fmt.Fprintln(pw, `data: {"usage":{"input_tokens":1,"output_tokens":2,"cache_read_input_tokens":3,"cache_creation_input_tokens":4}}`)
+		fmt.Fprintln(pw, `data: {"usage":{"output_tokens":5}}`)
+	}()
+
+	start := time.Now().Add(-10 * time.Millisecond)
+	result := svc.streamUpstreamResponse(c, resp, start)
+	_ = pr.Close()
+
+	require.NotNil(t, result)
+	require.NotNil(t, result.usage)
+	require.Equal(t, 1, result.usage.InputTokens)
+	// 第二次事件覆盖 output_tokens
+	require.Equal(t, 5, result.usage.OutputTokens)
+	require.Equal(t, 3, result.usage.CacheReadInputTokens)
+	require.Equal(t, 4, result.usage.CacheCreationInputTokens)
+	require.NotNil(t, result.firstTokenMs)
+
+	// 确保有透传输出
+	require.Contains(t, rec.Body.String(), "data:")
+}
+
 // --- 流式 happy path 测试 ---
 
 // TestStreamUpstreamResponse_NormalComplete
@@ -551,6 +590,75 @@ func TestHandleClaudeStreamingResponse_NormalComplete(t *testing.T) {
 	require.Contains(t, body, "event: message_stop", "should contain Claude message_stop event")
 	// 不应包含错误事件
 	require.NotContains(t, body, "event: error")
+}
+
+// TestHandleGeminiStreamingResponse_ThoughtsTokenCount
+// 验证：Gemini 流式转发时 thoughtsTokenCount 被计入 OutputTokens
+func TestHandleGeminiStreamingResponse_ThoughtsTokenCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newAntigravityTestService(&config.Config{
+		Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize},
+	})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	pr, pw := io.Pipe()
+	resp := &http.Response{StatusCode: http.StatusOK, Body: pr, Header: http.Header{}}
+
+	go func() {
+		defer func() { _ = pw.Close() }()
+		fmt.Fprintln(pw, `data: {"candidates":[{"content":{"parts":[{"text":"Hello"}]}}],"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":20,"thoughtsTokenCount":50}}`)
+		fmt.Fprintln(pw, "")
+		fmt.Fprintln(pw, `data: {"candidates":[{"content":{"parts":[{"text":" world"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":30,"thoughtsTokenCount":80,"cachedContentTokenCount":10}}`)
+		fmt.Fprintln(pw, "")
+	}()
+
+	result, err := svc.handleGeminiStreamingResponse(c, resp, time.Now())
+	_ = pr.Close()
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.usage)
+	// promptTokenCount=100, cachedContentTokenCount=10 → InputTokens=90
+	require.Equal(t, 90, result.usage.InputTokens)
+	// candidatesTokenCount=30 + thoughtsTokenCount=80 → OutputTokens=110
+	require.Equal(t, 110, result.usage.OutputTokens)
+	require.Equal(t, 10, result.usage.CacheReadInputTokens)
+}
+
+// TestHandleClaudeStreamingResponse_ThoughtsTokenCount
+// 验证：Gemini→Claude 流式转换时 thoughtsTokenCount 被计入 OutputTokens
+func TestHandleClaudeStreamingResponse_ThoughtsTokenCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	svc := newAntigravityTestService(&config.Config{
+		Gateway: config.GatewayConfig{MaxLineSize: defaultMaxLineSize},
+	})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+
+	pr, pw := io.Pipe()
+	resp := &http.Response{StatusCode: http.StatusOK, Body: pr, Header: http.Header{}}
+
+	go func() {
+		defer func() { _ = pw.Close() }()
+		fmt.Fprintln(pw, `data: {"response":{"candidates":[{"content":{"parts":[{"text":"Hi"}]},"finishReason":"STOP"}],"usageMetadata":{"promptTokenCount":50,"candidatesTokenCount":10,"thoughtsTokenCount":25}}}`)
+		fmt.Fprintln(pw, "")
+	}()
+
+	result, err := svc.handleClaudeStreamingResponse(c, resp, time.Now(), "gemini-2.5-pro")
+	_ = pr.Close()
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.NotNil(t, result.usage)
+	// promptTokenCount=50 → InputTokens=50
+	require.Equal(t, 50, result.usage.InputTokens)
+	// candidatesTokenCount=10 + thoughtsTokenCount=25 → OutputTokens=35
+	require.Equal(t, 35, result.usage.OutputTokens)
 }
 
 // --- 流式客户端断开检测测试 ---
@@ -850,4 +958,145 @@ func TestAntigravityClientWriter(t *testing.T) {
 		require.False(t, ok)
 		require.True(t, cw.Disconnected())
 	})
+}
+
+// TestUnwrapV1InternalResponse 测试 unwrapV1InternalResponse 的各种输入场景
+func TestUnwrapV1InternalResponse(t *testing.T) {
+	svc := &AntigravityGatewayService{}
+
+	// 构造 >50KB 的大型 JSON
+	largePadding := strings.Repeat("x", 50*1024)
+	largeInput := []byte(fmt.Sprintf(`{"response":{"id":"big","pad":"%s"}}`, largePadding))
+	largeExpected := fmt.Sprintf(`{"id":"big","pad":"%s"}`, largePadding)
+
+	tests := []struct {
+		name     string
+		input    []byte
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "正常 response 包装",
+			input:    []byte(`{"response":{"id":"123","content":"hello"}}`),
+			expected: `{"id":"123","content":"hello"}`,
+		},
+		{
+			name:     "无 response 透传",
+			input:    []byte(`{"id":"456"}`),
+			expected: `{"id":"456"}`,
+		},
+		{
+			name:     "空 JSON",
+			input:    []byte(`{}`),
+			expected: `{}`,
+		},
+		{
+			name:     "response 为 null",
+			input:    []byte(`{"response":null}`),
+			expected: `null`,
+		},
+		{
+			name:     "response 为基础类型 string",
+			input:    []byte(`{"response":"hello"}`),
+			expected: `"hello"`,
+		},
+		{
+			name:     "非法 JSON",
+			input:    []byte(`not json`),
+			expected: `not json`,
+		},
+		{
+			name:     "嵌套 response 只解一层",
+			input:    []byte(`{"response":{"response":{"inner":true}}}`),
+			expected: `{"response":{"inner":true}}`,
+		},
+		{
+			name:     "大型 JSON >50KB",
+			input:    largeInput,
+			expected: largeExpected,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := svc.unwrapV1InternalResponse(tt.input)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expected, strings.TrimSpace(string(got)))
+		})
+	}
+}
+
+// --- unwrapV1InternalResponse benchmark 对照组 ---
+
+// unwrapV1InternalResponseOld 旧实现：Unmarshal+Marshal 双重开销（仅用于 benchmark 对照）
+func unwrapV1InternalResponseOld(body []byte) ([]byte, error) {
+	var outer map[string]any
+	if err := json.Unmarshal(body, &outer); err != nil {
+		return nil, err
+	}
+	if resp, ok := outer["response"]; ok {
+		return json.Marshal(resp)
+	}
+	return body, nil
+}
+
+func BenchmarkUnwrapV1Internal_Old_Small(b *testing.B) {
+	body := []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"hello world"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}}`)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = unwrapV1InternalResponseOld(body)
+	}
+}
+
+func BenchmarkUnwrapV1Internal_New_Small(b *testing.B) {
+	body := []byte(`{"response":{"candidates":[{"content":{"parts":[{"text":"hello world"}]}}],"usageMetadata":{"promptTokenCount":10,"candidatesTokenCount":5}}}`)
+	svc := &AntigravityGatewayService{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = svc.unwrapV1InternalResponse(body)
+	}
+}
+
+func BenchmarkUnwrapV1Internal_Old_Large(b *testing.B) {
+	body := generateLargeUnwrapJSON(10 * 1024) // ~10KB
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = unwrapV1InternalResponseOld(body)
+	}
+}
+
+func BenchmarkUnwrapV1Internal_New_Large(b *testing.B) {
+	body := generateLargeUnwrapJSON(10 * 1024) // ~10KB
+	svc := &AntigravityGatewayService{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = svc.unwrapV1InternalResponse(body)
+	}
+}
+
+// generateLargeUnwrapJSON 生成指定最小大小的包含 response 包装的 JSON
+func generateLargeUnwrapJSON(minSize int) []byte {
+	parts := make([]map[string]string, 0)
+	current := 0
+	for current < minSize {
+		text := fmt.Sprintf("这是第 %d 段内容，用于填充 JSON 到目标大小。", len(parts)+1)
+		parts = append(parts, map[string]string{"text": text})
+		current += len(text) + 20 // 估算 JSON 编码开销
+	}
+	inner := map[string]any{
+		"candidates": []map[string]any{
+			{"content": map[string]any{"parts": parts}},
+		},
+		"usageMetadata": map[string]any{
+			"promptTokenCount":     100,
+			"candidatesTokenCount": 50,
+		},
+	}
+	outer := map[string]any{"response": inner}
+	b, _ := json.Marshal(outer)
+	return b
 }

@@ -1,3 +1,5 @@
+//go:build unit
+
 package middleware
 
 import (
@@ -34,7 +36,7 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 			Status:      service.StatusActive,
 			Concurrency: 1,
 		},
-	}, nil)
+	}, nil, nil)
 
 	cfg := &config.Config{
 		Security: config.SecurityConfig{
@@ -139,6 +141,117 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 	})
 }
 
+func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret", ExpireHour: 1}}
+	authService := service.NewAuthService(nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil)
+
+	admin := &service.User{
+		ID:           1,
+		Email:        "admin@example.com",
+		Role:         service.RoleAdmin,
+		Status:       service.StatusActive,
+		TokenVersion: 2,
+		Concurrency:  1,
+	}
+
+	userRepo := &stubUserRepo{
+		getByID: func(ctx context.Context, id int64) (*service.User, error) {
+			if id != admin.ID {
+				return nil, service.ErrUserNotFound
+			}
+			clone := *admin
+			return &clone, nil
+		},
+	}
+	userService := service.NewUserService(userRepo, nil, nil)
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAdminAuthMiddleware(authService, userService, nil, cfg)))
+	router.GET("/t", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	t.Run("token_version_mismatch_rejected", func(t *testing.T) {
+		token, err := authService.GenerateToken(&service.User{
+			ID:           admin.ID,
+			Email:        admin.Email,
+			Role:         admin.Role,
+			TokenVersion: admin.TokenVersion - 1,
+		})
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+		require.Contains(t, w.Body.String(), "TOKEN_REVOKED")
+	})
+
+	t.Run("token_version_match_allows", func(t *testing.T) {
+		token, err := authService.GenerateToken(&service.User{
+			ID:           admin.ID,
+			Email:        admin.Email,
+			Role:         admin.Role,
+			TokenVersion: admin.TokenVersion,
+		})
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
+	t.Run("websocket_token_version_mismatch_rejected", func(t *testing.T) {
+		token, err := authService.GenerateToken(&service.User{
+			ID:           admin.ID,
+			Email:        admin.Email,
+			Role:         admin.Role,
+			TokenVersion: admin.TokenVersion - 1,
+		})
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Connection", "Upgrade")
+		req.Header.Set("Sec-WebSocket-Protocol", "sub2api-admin, jwt."+token)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+		require.Contains(t, w.Body.String(), "TOKEN_REVOKED")
+	})
+
+	t.Run("websocket_token_version_match_allows", func(t *testing.T) {
+		token, err := authService.GenerateToken(&service.User{
+			ID:           admin.ID,
+			Email:        admin.Email,
+			Role:         admin.Role,
+			TokenVersion: admin.TokenVersion,
+		})
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/t", nil)
+		req.Header.Set("Upgrade", "websocket")
+		req.Header.Set("Connection", "Upgrade")
+		req.Header.Set("Sec-WebSocket-Protocol", "sub2api-admin, jwt."+token)
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// Stub repositories
+// ---------------------------------------------------------------------------
+
 type stubSettingRepo struct {
 	values map[string]string
 }
@@ -184,6 +297,7 @@ func (r *stubSettingRepo) Delete(ctx context.Context, key string) error {
 
 type stubUserRepo struct {
 	firstAdmin *service.User
+	getByID    func(ctx context.Context, id int64) (*service.User, error)
 }
 
 func (r *stubUserRepo) Create(ctx context.Context, user *service.User) error {
@@ -191,6 +305,9 @@ func (r *stubUserRepo) Create(ctx context.Context, user *service.User) error {
 }
 
 func (r *stubUserRepo) GetByID(ctx context.Context, id int64) (*service.User, error) {
+	if r.getByID != nil {
+		return r.getByID(ctx, id)
+	}
 	return nil, errors.New("not implemented")
 }
 
@@ -248,4 +365,16 @@ func (r *stubUserRepo) ExistsByEmail(ctx context.Context, email string) (bool, e
 
 func (r *stubUserRepo) RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error) {
 	return 0, errors.New("not implemented")
+}
+
+func (r *stubUserRepo) UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error {
+	return errors.New("not implemented")
+}
+
+func (r *stubUserRepo) EnableTotp(ctx context.Context, userID int64) error {
+	return errors.New("not implemented")
+}
+
+func (r *stubUserRepo) DisableTotp(ctx context.Context, userID int64) error {
+	return errors.New("not implemented")
 }

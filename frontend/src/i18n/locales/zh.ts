@@ -749,6 +749,7 @@ export default {
     rateMultiplierNotice:
       '模型倍率说明：模型倍率可以理解为实际的结算价格。如2× 表示实际结算单价按 2 元≈1 美金额度进行换算，最终结算以系统显示为准。',
     quota: '额度',
+    lastUsedAt: '上次使用时间',
     useKey: '使用密钥',
     useKeyModal: {
       title: '使用 API 密钥',
@@ -852,6 +853,10 @@ export default {
     description: '查看和分析您的 API 使用历史',
     costDetails: '成本明细',
     tokenDetails: 'Token 明细',
+    cacheTtlOverriddenHint: '缓存 TTL Override 已启用',
+    cacheTtlOverriddenLabel: 'TTL 替换',
+    cacheTtlOverridden5m: '按 5m 计费',
+    cacheTtlOverridden1h: '按 1h 计费',
     totalRequests: '总请求数',
     totalTokens: '总 Token',
     totalCost: '总消费',
@@ -1187,8 +1192,8 @@ export default {
       deleteUser: '删除用户',
       exportRecords: '导出记录',
       deleteConfirmMessage: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
-      searchPlaceholder: '搜索用户邮箱或用户名、备注、支持模糊查询...',
-      searchUsers: '搜索用户邮箱或用户名、备注、支持模糊查询',
+      searchPlaceholder: '邮箱/用户名/备注/API Key 模糊搜索...',
+      searchUsers: '邮箱/用户名/备注/API Key 模糊搜索',
       roleFilter: '角色筛选',
       allRoles: '全部角色',
       allStatus: '全部状态',
@@ -1484,7 +1489,8 @@ export default {
         anthropic: 'Anthropic',
         openai: 'OpenAI',
         gemini: 'Gemini',
-        antigravity: 'Antigravity'
+        antigravity: 'Antigravity',
+        sora: 'Sora'
       },
       statuses: {
         active: '正常',
@@ -1542,6 +1548,14 @@ export default {
       imagePricing: {
         title: '图片生成计费',
         description: '配置 gemini-3-pro-image 模型的图片生成价格，留空则使用默认价格'
+      },
+      soraPricing: {
+        title: 'Sora 按次计费',
+        description: '配置 Sora 图片/视频按次收费价格，留空则默认不计费',
+        image360: '图片 360px ($)',
+        image540: '图片 540px ($)',
+        video: '视频（标准）($)',
+        videoHd: '视频（Pro-HD）($)'
       },
       claudeCode: {
         title: 'Claude Code 客户端限制',
@@ -1686,6 +1700,8 @@ export default {
       refreshInterval15s: '15 秒',
       refreshInterval30s: '30 秒',
       autoRefreshCountdown: '自动刷新：{seconds}s',
+      listPendingSyncHint: '列表存在待同步变更，点击同步可补齐最新数据。',
+      listPendingSyncAction: '立即同步',
       syncFromCrs: '从 CRS 同步',
       dataExport: '导出',
       dataExportSelected: '导出选中',
@@ -1724,9 +1740,22 @@ export default {
       syncResult: '同步结果',
       syncResultSummary: '创建 {created}，更新 {updated}，跳过 {skipped}，失败 {failed}',
       syncErrors: '错误/跳过详情',
-      syncCompleted: '同步完成：创建 {created}，更新 {updated}',
-      syncCompletedWithErrors: '同步完成但有错误：失败 {failed}（创建 {created}，更新 {updated}）',
+      syncCompleted: '同步完成：创建 {created}，更新 {updated}，跳过 {skipped}',
+      syncCompletedWithErrors: '同步完成但有错误：失败 {failed}（创建 {created}，更新 {updated}，跳过 {skipped}）',
       syncFailed: '同步失败',
+      crsPreview: '预览',
+      crsPreviewing: '预览中...',
+      crsPreviewFailed: '预览失败',
+      crsExistingAccounts: '将自动更新的已有账号',
+      crsNewAccounts: '新账号（可选择）',
+      crsSelectAll: '全选',
+      crsSelectNone: '全不选',
+      crsNoNewAccounts: '所有 CRS 账号均已同步。',
+      crsWillUpdate: '将更新 {count} 个已有账号。',
+      crsSelectedCount: '已选择 {count} 个新账号',
+      crsUpdateBehaviorNote:
+        '已有账号仅同步 CRS 返回的字段，缺失字段保持原值；凭据按键合并，不会清空未下发的键；未勾选"同步代理"时保留原有代理。',
+      crsBack: '返回',
       editAccount: '编辑账号',
       deleteAccount: '删除账号',
       deleteConfirmMessage: "确定要删除账号 '{name}' 吗？",
@@ -1740,6 +1769,7 @@ export default {
       allPlatforms: '全部平台',
       allTypes: '全部类型',
       allStatus: '全部状态',
+      allGroups: '全部分组',
       oauthType: 'OAuth',
       // Schedulable toggle
       schedulable: '参与调度',
@@ -1747,7 +1777,7 @@ export default {
       schedulableEnabled: '调度已开启',
       schedulableDisabled: '调度已关闭',
       failedToToggleSchedulable: '切换调度状态失败',
-      allGroups: '共 {count} 个分组',
+      groupCountTotal: '共 {count} 个分组',
       columns: {
         name: '名称',
         platformType: '平台/类型',
@@ -1798,7 +1828,8 @@ export default {
         openai: 'OpenAI',
         anthropic: 'Anthropic',
         gemini: 'Gemini',
-        antigravity: 'Antigravity'
+        antigravity: 'Antigravity',
+        sora: 'Sora'
       },
       types: {
         oauth: 'OAuth',
@@ -1807,6 +1838,7 @@ export default {
         googleOauth: 'Google OAuth',
         codeAssist: 'Code Assist',
         antigravityOauth: 'Antigravity OAuth',
+        antigravityApikey: '通过 Base URL + API Key 连接',
         upstream: '对接上游',
         upstreamDesc: '通过 Base URL + API Key 连接上游',
         api_key: 'API Key',
@@ -1982,7 +2014,20 @@ export default {
       // OpenAI specific hints
       openai: {
         baseUrlHint: '留空使用官方 OpenAI API',
-        apiKeyHint: '您的 OpenAI API Key'
+        apiKeyHint: '您的 OpenAI API Key',
+        oauthPassthrough: '自动透传（仅替换认证）',
+        oauthPassthroughDesc:
+          '开启后，该 OpenAI 账号将自动透传请求与响应，仅替换认证并保留计费/并发/审计及必要安全过滤；如遇兼容性问题可随时关闭回滚。',
+        codexCLIOnly: '仅允许 Codex 官方客户端',
+        codexCLIOnlyDesc: '仅对 OpenAI OAuth 生效。开启后仅允许 Codex 官方客户端家族访问；关闭后完全绕过并保持原逻辑。',
+        modelRestrictionDisabledByPassthrough: '已开启自动透传：模型白名单/映射不会生效。',
+        enableSora: '同时启用 Sora',
+        enableSoraHint: 'Sora 使用相同的 OpenAI 账号，开启后将同时创建 Sora 平台账号'
+      },
+      anthropic: {
+        apiKeyPassthrough: '自动透传（仅替换认证）',
+        apiKeyPassthroughDesc:
+          '仅对 Anthropic API Key 生效。开启后，messages/count_tokens 请求将透传上游并仅替换认证，保留计费/并发/审计及必要安全过滤；关闭即可回滚到现有兼容链路。'
       },
       modelRestriction: '模型限制（可选）',
       modelWhitelist: '模型白名单',
@@ -1991,6 +2036,9 @@ export default {
       mapRequestModels: '将请求模型映射到实际模型。左边是请求的模型，右边是发送到 API 的实际模型。',
       selectedModels: '已选择 {count} 个模型',
       supportsAllModels: '（支持所有模型）',
+      soraModelsLoadFailed: '加载 Sora 模型列表失败，已回退到默认列表',
+      soraModelsLoading: '正在加载 Sora 模型...',
+      soraModelsRetry: '加载失败，点击重试',
       requestModel: '请求模型',
       actualModel: '实际模型',
       addMapping: '添加映射',
@@ -2053,6 +2101,12 @@ export default {
         sessionIdMasking: {
           label: '会话 ID 伪装',
           hint: '启用后将在 15 分钟内固定 metadata.user_id 中的 session ID，使上游认为请求来自同一会话'
+        },
+        cacheTTLOverride: {
+          label: '缓存 TTL 强制替换',
+          hint: '将所有缓存创建 token 强制按指定的 TTL 类型（5分钟或1小时）计费',
+          target: '目标 TTL',
+          targetHint: '选择计费使用的 TTL 类型'
         }
       },
       expired: '已过期',
@@ -2073,6 +2127,8 @@ export default {
       creating: '创建中...',
       updating: '更新中...',
       accountCreated: '账号创建成功',
+      soraAccountCreated: 'Sora 账号已同时创建',
+      soraAccountFailed: 'Sora 账号创建失败，请稍后手动添加',
       accountUpdated: '账号更新成功',
       failedToCreate: '创建账号失败',
       failedToUpdate: '更新账号失败',
@@ -2085,7 +2141,7 @@ export default {
       // Upstream type
       upstream: {
         baseUrl: '上游 Base URL',
-        baseUrlHint: '上游 Antigravity 服务的地址，例如：https://s.konstants.xyz',
+        baseUrlHint: '上游 Antigravity 服务的地址，例如：https://cloudcode-pa.googleapis.com',
         apiKey: '上游 API Key',
         apiKeyHint: '上游服务的 API Key',
         pleaseEnterBaseUrl: '请输入上游 Base URL',
@@ -2158,9 +2214,13 @@ export default {
           refreshTokenAuth: '手动输入 RT',
           refreshTokenDesc: '输入您已有的 OpenAI Refresh Token，支持批量输入（每行一个），系统将自动验证并创建账号。',
           refreshTokenPlaceholder: '粘贴您的 OpenAI Refresh Token...\n支持多个，每行一个',
+          sessionTokenAuth: '手动输入 ST',
+          sessionTokenDesc: '输入您已有的 Sora Session Token，支持批量输入（每行一个），系统将自动验证并创建账号。',
+          sessionTokenPlaceholder: '粘贴您的 Sora Session Token...\n支持多个，每行一个',
           validating: '验证中...',
           validateAndCreate: '验证并创建账号',
-          pleaseEnterRefreshToken: '请输入 Refresh Token'
+          pleaseEnterRefreshToken: '请输入 Refresh Token',
+          pleaseEnterSessionToken: '请输入 Session Token'
         },
         // Gemini specific
         gemini: {
@@ -2226,7 +2286,15 @@ export default {
           authCodeHint: '您可以直接复制整个链接或仅复制 code 参数值，系统会自动识别',
           failedToGenerateUrl: '生成 Antigravity 授权链接失败',
           missingExchangeParams: '缺少 code / session_id / state',
-          failedToExchangeCode: 'Antigravity 授权码兑换失败'
+          failedToExchangeCode: 'Antigravity 授权码兑换失败',
+          // Refresh Token auth
+          refreshTokenAuth: '手动输入 RT',
+          refreshTokenDesc: '输入您已有的 Antigravity Refresh Token，支持批量输入（每行一个），系统将自动验证并创建账号。',
+          refreshTokenPlaceholder: '粘贴您的 Antigravity Refresh Token...\n支持多个，每行一个',
+          validating: '验证中...',
+          validateAndCreate: '验证并创建账号',
+          pleaseEnterRefreshToken: '请输入 Refresh Token',
+          failedToValidateRT: '验证 Refresh Token 失败'
         }
       },
       // Gemini specific (platform-wide)
@@ -2368,6 +2436,7 @@ export default {
       reAuthorizeAccount: '重新授权账号',
       claudeCodeAccount: 'Claude Code 账号',
       openaiAccount: 'OpenAI 账号',
+      soraAccount: 'Sora 账号',
       geminiAccount: 'Gemini 账号',
       antigravityAccount: 'Antigravity 账号',
       inputMethod: '输入方式',
@@ -2391,6 +2460,10 @@ export default {
       selectTestModel: '选择测试模型',
       testModel: '测试模型',
       testPrompt: '提示词："hi"',
+      soraTestHint: 'Sora 测试将执行连通性与能力检测（/backend/me、订阅信息、Sora2 邀请码与剩余额度）。',
+      soraTestTarget: '检测目标：Sora 账号能力',
+      soraTestMode: '模式：连通性 + 能力探测',
+      soraTestingFlow: '执行 Sora 连通性与能力检测...',
       // Stats Modal
       viewStats: '查看统计',
       usageStatistics: '使用统计',
@@ -2518,6 +2591,8 @@ export default {
       noProxiesYet: '暂无代理',
       createFirstProxy: '添加您的第一个代理以开始使用。',
       testConnection: '测试连接',
+      qualityCheck: '质量检测',
+      batchQualityCheck: '批量质量检测',
       batchTest: '批量测试',
       testFailed: '失败',
       latencyFailed: '链接失败',
@@ -2565,6 +2640,28 @@ export default {
       proxyWorking: '代理连接正常',
       proxyWorkingWithLatency: '代理连接正常，延迟 {latency}ms',
       proxyTestFailed: '代理测试失败',
+      qualityCheckDone: '质量检测完成：评分 {score}（{grade}）',
+      qualityCheckFailed: '代理质量检测失败',
+      batchQualityDone: '批量质量检测完成，共检测 {count} 个；优质 {healthy} 个，告警 {warn} 个，挑战 {challenge} 个，异常 {failed} 个',
+      batchQualityFailed: '批量质量检测失败',
+      batchQualityEmpty: '暂无可检测质量的代理',
+      qualityReportTitle: '代理质量检测报告',
+      qualityGrade: '等级 {grade}',
+      qualityExitIP: '出口 IP',
+      qualityCountry: '出口地区',
+      qualityBaseLatency: '基础延迟',
+      qualityCheckedAt: '检测时间',
+      qualityTableTarget: '检测项',
+      qualityTableStatus: '状态',
+      qualityTableLatency: '延迟',
+      qualityTableMessage: '说明',
+      qualityInline: '质量 {grade}/{score}',
+      qualityStatusHealthy: '优质',
+      qualityStatusPass: '通过',
+      qualityStatusWarn: '告警',
+      qualityStatusFail: '失败',
+      qualityStatusChallenge: '挑战',
+      qualityTargetBase: '基础连通性',
       proxyCreatedSuccess: '代理添加成功',
       proxyUpdatedSuccess: '代理更新成功',
       proxyDeletedSuccess: '代理删除成功',
@@ -2615,7 +2712,7 @@ export default {
       allStatus: '全部状态',
       unused: '未使用',
       used: '已使用',
-      searchCodes: '搜索兑换码...',
+      searchCodes: '搜索兑换码或邮箱...',
       exportCsv: '导出 CSV',
       deleteAllUnused: '删除全部未使用',
       deleteCodeConfirm: '确定要删除此兑换码吗？此操作无法撤销。',
@@ -2841,6 +2938,8 @@ export default {
       inputTokens: '输入 Token',
       outputTokens: '输出 Token',
       cacheCreationTokens: '缓存创建 Token',
+      cacheCreation5mTokens: '缓存创建',
+      cacheCreation1hTokens: '缓存创建',
       cacheReadTokens: '缓存读取 Token',
       failedToLoad: '加载使用记录失败',
       billingType: '计费类型',
@@ -2977,11 +3076,33 @@ export default {
         '5m': '近5分钟',
         '30m': '近30分钟',
         '1h': '近1小时',
+        '1d': '近1天',
+        '15d': '近15天',
         '6h': '近6小时',
         '24h': '近24小时',
         '7d': '近7天',
         '30d': '近30天',
         custom: '自定义'
+      },
+      openaiTokenStats: {
+        title: 'OpenAI Token 请求统计',
+        viewModeTopN: 'TopN',
+        viewModePagination: '分页',
+        prevPage: '上一页',
+        nextPage: '下一页',
+        pageInfo: '第 {page}/{total} 页',
+        totalModels: '模型总数：{total}',
+        failedToLoad: '加载 OpenAI Token 统计失败',
+        empty: '当前筛选条件下暂无 OpenAI Token 请求统计数据',
+        table: {
+          model: '模型',
+          requestCount: '请求数',
+          avgTokensPerSec: '平均 Tokens/秒',
+          avgFirstTokenMs: '平均首 Token 延迟(ms)',
+          totalOutputTokens: '输出 Token 总数',
+          avgDurationMs: '平均时长(ms)',
+          requestsWithFirstToken: '首 Token 样本数'
+        }
       },
       customTimeRange: {
         startTime: '开始时间',
@@ -3877,6 +3998,7 @@ export default {
       custom: '自定义',
       code: '状态码',
       body: '消息体',
+      skipMonitoring: '跳过监控',
 
       // Columns
       columns: {
@@ -3921,6 +4043,8 @@ export default {
         passthroughBody: '透传上游错误信息',
         customMessage: '自定义错误信息',
         customMessagePlaceholder: '返回给客户端的错误信息...',
+        skipMonitoring: '跳过运维监控记录',
+        skipMonitoringHint: '开启后，匹配此规则的错误不会被记录到运维监控中',
         enabled: '启用此规则'
       },
 

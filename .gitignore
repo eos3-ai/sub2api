@@ -129,3 +129,6 @@ deploy/docker-compose.override.yml
 vite.config.js
 .remote-verify/
 .serena/
+.codex/
+frontend/coverage/
+aicodex

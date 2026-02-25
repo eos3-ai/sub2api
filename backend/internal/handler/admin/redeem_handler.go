@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"fmt"
 	"strconv"
@@ -88,23 +89,24 @@ func (h *RedeemHandler) Generate(c *gin.Context) {
 		return
 	}
 
-	codes, err := h.adminService.GenerateRedeemCodes(c.Request.Context(), &service.GenerateRedeemCodesInput{
-		Count:        req.Count,
-		Type:         req.Type,
-		Value:        req.Value,
-		GroupID:      req.GroupID,
-		ValidityDays: req.ValidityDays,
-	})
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
+	executeAdminIdempotentJSON(c, "admin.redeem_codes.generate", req, service.DefaultWriteIdempotencyTTL(), func(ctx context.Context) (any, error) {
+		codes, execErr := h.adminService.GenerateRedeemCodes(ctx, &service.GenerateRedeemCodesInput{
+			Count:        req.Count,
+			Type:         req.Type,
+			Value:        req.Value,
+			GroupID:      req.GroupID,
+			ValidityDays: req.ValidityDays,
+		})
+		if execErr != nil {
+			return nil, execErr
+		}
 
-	out := make([]dto.AdminRedeemCode, 0, len(codes))
-	for i := range codes {
-		out = append(out, *dto.RedeemCodeFromServiceAdmin(&codes[i]))
-	}
-	response.Success(c, out)
+		out := make([]dto.AdminRedeemCode, 0, len(codes))
+		for i := range codes {
+			out = append(out, *dto.RedeemCodeFromServiceAdmin(&codes[i]))
+		}
+		return out, nil
+	})
 }
 
 // Delete handles deleting a redeem code
@@ -202,7 +204,7 @@ func (h *RedeemHandler) Export(c *gin.Context) {
 	writer := csv.NewWriter(&buf)
 
 	// Write header
-	if err := writer.Write([]string{"id", "code", "type", "value", "status", "used_by", "used_at", "created_at"}); err != nil {
+	if err := writer.Write([]string{"id", "code", "type", "value", "status", "used_by", "used_by_email", "used_at", "created_at"}); err != nil {
 		response.InternalError(c, "Failed to export redeem codes: "+err.Error())
 		return
 	}
@@ -212,6 +214,10 @@ func (h *RedeemHandler) Export(c *gin.Context) {
 		usedBy := ""
 		if code.UsedBy != nil {
 			usedBy = fmt.Sprintf("%d", *code.UsedBy)
+		}
+		usedByEmail := ""
+		if code.User != nil {
+			usedByEmail = code.User.Email
 		}
 		usedAt := ""
 		if code.UsedAt != nil {
@@ -224,6 +230,7 @@ func (h *RedeemHandler) Export(c *gin.Context) {
 			fmt.Sprintf("%.2f", code.Value),
 			code.Status,
 			usedBy,
+			usedByEmail,
 			usedAt,
 			code.CreatedAt.Format("2006-01-02 15:04:05"),
 		}); err != nil {

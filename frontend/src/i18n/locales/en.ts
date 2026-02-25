@@ -750,6 +750,7 @@ export default {
     rateMultiplierNotice:
       'Rate multiplier note: The multiplier represents the actual settlement price. For example, 2x means the settlement unit price is converted at 2 CNY ~ 1 USD. Final billing is subject to the system display.',
     quota: 'Quota',
+    lastUsedAt: 'Last Used',
     useKey: 'Use Key',
     useKeyModal: {
       title: 'Use API Key',
@@ -848,6 +849,10 @@ export default {
     description: 'View and analyze your API usage history',
     costDetails: 'Cost Breakdown',
     tokenDetails: 'Token Breakdown',
+    cacheTtlOverriddenHint: 'Cache TTL Override enabled',
+    cacheTtlOverriddenLabel: 'TTL Override',
+    cacheTtlOverridden5m: 'Billed as 5m',
+    cacheTtlOverridden1h: 'Billed as 1h',
     totalRequests: 'Total Requests',
     totalTokens: 'Total Tokens',
     totalCost: 'Total Cost',
@@ -1165,7 +1170,7 @@ export default {
       editUser: 'Edit User',
       deleteUser: 'Delete User',
       exportRecords: 'Export Records',
-      searchUsers: 'Search users...',
+      searchUsers: 'Search by email, username, notes, or API key...',
       allRoles: 'All Roles',
       allStatus: 'All Status',
       admin: 'Admin',
@@ -1427,7 +1432,8 @@ export default {
         anthropic: 'Anthropic',
         openai: 'OpenAI',
         gemini: 'Gemini',
-        antigravity: 'Antigravity'
+        antigravity: 'Antigravity',
+        sora: 'Sora'
       },
       statuses: {
         active: 'Active',
@@ -1456,6 +1462,14 @@ export default {
       imagePricing: {
         title: 'Image Generation Pricing',
         description: 'Configure pricing for gemini-3-pro-image model. Leave empty to use default prices.'
+      },
+      soraPricing: {
+        title: 'Sora Per-Request Pricing',
+        description: 'Configure per-request pricing for Sora image/video generation. Leave empty to disable billing.',
+        image360: 'Image 360px ($)',
+        image540: 'Image 540px ($)',
+        video: 'Video (standard) ($)',
+        videoHd: 'Video (Pro-HD) ($)'
       },
       claudeCode: {
         title: 'Claude Code Client Restriction',
@@ -1599,6 +1613,8 @@ export default {
       refreshInterval15s: '15 seconds',
       refreshInterval30s: '30 seconds',
       autoRefreshCountdown: 'Auto refresh: {seconds}s',
+      listPendingSyncHint: 'List changes are pending sync. Click sync to load latest rows.',
+      listPendingSyncAction: 'Sync now',
       syncFromCrs: 'Sync from CRS',
       dataExport: 'Export',
       dataExportSelected: 'Export Selected',
@@ -1637,10 +1653,23 @@ export default {
       syncResult: 'Sync Result',
       syncResultSummary: 'Created {created}, updated {updated}, skipped {skipped}, failed {failed}',
       syncErrors: 'Errors / Skipped Details',
-      syncCompleted: 'Sync completed: created {created}, updated {updated}',
+      syncCompleted: 'Sync completed: created {created}, updated {updated}, skipped {skipped}',
       syncCompletedWithErrors:
-        'Sync completed with errors: failed {failed} (created {created}, updated {updated})',
+        'Sync completed with errors: failed {failed} (created {created}, updated {updated}, skipped {skipped})',
       syncFailed: 'Sync failed',
+      crsPreview: 'Preview',
+      crsPreviewing: 'Previewing...',
+      crsPreviewFailed: 'Preview failed',
+      crsExistingAccounts: 'Existing accounts (will be updated)',
+      crsNewAccounts: 'New accounts (select to sync)',
+      crsSelectAll: 'Select all',
+      crsSelectNone: 'Select none',
+      crsNoNewAccounts: 'All CRS accounts are already synced.',
+      crsWillUpdate: 'Will update {count} existing accounts.',
+      crsSelectedCount: '{count} new accounts selected',
+      crsUpdateBehaviorNote:
+        'Existing accounts only sync fields returned by CRS; missing fields keep their current values. Credentials are merged by key — keys not returned by CRS are preserved. Proxies are kept when "Sync proxies" is unchecked.',
+      crsBack: 'Back',
       editAccount: 'Edit Account',
       deleteAccount: 'Delete Account',
       searchAccounts: 'Search accounts...',
@@ -1650,6 +1679,7 @@ export default {
       allPlatforms: 'All Platforms',
       allTypes: 'All Types',
       allStatus: 'All Status',
+      allGroups: 'All Groups',
       oauthType: 'OAuth',
       setupToken: 'Setup Token',
       apiKey: 'API Key',
@@ -1659,13 +1689,14 @@ export default {
       schedulableEnabled: 'Scheduling enabled',
       schedulableDisabled: 'Scheduling disabled',
       failedToToggleSchedulable: 'Failed to toggle scheduling status',
-      allGroups: '{count} groups total',
+      groupCountTotal: '{count} groups total',
       platforms: {
         anthropic: 'Anthropic',
         claude: 'Claude',
         openai: 'OpenAI',
         gemini: 'Gemini',
-        antigravity: 'Antigravity'
+        antigravity: 'Antigravity',
+        sora: 'Sora'
       },
       types: {
         oauth: 'OAuth',
@@ -1674,6 +1705,7 @@ export default {
         googleOauth: 'Google OAuth',
         codeAssist: 'Code Assist',
         antigravityOauth: 'Antigravity OAuth',
+        antigravityApikey: 'Connect via Base URL + API Key',
         upstream: 'Upstream',
         upstreamDesc: 'Connect via Base URL + API Key'
       },
@@ -1830,7 +1862,21 @@ export default {
       // OpenAI specific hints
       openai: {
         baseUrlHint: 'Leave default for official OpenAI API',
-        apiKeyHint: 'Your OpenAI API Key'
+        apiKeyHint: 'Your OpenAI API Key',
+        oauthPassthrough: 'Auto passthrough (auth only)',
+        oauthPassthroughDesc:
+          'When enabled, this OpenAI account uses automatic passthrough: the gateway forwards request/response as-is and only swaps auth, while keeping billing/concurrency/audit and necessary safety filtering.',
+        codexCLIOnly: 'Codex official clients only',
+        codexCLIOnlyDesc:
+          'Only applies to OpenAI OAuth. When enabled, only Codex official client families are allowed; when disabled, the gateway bypasses this restriction and keeps existing behavior.',
+        modelRestrictionDisabledByPassthrough: 'Automatic passthrough is enabled: model whitelist/mapping will not take effect.',
+        enableSora: 'Enable Sora simultaneously',
+        enableSoraHint: 'Sora uses the same OpenAI account. Enable to create Sora account simultaneously.'
+      },
+      anthropic: {
+        apiKeyPassthrough: 'Auto passthrough (auth only)',
+        apiKeyPassthroughDesc:
+          'Only applies to Anthropic API Key accounts. When enabled, messages/count_tokens are forwarded in passthrough mode with auth replacement only, while billing/concurrency/audit and safety filtering are preserved. Disable to roll back immediately.'
       },
       modelRestriction: 'Model Restriction (Optional)',
       modelWhitelist: 'Model Whitelist',
@@ -1840,6 +1886,9 @@ export default {
         'Map request models to actual models. Left is the requested model, right is the actual model sent to API.',
       selectedModels: 'Selected {count} model(s)',
       supportsAllModels: '(supports all models)',
+      soraModelsLoadFailed: 'Failed to load Sora models, fallback to default list',
+      soraModelsLoading: 'Loading Sora models...',
+      soraModelsRetry: 'Load failed, click to retry',
       requestModel: 'Request model',
       actualModel: 'Actual model',
       addMapping: 'Add Mapping',
@@ -1904,6 +1953,12 @@ export default {
         sessionIdMasking: {
           label: 'Session ID Masking',
           hint: 'When enabled, fixes the session ID in metadata.user_id for 15 minutes, making upstream think requests come from the same session'
+        },
+        cacheTTLOverride: {
+          label: 'Cache TTL Override',
+          hint: 'Force all cache creation tokens to be billed as the selected TTL tier (5m or 1h)',
+          target: 'Target TTL',
+          targetHint: 'Select the TTL tier for billing'
         }
       },
       expired: 'Expired',
@@ -1924,6 +1979,8 @@ export default {
       creating: 'Creating...',
       updating: 'Updating...',
       accountCreated: 'Account created successfully',
+      soraAccountCreated: 'Sora account created simultaneously',
+      soraAccountFailed: 'Failed to create Sora account, please add manually later',
       accountUpdated: 'Account updated successfully',
       failedToCreate: 'Failed to create account',
       failedToUpdate: 'Failed to update account',
@@ -1936,7 +1993,7 @@ export default {
       // Upstream type
       upstream: {
         baseUrl: 'Upstream Base URL',
-        baseUrlHint: 'The address of the upstream Antigravity service, e.g., https://s.konstants.xyz',
+        baseUrlHint: 'The address of the upstream Antigravity service, e.g., https://cloudcode-pa.googleapis.com',
         apiKey: 'Upstream API Key',
         apiKeyHint: 'API Key for the upstream service',
         pleaseEnterBaseUrl: 'Please enter upstream Base URL',
@@ -2015,9 +2072,13 @@ export default {
           refreshTokenAuth: 'Manual RT Input',
           refreshTokenDesc: 'Enter your existing OpenAI Refresh Token(s). Supports batch input (one per line). The system will automatically validate and create accounts.',
           refreshTokenPlaceholder: 'Paste your OpenAI Refresh Token...\nSupports multiple, one per line',
+          sessionTokenAuth: 'Manual ST Input',
+          sessionTokenDesc: 'Enter your existing Sora Session Token(s). Supports batch input (one per line). The system will automatically validate and create accounts.',
+          sessionTokenPlaceholder: 'Paste your Sora Session Token...\nSupports multiple, one per line',
           validating: 'Validating...',
           validateAndCreate: 'Validate & Create Account',
-          pleaseEnterRefreshToken: 'Please enter Refresh Token'
+          pleaseEnterRefreshToken: 'Please enter Refresh Token',
+          pleaseEnterSessionToken: 'Please enter Session Token'
         },
         // Gemini specific
 	        gemini: {
@@ -2084,13 +2145,20 @@ export default {
           authCode: 'Authorization URL or Code',
           authCodePlaceholder:
             'Option 1: Copy the complete URL\n(http://localhost:xxx/auth/callback?code=...)\nOption 2: Copy only the code parameter value',
-          authCodeHint: 'You can copy the entire URL or just the code parameter value, the system will auto-detect',
-          failedToGenerateUrl: 'Failed to generate Antigravity auth URL',
-          missingExchangeParams: 'Missing code, session ID, or state',
-          failedToExchangeCode: 'Failed to exchange Antigravity auth code'
-        }
-	      },
-      // Gemini specific (platform-wide)
+                    authCodeHint: 'You can copy the entire URL or just the code parameter value, the system will auto-detect',
+                    failedToGenerateUrl: 'Failed to generate Antigravity auth URL',
+                    missingExchangeParams: 'Missing code, session ID, or state',
+                    failedToExchangeCode: 'Failed to exchange Antigravity auth code',
+                    // Refresh Token auth
+                    refreshTokenAuth: 'Manual RT',
+                    refreshTokenDesc: 'Enter your existing Antigravity Refresh Token. Supports batch input (one per line). The system will automatically validate and create accounts.',
+                    refreshTokenPlaceholder: 'Paste your Antigravity Refresh Token...\nSupports multiple tokens, one per line',
+                    validating: 'Validating...',
+                    validateAndCreate: 'Validate & Create',
+                    pleaseEnterRefreshToken: 'Please enter Refresh Token',
+                    failedToValidateRT: 'Failed to validate Refresh Token'
+                  }
+                },      // Gemini specific (platform-wide)
       gemini: {
         helpButton: 'Help',
         helpDialog: {
@@ -2231,6 +2299,7 @@ export default {
       reAuthorizeAccount: 'Re-Authorize Account',
       claudeCodeAccount: 'Claude Code Account',
       openaiAccount: 'OpenAI Account',
+      soraAccount: 'Sora Account',
       geminiAccount: 'Gemini Account',
       antigravityAccount: 'Antigravity Account',
       inputMethod: 'Input Method',
@@ -2256,6 +2325,10 @@ export default {
       selectTestModel: 'Select Test Model',
       testModel: 'Test model',
       testPrompt: 'Prompt: "hi"',
+      soraTestHint: 'Sora test runs connectivity and capability checks (/backend/me, subscription, Sora2 invite and remaining quota).',
+      soraTestTarget: 'Target: Sora account capability',
+      soraTestMode: 'Mode: Connectivity + Capability checks',
+      soraTestingFlow: 'Running Sora connectivity and capability checks...',
       // Stats Modal
       viewStats: 'View Stats',
       usageStatistics: 'Usage Statistics',
@@ -2367,6 +2440,8 @@ export default {
         actions: 'Actions'
       },
       testConnection: 'Test Connection',
+      qualityCheck: 'Quality Check',
+      batchQualityCheck: 'Batch Quality Check',
       batchTest: 'Test All Proxies',
       testFailed: 'Failed',
       latencyFailed: 'Connection failed',
@@ -2427,6 +2502,29 @@ export default {
       proxyWorking: 'Proxy is working!',
       proxyWorkingWithLatency: 'Proxy is working! Latency: {latency}ms',
       proxyTestFailed: 'Proxy test failed',
+      qualityCheckDone: 'Quality check completed: score {score} ({grade})',
+      qualityCheckFailed: 'Failed to run proxy quality check',
+      batchQualityDone:
+        'Batch quality check completed for {count} proxies: healthy {healthy}, warn {warn}, challenge {challenge}, abnormal {failed}',
+      batchQualityFailed: 'Batch quality check failed',
+      batchQualityEmpty: 'No proxies available for quality check',
+      qualityReportTitle: 'Proxy Quality Report',
+      qualityGrade: 'Grade {grade}',
+      qualityExitIP: 'Exit IP',
+      qualityCountry: 'Exit Region',
+      qualityBaseLatency: 'Base Latency',
+      qualityCheckedAt: 'Checked At',
+      qualityTableTarget: 'Target',
+      qualityTableStatus: 'Status',
+      qualityTableLatency: 'Latency',
+      qualityTableMessage: 'Message',
+      qualityInline: 'Quality {grade}/{score}',
+      qualityStatusHealthy: 'Healthy',
+      qualityStatusPass: 'Pass',
+      qualityStatusWarn: 'Warn',
+      qualityStatusFail: 'Fail',
+      qualityStatusChallenge: 'Challenge',
+      qualityTargetBase: 'Base Connectivity',
       failedToLoad: 'Failed to load proxies',
       failedToCreate: 'Failed to create proxy',
       failedToUpdate: 'Failed to update proxy',
@@ -2444,7 +2542,7 @@ export default {
       title: 'Redeem Code Management',
       description: 'Generate and manage redeem codes',
       generateCodes: 'Generate Codes',
-      searchCodes: 'Search codes...',
+      searchCodes: 'Search codes or email...',
       allTypes: 'All Types',
       allStatus: 'All Status',
       balance: 'Balance',
@@ -2667,6 +2765,8 @@ export default {
       inputTokens: 'Input Tokens',
       outputTokens: 'Output Tokens',
       cacheCreationTokens: 'Cache Creation Tokens',
+      cacheCreation5mTokens: 'Cache Write',
+      cacheCreation1hTokens: 'Cache Write',
       cacheReadTokens: 'Cache Read Tokens',
       failedToLoad: 'Failed to load usage records',
       billingType: 'Billing Type',
@@ -2802,10 +2902,32 @@ export default {
         '5m': 'Last 5 minutes',
         '30m': 'Last 30 minutes',
         '1h': 'Last 1 hour',
+        '1d': 'Last 1 day',
+        '15d': 'Last 15 days',
         '6h': 'Last 6 hours',
         '24h': 'Last 24 hours',
         '7d': 'Last 7 days',
         '30d': 'Last 30 days'
+      },
+      openaiTokenStats: {
+        title: 'OpenAI Token Request Stats',
+        viewModeTopN: 'TopN',
+        viewModePagination: 'Pagination',
+        prevPage: 'Previous',
+        nextPage: 'Next',
+        pageInfo: 'Page {page}/{total}',
+        totalModels: 'Total models: {total}',
+        failedToLoad: 'Failed to load OpenAI token stats',
+        empty: 'No OpenAI token stats for the current filters',
+        table: {
+          model: 'Model',
+          requestCount: 'Requests',
+          avgTokensPerSec: 'Avg Tokens/sec',
+          avgFirstTokenMs: 'Avg First Token Latency (ms)',
+          totalOutputTokens: 'Total Output Tokens',
+          avgDurationMs: 'Avg Duration (ms)',
+          requestsWithFirstToken: 'Requests With First Token'
+        }
       },
       fullscreen: {
         enter: 'Enter Fullscreen'
@@ -3677,6 +3799,7 @@ export default {
       custom: 'Custom',
       code: 'Code',
       body: 'Body',
+      skipMonitoring: 'Skip Monitoring',
 
       // Columns
       columns: {
@@ -3721,6 +3844,8 @@ export default {
         passthroughBody: 'Passthrough upstream error message',
         customMessage: 'Custom error message',
         customMessagePlaceholder: 'Error message to return to client...',
+        skipMonitoring: 'Skip monitoring',
+        skipMonitoringHint: 'When enabled, errors matching this rule will not be recorded in ops monitoring',
         enabled: 'Enable this rule'
       },
 

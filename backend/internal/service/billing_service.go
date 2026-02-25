@@ -31,8 +31,8 @@ type ModelPricing struct {
 	OutputPricePerToken        float64 // 每token输出价格 (USD)
 	CacheCreationPricePerToken float64 // 缓存创建每token价格 (USD)
 	CacheReadPricePerToken     float64 // 缓存读取每token价格 (USD)
-	CacheCreation5mPrice       float64 // 5分钟缓存创建价格（每百万token）- 仅用于硬编码回退
-	CacheCreation1hPrice       float64 // 1小时缓存创建价格（每百万token）- 仅用于硬编码回退
+	CacheCreation5mPrice       float64 // 5分钟缓存创建每token价格 (USD)
+	CacheCreation1hPrice       float64 // 1小时缓存创建每token价格 (USD)
 	SupportsCacheBreakdown     bool    // 是否支持详细的缓存分类
 }
 
@@ -173,12 +173,20 @@ func (s *BillingService) GetModelPricing(model string) (*ModelPricing, error) {
 	if s.pricingService != nil {
 		litellmPricing := s.pricingService.GetModelPricing(model)
 		if litellmPricing != nil {
+			// 启用 5m/1h 分类计费的条件：
+			// 1. 存在 1h 价格
+			// 2. 1h 价格 > 5m 价格（防止 LiteLLM 数据错误导致少收费）
+			price5m := litellmPricing.CacheCreationInputTokenCost
+			price1h := litellmPricing.CacheCreationInputTokenCostAbove1hr
+			enableBreakdown := price1h > 0 && price1h > price5m
 			return &ModelPricing{
 				InputPricePerToken:         litellmPricing.InputCostPerToken,
 				OutputPricePerToken:        litellmPricing.OutputCostPerToken,
 				CacheCreationPricePerToken: litellmPricing.CacheCreationInputTokenCost,
 				CacheReadPricePerToken:     litellmPricing.CacheReadInputTokenCost,
-				SupportsCacheBreakdown:     false,
+				CacheCreation5mPrice:       price5m,
+				CacheCreation1hPrice:       price1h,
+				SupportsCacheBreakdown:     enableBreakdown,
 			}, nil
 		}
 	}
@@ -210,9 +218,14 @@ func (s *BillingService) CalculateCost(model string, tokens UsageTokens, rateMul
 
 	// 计算缓存费用
 	if pricing.SupportsCacheBreakdown && (pricing.CacheCreation5mPrice > 0 || pricing.CacheCreation1hPrice > 0) {
-		// 支持详细缓存分类的模型（5分钟/1小时缓存）
-		breakdown.CacheCreationCost = float64(tokens.CacheCreation5mTokens)/1_000_000*pricing.CacheCreation5mPrice +
-			float64(tokens.CacheCreation1hTokens)/1_000_000*pricing.CacheCreation1hPrice
+		// 支持详细缓存分类的模型（5分钟/1小时缓存，价格为 per-token）
+		if tokens.CacheCreation5mTokens == 0 && tokens.CacheCreation1hTokens == 0 && tokens.CacheCreationTokens > 0 {
+			// API 未返回 ephemeral 明细，回退到全部按 5m 单价计费
+			breakdown.CacheCreationCost = float64(tokens.CacheCreationTokens) * pricing.CacheCreation5mPrice
+		} else {
+			breakdown.CacheCreationCost = float64(tokens.CacheCreation5mTokens)*pricing.CacheCreation5mPrice +
+				float64(tokens.CacheCreation1hTokens)*pricing.CacheCreation1hPrice
+		}
 	} else {
 		// 标准缓存创建价格（per-token）
 		breakdown.CacheCreationCost = float64(tokens.CacheCreationTokens) * pricing.CacheCreationPricePerToken
@@ -281,10 +294,12 @@ func (s *BillingService) CalculateCostWithLongContext(model string, tokens Usage
 
 	// 范围内部分：正常计费
 	inRangeTokens := UsageTokens{
-		InputTokens:         inRangeInputTokens,
-		OutputTokens:        tokens.OutputTokens, // 输出只算一次
-		CacheCreationTokens: tokens.CacheCreationTokens,
-		CacheReadTokens:     inRangeCacheTokens,
+		InputTokens:           inRangeInputTokens,
+		OutputTokens:          tokens.OutputTokens, // 输出只算一次
+		CacheCreationTokens:   tokens.CacheCreationTokens,
+		CacheReadTokens:       inRangeCacheTokens,
+		CacheCreation5mTokens: tokens.CacheCreation5mTokens,
+		CacheCreation1hTokens: tokens.CacheCreation1hTokens,
 	}
 	inRangeCost, err := s.CalculateCost(model, inRangeTokens, rateMultiplier)
 	if err != nil {
@@ -298,7 +313,7 @@ func (s *BillingService) CalculateCostWithLongContext(model string, tokens Usage
 	}
 	outRangeCost, err := s.CalculateCost(model, outRangeTokens, rateMultiplier*extraMultiplier)
 	if err != nil {
-		return inRangeCost, nil // 出错时返回范围内成本
+		return inRangeCost, fmt.Errorf("out-range cost: %w", err)
 	}
 
 	// 合并成本
@@ -374,6 +389,14 @@ type ImagePriceConfig struct {
 	Price4K *float64 // 4K 尺寸价格（nil 表示使用默认值）
 }
 
+// SoraPriceConfig Sora 按次计费配置
+type SoraPriceConfig struct {
+	ImagePrice360          *float64
+	ImagePrice540          *float64
+	VideoPricePerRequest   *float64
+	VideoPricePerRequestHD *float64
+}
+
 // CalculateImageCost 计算图片生成费用
 // model: 请求的模型名称（用于获取 LiteLLM 默认价格）
 // imageSize: 图片尺寸 "1K", "2K", "4K"
@@ -392,6 +415,65 @@ func (s *BillingService) CalculateImageCost(model string, imageSize string, imag
 	totalCost := unitPrice * float64(imageCount)
 
 	// 应用倍率
+	if rateMultiplier <= 0 {
+		rateMultiplier = 1.0
+	}
+	actualCost := totalCost * rateMultiplier
+
+	return &CostBreakdown{
+		TotalCost:  totalCost,
+		ActualCost: actualCost,
+	}
+}
+
+// CalculateSoraImageCost 计算 Sora 图片按次费用
+func (s *BillingService) CalculateSoraImageCost(imageSize string, imageCount int, groupConfig *SoraPriceConfig, rateMultiplier float64) *CostBreakdown {
+	if imageCount <= 0 {
+		return &CostBreakdown{}
+	}
+
+	unitPrice := 0.0
+	if groupConfig != nil {
+		switch imageSize {
+		case "540":
+			if groupConfig.ImagePrice540 != nil {
+				unitPrice = *groupConfig.ImagePrice540
+			}
+		default:
+			if groupConfig.ImagePrice360 != nil {
+				unitPrice = *groupConfig.ImagePrice360
+			}
+		}
+	}
+
+	totalCost := unitPrice * float64(imageCount)
+	if rateMultiplier <= 0 {
+		rateMultiplier = 1.0
+	}
+	actualCost := totalCost * rateMultiplier
+
+	return &CostBreakdown{
+		TotalCost:  totalCost,
+		ActualCost: actualCost,
+	}
+}
+
+// CalculateSoraVideoCost 计算 Sora 视频按次费用
+func (s *BillingService) CalculateSoraVideoCost(model string, groupConfig *SoraPriceConfig, rateMultiplier float64) *CostBreakdown {
+	unitPrice := 0.0
+	if groupConfig != nil {
+		modelLower := strings.ToLower(model)
+		if strings.Contains(modelLower, "sora2pro-hd") {
+			if groupConfig.VideoPricePerRequestHD != nil {
+				unitPrice = *groupConfig.VideoPricePerRequestHD
+			}
+		}
+		if unitPrice <= 0 && groupConfig.VideoPricePerRequest != nil {
+			unitPrice = *groupConfig.VideoPricePerRequest
+		}
+	}
+
+	totalCost := unitPrice
 	if rateMultiplier <= 0 {
 		rateMultiplier = 1.0
 	}
