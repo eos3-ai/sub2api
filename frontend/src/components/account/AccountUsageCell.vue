@@ -290,7 +290,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
+import type { Account, AccountUsageInfo, GeminiCredentials } from '@/types'
 import { resolveCodexUsageWindow } from '@/utils/codexUsage'
 
 import UsageProgressBar from './UsageProgressBar.vue'
