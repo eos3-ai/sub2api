@@ -315,7 +315,9 @@ const startTest = async () => {
 
   try {
     // Create EventSource for SSE
-    const url = `/api/v1/admin/accounts/${props.account.id}/test`
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+    const baseUrl = API_BASE_URL.replace('/api/v1', '')
+    const url = `${baseUrl}/api/v1/admin/accounts/${props.account.id}/test`
 
     // Use fetch with streaming for SSE since EventSource doesn't support POST
     const response = await fetch(url, {
