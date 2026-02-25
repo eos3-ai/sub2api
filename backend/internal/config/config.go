@@ -611,6 +611,11 @@ type AnthropicAPIKeyMonitorConfig struct {
 	IncludeAccountIDs []int64 `mapstructure:"include_account_ids"`
 	// ExcludeAccountIDs optionally skips specific account IDs from monitoring.
 	ExcludeAccountIDs []int64 `mapstructure:"exclude_account_ids"`
+
+	// AvailableAccountAlertThreshold: when the number of schedulable Anthropic API-key accounts
+	// drops to or below this value, a DingTalk alert is fired. 0 disables the alert.
+	// Env: GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD
+	AvailableAccountAlertThreshold int `mapstructure:"available_account_alert_threshold"`
 }
 
 func (s *ServerConfig) Address() string {
@@ -1281,6 +1286,7 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.model_id", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_MODEL_ID")
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.include_account_ids", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")
 	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.exclude_account_ids", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")
+	_ = v.BindEnv("gateway.scheduling.anthropic_apikey_monitor.available_account_alert_threshold", "GATEWAY_SCHEDULING_ANTHROPIC_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD")
 
 	// Gateway TLS fingerprint simulation
 	_ = v.BindEnv("gateway.tls_fingerprint.enabled", "GATEWAY_TLS_FINGERPRINT_ENABLED")
@@ -1762,6 +1768,7 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.model_id", "")
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.include_account_ids", []int64{})
 	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.exclude_account_ids", []int64{})
+	viper.SetDefault("gateway.scheduling.anthropic_apikey_monitor.available_account_alert_threshold", 0)
 	viper.SetDefault("gateway.usage_record.worker_count", 128)
 	viper.SetDefault("gateway.usage_record.queue_size", 16384)
 	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 5)

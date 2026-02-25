@@ -49,6 +49,8 @@ type AnthropicAPIKeyMonitorService struct {
 
 	state map[int64]*anthropicAPIKeyMonitorState
 
+	lastAvailableAlertAt time.Time
+
 	dingtalk *DingtalkService
 }
 
@@ -242,8 +244,26 @@ func (s *AnthropicAPIKeyMonitorService) runOnce() {
 		}
 	}
 
+	// Count schedulable accounts before applying results.
+	schedulable := 0
+	for i := range targets {
+		if targets[i].Schedulable {
+			schedulable++
+		}
+	}
+
 	for res := range results {
-		s.applyResult(ctx, now, res)
+		schedulable += s.applyResult(ctx, now, res)
+	}
+
+	// Alert when available schedulable accounts fall to or below the configured threshold.
+	alertThreshold := s.effectiveAvailableAccountAlertThreshold()
+	if alertThreshold > 0 && schedulable <= alertThreshold {
+		const availableAlertCooldown = 5 * time.Minute
+		if now.Sub(s.lastAvailableAlertAt) >= availableAlertCooldown {
+			s.lastAvailableAlertAt = now
+			s.sendLowAvailableAccountAlert(schedulable, alertThreshold, now)
+		}
 	}
 }
 
@@ -348,6 +368,13 @@ func (s *AnthropicAPIKeyMonitorService) effectiveMaxConcurrency() int {
 	return n
 }
 
+func (s *AnthropicAPIKeyMonitorService) effectiveAvailableAccountAlertThreshold() int {
+	if s == nil || s.cfg == nil {
+		return 0
+	}
+	return s.cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.AvailableAccountAlertThreshold
+}
+
 func (s *AnthropicAPIKeyMonitorService) effectiveModelID() string {
 	if s == nil || s.cfg == nil {
 		return ""
@@ -400,9 +427,11 @@ func (s *AnthropicAPIKeyMonitorService) testAnthropicAPIKeyAccount(ctx context.C
 	return true, "", time.Since(startedAt)
 }
 
-func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now time.Time, res anthropicAPIKeyMonitorResult) {
+// applyResult processes a single monitor result and returns the change in schedulable count:
+// -1 if the account was just disabled, +1 if re-enabled, 0 if unchanged.
+func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now time.Time, res anthropicAPIKeyMonitorResult) int {
 	if res.AccountID <= 0 {
-		return
+		return 0
 	}
 
 	st := s.state[res.AccountID]
@@ -419,20 +448,20 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 
 		threshold := s.effectiveSuccessThreshold()
 		if st.ConsecutiveSuccesses < threshold {
-			return
+			return 0
 		}
 
 		// Recovery: only auto-resume accounts that were auto-disabled by this monitor.
 		if res.Account.Schedulable {
-			return
+			return 0
 		}
 		if !getExtraBool(res.Account.Extra, anthropicAPIKeyMonitorExtraAutoDisabledKey) {
-			return
+			return 0
 		}
 
 		if err := s.accountRepo.SetSchedulable(ctx, res.AccountID, true); err != nil {
 			slog.Warn("anthropic_apikey_monitor_enable_schedulable_failed", "account_id", res.AccountID, "error", err)
-			return
+			return 0
 		}
 		updates := map[string]any{
 			anthropicAPIKeyMonitorExtraAutoDisabledKey:    false,
@@ -443,10 +472,9 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 			slog.Warn("anthropic_apikey_monitor_update_extra_on_recovery_failed", "account_id", res.AccountID, "error", err)
 		}
 
-		s.sendRecoveryAlert(res.Account, threshold, res.Latency, now)
 		// Reset counters to avoid immediate flip-flop on transient next failures.
 		st.ConsecutiveSuccesses = 0
-		return
+		return +1
 	}
 
 	// Failure path.
@@ -456,17 +484,17 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 
 	threshold := s.effectiveFailureThreshold()
 	if st.ConsecutiveFailures < threshold {
-		return
+		return 0
 	}
 
 	// Only stop scheduling if currently schedulable.
 	if !res.Account.Schedulable {
-		return
+		return 0
 	}
 
 	if err := s.accountRepo.SetSchedulable(ctx, res.AccountID, false); err != nil {
 		slog.Warn("anthropic_apikey_monitor_disable_schedulable_failed", "account_id", res.AccountID, "error", err)
-		return
+		return 0
 	}
 
 	reason := st.LastError
@@ -486,8 +514,8 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 		slog.Warn("anthropic_apikey_monitor_update_extra_on_failure_failed", "account_id", res.AccountID, "error", err)
 	}
 
-	s.sendAbnormalAlert(res.Account, threshold, reason, res.Latency, now)
 	st.ConsecutiveFailures = 0
+	return -1
 }
 
 func getExtraBool(extra map[string]any, key string) bool {
@@ -502,90 +530,20 @@ func getExtraBool(extra map[string]any, key string) bool {
 	return ok && b
 }
 
-func (s *AnthropicAPIKeyMonitorService) sendAbnormalAlert(account Account, threshold int, reason string, latency time.Duration, now time.Time) {
+func (s *AnthropicAPIKeyMonitorService) sendLowAvailableAccountAlert(schedulable, threshold int, now time.Time) {
 	if s == nil || s.dingtalk == nil || !s.dingtalk.Enabled() {
 		return
 	}
 
-	name := strings.TrimSpace(account.Name)
-	if name == "" {
-		name = "(unnamed)"
-	}
-
-	title := fmt.Sprintf("账号告警: 调度已停止 %s (#%d)", name, account.ID)
+	title := fmt.Sprintf("账号告警: 可用 Anthropic API-key 账号不足 (剩余 %d)", schedulable)
 
 	sb := strings.Builder{}
-	sb.WriteString("### 【账号告警】Anthropic API-key 账号连通性异常，已停止调度\n\n")
-	sb.WriteString("**账号**：`")
-	sb.WriteString(escapeInlineCode(name))
-	sb.WriteString("` (#")
-	sb.WriteString(fmt.Sprintf("%d", account.ID))
-	sb.WriteString(")  \n")
-	sb.WriteString("**平台**：`")
-	sb.WriteString(escapeInlineCode(account.Platform))
+	sb.WriteString("### 【账号告警】Anthropic API-key 可用调度账号数量不足\n\n")
+	sb.WriteString("**当前可用账号数**：`")
+	sb.WriteString(fmt.Sprintf("%d", schedulable))
 	sb.WriteString("`  \n")
-	sb.WriteString("**类型**：`")
-	sb.WriteString(escapeInlineCode(account.Type))
-	sb.WriteString("`  \n")
-	sb.WriteString("**连续失败**：`")
+	sb.WriteString("**告警阈值**：`≤ ")
 	sb.WriteString(fmt.Sprintf("%d", threshold))
-	sb.WriteString("`  \n")
-	sb.WriteString("**耗时**：`")
-	sb.WriteString(latency.String())
-	sb.WriteString("`  \n")
-	sb.WriteString("**时间**：`")
-	sb.WriteString(escapeInlineCode(now.Format(time.RFC3339)))
-	sb.WriteString("`  \n")
-
-	reason = strings.TrimSpace(reason)
-	if reason != "" {
-		reason = strings.ReplaceAll(reason, "```", "'''")
-		reason = truncateString(reason, 1500)
-		sb.WriteString("\n\n**原因**\n")
-		sb.WriteString("```text\n")
-		sb.WriteString(reason)
-		sb.WriteString("\n```\n")
-	}
-
-	go func(title, text string) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.dingtalk.SendMarkdown(ctx, title, text); err != nil {
-			slog.Warn("anthropic_apikey_monitor_dingtalk_send_failed", "account_id", account.ID, "error", err)
-		}
-	}(title, sb.String())
-}
-
-func (s *AnthropicAPIKeyMonitorService) sendRecoveryAlert(account Account, threshold int, latency time.Duration, now time.Time) {
-	if s == nil || s.dingtalk == nil || !s.dingtalk.Enabled() {
-		return
-	}
-
-	name := strings.TrimSpace(account.Name)
-	if name == "" {
-		name = "(unnamed)"
-	}
-
-	title := fmt.Sprintf("账号恢复: 调度已启用 %s (#%d)", name, account.ID)
-
-	sb := strings.Builder{}
-	sb.WriteString("### 【账号恢复】Anthropic API-key 账号连通性恢复，已启用调度\n\n")
-	sb.WriteString("**账号**：`")
-	sb.WriteString(escapeInlineCode(name))
-	sb.WriteString("` (#")
-	sb.WriteString(fmt.Sprintf("%d", account.ID))
-	sb.WriteString(")  \n")
-	sb.WriteString("**平台**：`")
-	sb.WriteString(escapeInlineCode(account.Platform))
-	sb.WriteString("`  \n")
-	sb.WriteString("**类型**：`")
-	sb.WriteString(escapeInlineCode(account.Type))
-	sb.WriteString("`  \n")
-	sb.WriteString("**连续成功**：`")
-	sb.WriteString(fmt.Sprintf("%d", threshold))
-	sb.WriteString("`  \n")
-	sb.WriteString("**耗时**：`")
-	sb.WriteString(latency.String())
 	sb.WriteString("`  \n")
 	sb.WriteString("**时间**：`")
 	sb.WriteString(escapeInlineCode(now.Format(time.RFC3339)))
@@ -595,7 +553,7 @@ func (s *AnthropicAPIKeyMonitorService) sendRecoveryAlert(account Account, thres
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := s.dingtalk.SendMarkdown(ctx, title, text); err != nil {
-			slog.Warn("anthropic_apikey_monitor_dingtalk_send_failed", "account_id", account.ID, "error", err)
+			slog.Warn("anthropic_apikey_monitor_low_available_dingtalk_send_failed", "error", err)
 		}
 	}(title, sb.String())
 }
