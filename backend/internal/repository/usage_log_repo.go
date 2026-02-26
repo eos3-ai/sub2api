@@ -1518,32 +1518,39 @@ func (r *usageLogRepository) GetBatchUserUsageStats(ctx context.Context, userIDs
 type BatchAPIKeyUsageStats = usagestats.BatchAPIKeyUsageStats
 
 // GetBatchAPIKeyUsageStats gets today and total actual_cost for multiple API keys within a time range.
-// If startTime is zero, defaults to 30 days ago.
+// If both startTime and endTime are zero, returns all-time history (no time filter).
 func (r *usageLogRepository) GetBatchAPIKeyUsageStats(ctx context.Context, apiKeyIDs []int64, startTime, endTime time.Time) (map[int64]*BatchAPIKeyUsageStats, error) {
 	result := make(map[int64]*BatchAPIKeyUsageStats)
 	if len(apiKeyIDs) == 0 {
 		return result, nil
 	}
 
-	// 默认最近 30 天
-	if startTime.IsZero() {
-		startTime = time.Now().AddDate(0, 0, -30)
-	}
-	if endTime.IsZero() {
-		endTime = time.Now()
-	}
-
 	for _, id := range apiKeyIDs {
 		result[id] = &BatchAPIKeyUsageStats{APIKeyID: id}
 	}
 
-	query := `
+	var query string
+	var args []interface{}
+	args = append(args, pq.Array(apiKeyIDs))
+
+	if !startTime.IsZero() && !endTime.IsZero() {
+		query = `
 		SELECT api_key_id, COALESCE(SUM(actual_cost), 0) as total_cost
 		FROM usage_logs
 		WHERE api_key_id = ANY($1) AND created_at >= $2 AND created_at < $3
 		GROUP BY api_key_id
 	`
-	rows, err := r.sql.QueryContext(ctx, query, pq.Array(apiKeyIDs), startTime, endTime)
+		args = append(args, startTime, endTime)
+	} else {
+		query = `
+		SELECT api_key_id, COALESCE(SUM(actual_cost), 0) as total_cost
+		FROM usage_logs
+		WHERE api_key_id = ANY($1)
+		GROUP BY api_key_id
+	`
+	}
+
+	rows, err := r.sql.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
