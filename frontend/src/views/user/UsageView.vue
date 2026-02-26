@@ -126,7 +126,7 @@
               <button @click="resetFilters" class="btn btn-secondary">
                 {{ t('common.reset') }}
               </button>
-              <button @click="exportBillingToCSV" :disabled="exportingBilling" class="btn btn-secondary">
+              <button @click="exportBillingToCSV" :disabled="exportingBilling" class="btn btn-primary">
                 <svg
                   v-if="exportingBilling"
                   class="-ml-1 mr-2 h-4 w-4 animate-spin"
@@ -817,7 +817,6 @@ const exportToCSV = async () => {
       'Cache Creation Tokens',
       'Rate Multiplier',
       'Billed Cost',
-      'Original Cost',
       'First Token (ms)',
       'Duration (ms)'
     ]
@@ -834,7 +833,6 @@ const exportToCSV = async () => {
         log.cache_creation_tokens,
         log.rate_multiplier,
         log.actual_cost.toFixed(8),
-        log.total_cost.toFixed(8),
         log.first_token_ms ?? '',
         log.duration_ms
       ].map(escapeCSVValue)
@@ -893,6 +891,7 @@ const exportBillingToCSV = async () => {
 
     // Group by model and aggregate
     interface ModelBilling {
+      apiKeyName: string
       model: string
       totalCost: number
       totalTokens: number
@@ -902,7 +901,9 @@ const exportBillingToCSV = async () => {
     const modelMap = new Map<string, ModelBilling>()
 
     allLogs.forEach((log) => {
-      const existing = modelMap.get(log.model)
+      const apiKeyName = log.api_key?.name || ''
+      const key = `${apiKeyName}||${log.model}`
+      const existing = modelMap.get(key)
       const totalTokens = log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
 
       if (existing) {
@@ -910,7 +911,8 @@ const exportBillingToCSV = async () => {
         existing.totalTokens += totalTokens
         existing.totalRequests += 1
       } else {
-        modelMap.set(log.model, {
+        modelMap.set(key, {
+          apiKeyName,
           model: log.model,
           totalCost: log.actual_cost,
           totalTokens: totalTokens,
@@ -923,6 +925,7 @@ const exportBillingToCSV = async () => {
     const billingData = Array.from(modelMap.values()).sort((a, b) => b.totalCost - a.totalCost)
 
     const headers = [
+      'API Key Name',
       'Model',
       'Billed Cost',
       'Total Tokens',
@@ -931,6 +934,7 @@ const exportBillingToCSV = async () => {
 
     const rows = billingData.map((item) =>
       [
+        item.apiKeyName,
         item.model,
         item.totalCost.toFixed(8),
         item.totalTokens,
