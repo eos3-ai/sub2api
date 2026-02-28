@@ -214,19 +214,6 @@ func parsePaymentOrderFilter(c *gin.Context) (service.PaymentOrderFilter, error)
 		filter.Status = strings.ToLower(s)
 	}
 
-	userQuery := strings.TrimSpace(c.Query("user_email"))
-	if userQuery == "" {
-		// Backward compatible param name in frontend: `user`
-		userQuery = strings.TrimSpace(c.Query("user"))
-	}
-	if userQuery != "" {
-		// Only accept email-based filtering in this deployment.
-		if !strings.Contains(userQuery, "@") {
-			return filter, fmt.Errorf("invalid user_email (must be an email)")
-		}
-		return filter, fmt.Errorf("user email filter requires user repository")
-	}
-
 	if s := strings.TrimSpace(c.Query("from")); s != "" {
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
@@ -240,6 +227,19 @@ func parsePaymentOrderFilter(c *gin.Context) (service.PaymentOrderFilter, error)
 			return filter, fmt.Errorf("invalid to (use RFC3339)")
 		}
 		filter.To = &t
+	}
+
+	userQuery := strings.TrimSpace(c.Query("user_email"))
+	if userQuery == "" {
+		// Backward compatible param name in frontend: `user`
+		userQuery = strings.TrimSpace(c.Query("user"))
+	}
+	if userQuery != "" {
+		// Only accept email-based filtering in this deployment.
+		if !strings.Contains(userQuery, "@") {
+			return filter, fmt.Errorf("invalid user_email (must be an email)")
+		}
+		return filter, fmt.Errorf("user email filter requires user repository")
 	}
 
 	return filter, nil
