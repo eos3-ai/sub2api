@@ -2,20 +2,32 @@
   <AppLayout>
     <TablePageLayout>
       <template #actions>
-        <div class="flex justify-end gap-3">
-        <button
-          @click="loadApiKeys"
-          :disabled="loading"
-          class="btn btn-secondary"
-          :title="t('common.refresh')"
-        >
-          <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
-        </button>
-        <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
-          <Icon name="plus" size="md" class="mr-2" />
-          {{ t('keys.createKey') }}
-        </button>
-      </div>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div class="w-full lg:max-w-[520px]">
+            <div
+              class="rounded-lg border border-blue-100 bg-blue-50/90 px-3 py-2 text-xs text-blue-900 shadow-sm backdrop-blur dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-100"
+            >
+              <div class="flex items-start gap-2">
+                <Icon name="infoCircle" size="sm" class="mt-0.5 text-blue-600 dark:text-blue-400" />
+                <p class="leading-relaxed">{{ t('keys.rateMultiplierNotice') }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="ml-auto flex items-center gap-3">
+            <button
+              @click="loadApiKeys"
+              :disabled="loading"
+              class="btn btn-secondary"
+              :title="t('common.refresh')"
+            >
+              <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
+            </button>
+            <button @click="showCreateModal = true" class="btn btn-primary" data-tour="keys-create-btn">
+              <Icon name="plus" size="md" class="mr-2" />
+              {{ t('keys.createKey') }}
+            </button>
+          </div>
+        </div>
       </template>
 
       <template #table>
