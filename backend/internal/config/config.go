@@ -1222,6 +1222,7 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("server.mode", "SERVER_MODE", "GIN_MODE")
 	_ = v.BindEnv("run_mode", "RUN_MODE")
 	_ = v.BindEnv("timezone", "TIMEZONE", "TZ")
+	_ = v.BindEnv("server.frontend_url", "SERVER_FRONTEND_URL", "PAYMENT_BASE_URL")
 
 	// Database
 	_ = v.BindEnv("database.host", "DATABASE_HOST")
