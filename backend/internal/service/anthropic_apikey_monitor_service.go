@@ -191,7 +191,7 @@ func (s *AnthropicAPIKeyMonitorService) runOnce() {
 	}
 
 	ctx := s.stopCtx
-	accounts, err := s.accountRepo.ListByPlatform(ctx, PlatformAnthropic)
+	accounts, err := s.accountRepo.ListByPlatformForMonitor(ctx, PlatformAnthropic)
 	if err != nil {
 		slog.Warn("anthropic_apikey_monitor_list_accounts_failed", "error", err)
 		return
@@ -245,9 +245,10 @@ func (s *AnthropicAPIKeyMonitorService) runOnce() {
 	}
 
 	// Count schedulable accounts before applying results.
+	// Exclude error accounts: even if schedulable=true, they are not usable.
 	schedulable := 0
 	for i := range targets {
-		if targets[i].Schedulable {
+		if targets[i].Status == StatusActive && targets[i].Schedulable {
 			schedulable++
 		}
 	}
@@ -297,8 +298,8 @@ func (s *AnthropicAPIKeyMonitorService) selectTargets(accounts []Account) []Acco
 		if acc.Type != AccountTypeAPIKey {
 			continue
 		}
-		// Only active accounts; schedulable may be toggled by this monitor.
-		if acc.Status != StatusActive {
+		// Active and error accounts; error accounts may be restored by this monitor.
+		if acc.Status != StatusActive && acc.Status != StatusError {
 			continue
 		}
 		if hasInclude {
@@ -451,7 +452,25 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 			return 0
 		}
 
-		// Recovery: only auto-resume accounts that were auto-disabled by this monitor.
+		// Case 1: account is in error state — call ClearError to restore it to active.
+		if res.Account.Status == StatusError {
+			if err := s.accountRepo.ClearError(ctx, res.AccountID); err != nil {
+				slog.Warn("anthropic_apikey_monitor_clear_error_failed", "account_id", res.AccountID, "error", err)
+				return 0
+			}
+			updates := map[string]any{
+				anthropicAPIKeyMonitorExtraRecoveredAtKey:     now.Format(time.RFC3339),
+				anthropicAPIKeyMonitorExtraRecoveredReasonKey: fmt.Sprintf("consecutive_successes=%d", threshold),
+			}
+			if err := s.accountRepo.UpdateExtra(ctx, res.AccountID, updates); err != nil {
+				slog.Warn("anthropic_apikey_monitor_update_extra_on_error_recovery_failed", "account_id", res.AccountID, "error", err)
+			}
+			slog.Info("anthropic_apikey_monitor_error_cleared", "account_id", res.AccountID, "consecutive_successes", threshold)
+			st.ConsecutiveSuccesses = 0
+			return +1
+		}
+
+		// Case 2: recovery — only auto-resume accounts that were auto-disabled by this monitor.
 		if res.Account.Schedulable {
 			return 0
 		}
@@ -487,8 +506,8 @@ func (s *AnthropicAPIKeyMonitorService) applyResult(ctx context.Context, now tim
 		return 0
 	}
 
-	// Only stop scheduling if currently schedulable.
-	if !res.Account.Schedulable {
+	// Only stop scheduling if currently schedulable and not already in error state.
+	if !res.Account.Schedulable || res.Account.Status == StatusError {
 		return 0
 	}
 
