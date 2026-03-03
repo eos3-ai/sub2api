@@ -5,7 +5,8 @@
 import { apiClient } from '../client'
 import type { PaginatedResponse } from '@/types'
 
-export type AdminInvoiceStatus = 'submitted' | 'approved' | 'rejected' | 'issued' | 'cancelled'
+export type AdminInvoiceStatus = 'submitted' | 'approved' | 'rejected' | 'issuing' | 'issued' | 'cancelled'
+export type AdminInvoiceProvider = 'manual' | 'nuonuo'
 export type AdminInvoiceType = 'normal' | 'special'
 export type AdminInvoiceBuyerType = 'personal' | 'company'
 
@@ -44,6 +45,12 @@ export interface AdminInvoiceRequest {
   invoice_number?: string
   invoice_date?: string
   invoice_pdf_url?: string
+
+  // Auto-issue provider info
+  provider?: AdminInvoiceProvider
+  provider_invoice_id?: string
+  provider_error?: string
+  issuing_started_at?: string
 
   created_at: string
   updated_at: string
@@ -118,6 +125,11 @@ export async function issue(
   return data
 }
 
+export async function retryIssue(id: number): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>(`/admin/invoices/${id}/retry-issue`)
+  return data
+}
+
 export async function exportRecords(filters?: {
   status?: AdminInvoiceStatus | ''
   user_email?: string
@@ -142,6 +154,7 @@ export const invoicesAPI = {
   approve,
   reject,
   issue,
+  retryIssue,
   exportRecords
 }
 

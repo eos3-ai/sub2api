@@ -544,6 +544,7 @@ export default {
 
     statusSubmitted: 'Submitted',
     statusApproved: 'Approved',
+    statusIssuing: 'Issuing',
     statusRejected: 'Rejected',
     statusIssued: 'Issued',
     statusCancelled: 'Cancelled'
@@ -1160,7 +1161,16 @@ export default {
       invoicePdfUrl: 'Invoice URL',
       invoicePdfUrlPlaceholder: 'https://...',
       invoicePdfUrlRequired: 'Invoice URL is required',
-      issueSuccess: 'Invoice request marked as issued'
+      issueSuccess: 'Invoice request marked as issued',
+      // Auto-issue via provider
+      provider: 'Issue Method',
+      providerManual: 'Manual',
+      providerNuonuo: 'Nuonuo Auto',
+      providerError: 'Issue Error',
+      issuingHint: 'Calling Nuonuo API to issue invoice...',
+      retryIssue: 'Retry Auto-Issue',
+      retryIssueConfirm: 'Retry auto-issue for this invoice?',
+      retryIssueSuccess: 'Auto-issue triggered. Refresh to see status update.'
     },
 
     // Users

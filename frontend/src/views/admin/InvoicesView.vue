@@ -132,10 +132,11 @@
             </div>
             <div class="rounded-xl border border-gray-100 bg-white p-4 dark:border-dark-800 dark:bg-dark-900">
               <div class="text-xs font-semibold text-gray-500 dark:text-dark-400">{{ t('common.status') }}</div>
-              <div class="mt-1">
+              <div class="mt-1 flex items-center gap-2">
                 <span :class="['badge', statusBadgeClass(detail.invoice.status)]">
                   {{ invoiceStatusLabel(detail.invoice.status) }}
                 </span>
+                <span v-if="detail.invoice.status === 'issuing'" class="text-xs text-gray-400 dark:text-dark-400 animate-pulse">{{ t('admin.invoices.issuingHint') }}</span>
               </div>
             </div>
             <div class="rounded-xl border border-gray-100 bg-white p-4 dark:border-dark-800 dark:bg-dark-900">
@@ -249,6 +250,17 @@
                 </p>
               </div>
 
+              <div v-if="detail.invoice.provider && detail.invoice.provider !== 'manual'" class="sm:col-span-2">
+                <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.invoices.provider') }}</p>
+                <p class="mt-1 text-sm text-gray-900 dark:text-white">{{ providerLabel(detail.invoice.provider) }}</p>
+              </div>
+              <div v-if="detail.invoice.provider_error" class="sm:col-span-2">
+                <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('admin.invoices.providerError') }}</p>
+                <p class="mt-1 whitespace-pre-wrap text-sm text-amber-600 dark:text-amber-400">
+                  {{ detail.invoice.provider_error }}
+                </p>
+              </div>
+
               <div v-if="detail.invoice.status === 'issued'" class="sm:col-span-2">
                 <div class="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -342,6 +354,14 @@
               @click="openReject"
             >
               {{ t('admin.invoices.reject') }}
+            </button>
+            <button
+              v-if="detail?.invoice.status === 'approved' && detail?.invoice.provider === 'nuonuo'"
+              class="btn btn-secondary"
+              :disabled="retrying"
+              @click="retryAutoIssue"
+            >
+              {{ retrying ? t('common.loading') : t('admin.invoices.retryIssue') }}
             </button>
             <button
               v-if="detail?.invoice.status === 'approved'"
@@ -454,7 +474,7 @@ import Modal from '@/components/common/Modal.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { adminAPI } from '@/api/admin'
 import type { Column } from '@/components/common/types'
-import type { AdminInvoiceRequest, AdminInvoiceStatus } from '@/api/admin/invoices'
+import type { AdminInvoiceRequest, AdminInvoiceStatus, AdminInvoiceProvider } from '@/api/admin/invoices'
 import { formatDateTime } from '@/utils/format'
 import { useAppStore } from '@/stores'
 
@@ -505,6 +525,7 @@ const statusOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: t('invoice.statusSubmitted'), value: 'submitted' },
   { label: t('invoice.statusApproved'), value: 'approved' },
+  { label: t('invoice.statusIssuing'), value: 'issuing' },
   { label: t('invoice.statusRejected'), value: 'rejected' },
   { label: t('invoice.statusIssued'), value: 'issued' },
   { label: t('invoice.statusCancelled'), value: 'cancelled' }
@@ -571,6 +592,8 @@ function invoiceStatusLabel(value: string): string {
       return t('invoice.statusSubmitted')
     case 'approved':
       return t('invoice.statusApproved')
+    case 'issuing':
+      return t('invoice.statusIssuing')
     case 'rejected':
       return t('invoice.statusRejected')
     case 'issued':
@@ -589,6 +612,8 @@ function statusBadgeClass(value: string): string {
       return 'badge-warning'
     case 'approved':
       return 'badge-purple'
+    case 'issuing':
+      return 'badge-warning'
     case 'issued':
       return 'badge-success'
     case 'rejected':
@@ -598,6 +623,11 @@ function statusBadgeClass(value: string): string {
     default:
       return 'badge-gray'
   }
+}
+
+function providerLabel(value: AdminInvoiceProvider | string | undefined): string {
+  if (value === 'nuonuo') return t('admin.invoices.providerNuonuo')
+  return t('admin.invoices.providerManual')
 }
 
 type InvoiceListQuery = {
@@ -684,6 +714,7 @@ const detailLoading = ref(false)
 const detail = ref<Awaited<ReturnType<typeof adminAPI.invoices.getByID>> | null>(null)
 
 const approving = ref(false)
+const retrying = ref(false)
 
 const rejectOpen = ref(false)
 const rejecting = ref(false)
@@ -764,6 +795,25 @@ async function submitReject() {
     appStore.showError(String((err as { message?: string })?.message || t('common.error')))
   } finally {
     rejecting.value = false
+  }
+}
+
+async function retryAutoIssue() {
+  const invoice = detail.value?.invoice
+  if (!invoice) return
+  if (!confirm(t('admin.invoices.retryIssueConfirm'))) return
+
+  retrying.value = true
+  try {
+    await adminAPI.invoices.retryIssue(invoice.id)
+    appStore.showSuccess(t('admin.invoices.retryIssueSuccess'))
+    await loadList()
+    // Refresh detail
+    detail.value = await adminAPI.invoices.getByID(invoice.id)
+  } catch (err) {
+    appStore.showError(String((err as { message?: string })?.message || t('common.error')))
+  } finally {
+    retrying.value = false
   }
 }
 

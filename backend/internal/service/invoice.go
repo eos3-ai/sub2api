@@ -6,8 +6,14 @@ const (
 	InvoiceStatusSubmitted = "submitted"
 	InvoiceStatusApproved  = "approved"
 	InvoiceStatusRejected  = "rejected"
+	InvoiceStatusIssuing   = "issuing" // auto-issue in progress
 	InvoiceStatusIssued    = "issued"
 	InvoiceStatusCancelled = "cancelled"
+)
+
+const (
+	InvoiceProviderManual = "manual"
+	InvoiceProviderNuonuo = "nuonuo"
 )
 
 const (
@@ -54,6 +60,12 @@ type InvoiceRequest struct {
 	InvoiceNumber string
 	InvoiceDate   *time.Time
 	InvoicePDFURL string
+
+	// Auto-issue via third-party provider (e.g. nuonuo)
+	Provider          string
+	ProviderInvoiceID string
+	ProviderError     string
+	IssuingStartedAt  *time.Time
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

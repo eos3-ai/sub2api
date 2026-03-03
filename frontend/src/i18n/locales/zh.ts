@@ -542,6 +542,7 @@ export default {
 
     statusSubmitted: '已提交',
     statusApproved: '已审核',
+    statusIssuing: '开票中',
     statusRejected: '已驳回',
     statusIssued: '已开票',
     statusCancelled: '已撤销'
@@ -1181,7 +1182,16 @@ export default {
       invoicePdfUrl: '发票链接',
       invoicePdfUrlPlaceholder: 'https://...',
       invoicePdfUrlRequired: '请输入发票链接',
-      issueSuccess: '已标记为已开票'
+      issueSuccess: '已标记为已开票',
+      // Auto-issue via provider
+      provider: '开票方式',
+      providerManual: '手动开票',
+      providerNuonuo: '诺诺自动开票',
+      providerError: '开票失败原因',
+      issuingHint: '正在调用诺诺 API 开票，请稍候...',
+      retryIssue: '重试自动开票',
+      retryIssueConfirm: '确认重新触发自动开票？',
+      retryIssueSuccess: '已触发自动开票，请稍后刷新查看状态'
     },
 
     // Users Management

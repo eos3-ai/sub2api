@@ -461,6 +461,7 @@ func registerInvoiceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		invoices.POST("/:id/approve", h.Admin.Invoices.Approve)
 		invoices.POST("/:id/reject", h.Admin.Invoices.Reject)
 		invoices.POST("/:id/issue", h.Admin.Invoices.Issue)
+		invoices.POST("/:id/retry-issue", h.Admin.Invoices.RetryIssue)
 	}
 }
 

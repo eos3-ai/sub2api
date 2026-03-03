@@ -401,3 +401,19 @@ func (h *InvoiceHandler) fetchAll(ctx context.Context, filter service.InvoiceReq
 		}
 	}
 }
+
+// RetryIssue triggers auto-issue for a previously failed approved invoice.
+// POST /api/v1/admin/invoices/:id/retry-issue
+func (h *InvoiceHandler) RetryIssue(c *gin.Context) {
+	id, err := strconv.ParseInt(strings.TrimSpace(c.Param("id")), 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid id")
+		return
+	}
+
+	if err := h.invoiceService.AdminRetryAutoIssue(c.Request.Context(), id); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, gin.H{"message": "auto-issue triggered"})
+}

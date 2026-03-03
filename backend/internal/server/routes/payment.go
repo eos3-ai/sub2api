@@ -26,3 +26,12 @@ func RegisterPaymentCallbackRoutes(r *gin.Engine, h *handler.Handlers) {
 	r.GET("/payment/success", h.Payment.PaymentReturn)
 	r.GET("/payment/cancel", h.Payment.PaymentReturn)
 }
+
+// RegisterInvoiceWebhookRoutes registers invoice provider callbacks (no auth).
+func RegisterInvoiceWebhookRoutes(r *gin.Engine, h *handler.Handlers) {
+	if r == nil || h == nil || h.Invoice == nil {
+		return
+	}
+	// Nuonuo e-invoice callback
+	r.POST("/api/invoice/webhook/nuonuo", h.Invoice.HandleNuonuoWebhook)
+}

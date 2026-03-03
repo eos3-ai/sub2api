@@ -34,8 +34,13 @@ type InvoiceRequest struct {
 	InvoiceNumber    string     `json:"invoice_number,omitempty"`
 	InvoiceDate      *time.Time `json:"invoice_date,omitempty"`
 	InvoicePDFURL    string     `json:"invoice_pdf_url,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt        time.Time  `json:"updated_at"`
+	// Provider info
+	Provider          string     `json:"provider,omitempty"`
+	ProviderInvoiceID string     `json:"provider_invoice_id,omitempty"`
+	ProviderError     string     `json:"provider_error,omitempty"`
+	IssuingStartedAt  *time.Time `json:"issuing_started_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 func InvoiceRequestFromService(r *service.InvoiceRequest) *InvoiceRequest {
@@ -69,6 +74,10 @@ func InvoiceRequestFromService(r *service.InvoiceRequest) *InvoiceRequest {
 		InvoiceNumber:    r.InvoiceNumber,
 		InvoiceDate:      r.InvoiceDate,
 		InvoicePDFURL:    r.InvoicePDFURL,
+		Provider:          r.Provider,
+		ProviderInvoiceID: r.ProviderInvoiceID,
+		ProviderError:     r.ProviderError,
+		IssuingStartedAt:  r.IssuingStartedAt,
 		CreatedAt:        r.CreatedAt,
 		UpdatedAt:        r.UpdatedAt,
 	}

@@ -832,6 +832,27 @@ type PaymentConfig struct {
 	Packages           []PaymentPackage `mapstructure:"packages"`
 	Zpay               ZpayConfig       `mapstructure:"zpay"`
 	Stripe             StripeConfig     `mapstructure:"stripe"`
+	Invoice            InvoiceConfig    `mapstructure:"invoice"`
+}
+
+type InvoiceConfig struct {
+	// Provider controls which backend issues invoices automatically.
+	// "manual" (default): admin enters invoice info manually.
+	// "nuonuo": auto-issue via Nuonuo (诺诺) API after approval.
+	Provider string       `mapstructure:"provider"`
+	Nuonuo   NuonuoConfig `mapstructure:"nuonuo"`
+}
+
+type NuonuoConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	AppKey        string `mapstructure:"app_key"`
+	AppSecret     string `mapstructure:"app_secret"`
+	TaxNo         string `mapstructure:"tax_no"`         // 销方税号
+	SellerName    string `mapstructure:"seller_name"`    // 销方名称
+	SellerAddress string `mapstructure:"seller_address"` // 销方地址电话
+	SellerBank    string `mapstructure:"seller_bank"`    // 销方开户行及账号
+	APIURL        string `mapstructure:"api_url"`        // 诺诺 API 地址, default: https://api.nuonuoyun.com
+	WebhookSecret string `mapstructure:"webhook_secret"` // 回调签名密钥
 }
 
 type PaymentPackage struct {
@@ -1339,6 +1360,18 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("payment.stripe.cancel_url", "PAYMENT_STRIPE_CANCEL_URL", "STRIPE_CANCEL_URL")
 	_ = v.BindEnv("payment.stripe.wechat_client", "PAYMENT_STRIPE_WECHAT_CLIENT", "STRIPE_WECHAT_CLIENT")
 	_ = v.BindEnv("payment.stripe.wechat_app_id", "PAYMENT_STRIPE_WECHAT_APP_ID", "STRIPE_WECHAT_APP_ID")
+
+	// Payment.Invoice (Nuonuo auto-issue)
+	_ = v.BindEnv("payment.invoice.provider", "PAYMENT_INVOICE_PROVIDER", "NUONUO_PROVIDER")
+	_ = v.BindEnv("payment.invoice.nuonuo.enabled", "PAYMENT_INVOICE_NUONUO_ENABLED", "NUONUO_ENABLED")
+	_ = v.BindEnv("payment.invoice.nuonuo.app_key", "PAYMENT_INVOICE_NUONUO_APP_KEY", "NUONUO_APP_KEY")
+	_ = v.BindEnv("payment.invoice.nuonuo.app_secret", "PAYMENT_INVOICE_NUONUO_APP_SECRET", "NUONUO_APP_SECRET")
+	_ = v.BindEnv("payment.invoice.nuonuo.tax_no", "PAYMENT_INVOICE_NUONUO_TAX_NO", "NUONUO_TAX_NO")
+	_ = v.BindEnv("payment.invoice.nuonuo.seller_name", "PAYMENT_INVOICE_NUONUO_SELLER_NAME", "NUONUO_SELLER_NAME")
+	_ = v.BindEnv("payment.invoice.nuonuo.seller_address", "PAYMENT_INVOICE_NUONUO_SELLER_ADDRESS", "NUONUO_SELLER_ADDRESS")
+	_ = v.BindEnv("payment.invoice.nuonuo.seller_bank", "PAYMENT_INVOICE_NUONUO_SELLER_BANK", "NUONUO_SELLER_BANK")
+	_ = v.BindEnv("payment.invoice.nuonuo.api_url", "PAYMENT_INVOICE_NUONUO_API_URL", "NUONUO_API_URL")
+	_ = v.BindEnv("payment.invoice.nuonuo.webhook_secret", "PAYMENT_INVOICE_NUONUO_WEBHOOK_SECRET", "NUONUO_WEBHOOK_SECRET")
 }
 
 // bindLegacyEnvAliases binds legacy (non-namespaced) env vars to the current config keys.

@@ -229,6 +229,15 @@ func (r *invoiceRepository) UpdateInvoiceRequest(ctx context.Context, req *servi
 	if req.InvoiceDate != nil {
 		invoiceDate = sql.NullTime{Time: *req.InvoiceDate, Valid: true}
 	}
+	var issuingStartedAt sql.NullTime
+	if req.IssuingStartedAt != nil {
+		issuingStartedAt = sql.NullTime{Time: *req.IssuingStartedAt, Valid: true}
+	}
+
+	provider := req.Provider
+	if provider == "" {
+		provider = service.InvoiceProviderManual
+	}
 
 	err := scanSingleRow(
 		ctx,
@@ -244,6 +253,10 @@ SET status=$2,
     invoice_number=$8,
     invoice_date=$9,
     invoice_pdf_url=$10,
+    provider=$11,
+    provider_invoice_id=$12,
+    provider_error=$13,
+    issuing_started_at=$14,
     updated_at=NOW()
 WHERE id=$1
 RETURNING updated_at
@@ -259,6 +272,10 @@ RETURNING updated_at
 			req.InvoiceNumber,
 			invoiceDate,
 			req.InvoicePDFURL,
+			provider,
+			req.ProviderInvoiceID,
+			req.ProviderError,
+			issuingStartedAt,
 		},
 		&req.UpdatedAt,
 	)
@@ -310,6 +327,7 @@ SELECT id, invoice_request_no, user_id, status,
        amount_cny_total, total_usd_total,
        reviewed_by, reviewed_at, reject_reason,
        issued_by, issued_at, invoice_number, invoice_date, invoice_pdf_url,
+       COALESCE(provider, 'manual'), COALESCE(provider_invoice_id, ''), COALESCE(provider_error, ''), issuing_started_at,
        created_at, updated_at
 FROM invoice_requests
 %s
@@ -357,6 +375,7 @@ SELECT id, invoice_request_no, user_id, status,
        amount_cny_total, total_usd_total,
        reviewed_by, reviewed_at, reject_reason,
        issued_by, issued_at, invoice_number, invoice_date, invoice_pdf_url,
+       COALESCE(provider, 'manual'), COALESCE(provider_invoice_id, ''), COALESCE(provider_error, ''), issuing_started_at,
        created_at, updated_at
 FROM invoice_requests
 WHERE id = $1
@@ -580,6 +599,48 @@ RETURNING id, created_at, updated_at
 	return err
 }
 
+func (r *invoiceRepository) GetInvoiceRequestByProviderInvoiceID(ctx context.Context, providerInvoiceID string) (*service.InvoiceRequest, error) {
+	if providerInvoiceID == "" {
+		return nil, nil
+	}
+	exec := sqlExecutorFromContext(ctx, r.db)
+
+	rows, err := exec.QueryContext(
+		ctx,
+		`
+SELECT id, invoice_request_no, user_id, status,
+       invoice_type, buyer_type, invoice_title, tax_no,
+       buyer_address, buyer_phone, buyer_bank_name, buyer_bank_account,
+       receiver_email, receiver_phone,
+       invoice_item_name, remark,
+       amount_cny_total, total_usd_total,
+       reviewed_by, reviewed_at, reject_reason,
+       issued_by, issued_at, invoice_number, invoice_date, invoice_pdf_url,
+       COALESCE(provider, 'manual'), COALESCE(provider_invoice_id, ''), COALESCE(provider_error, ''), issuing_started_at,
+       created_at, updated_at
+FROM invoice_requests
+WHERE provider_invoice_id = $1
+LIMIT 1
+`,
+		providerInvoiceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	if !rows.Next() {
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		return nil, nil
+	}
+	item, err := scanInvoiceRequest(rows)
+	if err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 type sqlInvoiceRequestScanner interface {
 	Scan(dest ...any) error
 }
@@ -591,6 +652,7 @@ func scanInvoiceRequest(s sqlInvoiceRequestScanner) (*service.InvoiceRequest, er
 	var issuedBy sql.NullInt64
 	var issuedAt sql.NullTime
 	var invoiceDate sql.NullTime
+	var issuingStartedAt sql.NullTime
 
 	if err := s.Scan(
 		&req.ID,
@@ -619,6 +681,10 @@ func scanInvoiceRequest(s sqlInvoiceRequestScanner) (*service.InvoiceRequest, er
 		&req.InvoiceNumber,
 		&invoiceDate,
 		&req.InvoicePDFURL,
+		&req.Provider,
+		&req.ProviderInvoiceID,
+		&req.ProviderError,
+		&issuingStartedAt,
 		&req.CreatedAt,
 		&req.UpdatedAt,
 	); err != nil {
@@ -644,6 +710,13 @@ func scanInvoiceRequest(s sqlInvoiceRequestScanner) (*service.InvoiceRequest, er
 	if invoiceDate.Valid {
 		t := invoiceDate.Time
 		req.InvoiceDate = &t
+	}
+	if issuingStartedAt.Valid {
+		t := issuingStartedAt.Time
+		req.IssuingStartedAt = &t
+	}
+	if req.Provider == "" {
+		req.Provider = service.InvoiceProviderManual
 	}
 
 	return &req, nil

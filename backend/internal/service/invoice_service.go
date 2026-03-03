@@ -10,6 +10,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
@@ -47,6 +48,8 @@ type InvoiceService struct {
 	settingService *SettingService
 	emailService   *EmailService
 	entClient      *dbent.Client
+	cfg            *config.Config
+	nuonuoService  *NuonuoInvoiceService
 }
 
 func NewInvoiceService(
@@ -54,12 +57,16 @@ func NewInvoiceService(
 	settingService *SettingService,
 	emailService *EmailService,
 	entClient *dbent.Client,
+	cfg *config.Config,
+	nuonuoService *NuonuoInvoiceService,
 ) *InvoiceService {
 	return &InvoiceService{
 		repo:           repo,
 		settingService: settingService,
 		emailService:   emailService,
 		entClient:      entClient,
+		cfg:            cfg,
+		nuonuoService:  nuonuoService,
 	}
 }
 
@@ -368,6 +375,10 @@ func (s *InvoiceService) AdminApproveInvoiceRequest(ctx context.Context, adminID
 		req.RejectReason = ""
 		req.ReviewedBy = &adminID
 		req.ReviewedAt = &now
+		req.Provider = InvoiceProviderManual
+		if s.shouldAutoIssue() {
+			req.Provider = InvoiceProviderNuonuo
+		}
 
 		if err := s.repo.UpdateInvoiceRequest(txCtx, req); err != nil {
 			return err
@@ -377,7 +388,214 @@ func (s *InvoiceService) AdminApproveInvoiceRequest(ctx context.Context, adminID
 	}); err != nil {
 		return nil, err
 	}
+
+	// Trigger async auto-issue after successful approval.
+	if s.shouldAutoIssue() {
+		go s.autoIssueInvoiceAsync(context.Background(), id)
+	}
+
 	return updated, nil
+}
+
+func (s *InvoiceService) shouldAutoIssue() bool {
+	if s == nil || s.cfg == nil || s.nuonuoService == nil {
+		return false
+	}
+	return strings.ToLower(strings.TrimSpace(s.cfg.Payment.Invoice.Provider)) == InvoiceProviderNuonuo &&
+		s.cfg.Payment.Invoice.Nuonuo.Enabled
+}
+
+func (s *InvoiceService) autoIssueInvoiceAsync(ctx context.Context, invoiceRequestID int64) {
+	// 1. Transition to "issuing".
+	now := time.Now()
+	var req *InvoiceRequest
+	if err := s.withTx(ctx, func(txCtx context.Context) error {
+		r, err := s.repo.GetInvoiceRequestByID(txCtx, invoiceRequestID)
+		if err != nil {
+			return err
+		}
+		if r == nil || r.Status != InvoiceStatusApproved {
+			return fmt.Errorf("invoice %d not in approved state", invoiceRequestID)
+		}
+		r.Status = InvoiceStatusIssuing
+		r.IssuingStartedAt = &now
+		r.ProviderError = ""
+		if err := s.repo.UpdateInvoiceRequest(txCtx, r); err != nil {
+			return err
+		}
+		req = r
+		return nil
+	}); err != nil {
+		log.Printf("[Invoice] auto-issue: set issuing failed: invoice_id=%d err=%v", invoiceRequestID, err)
+		return
+	}
+
+	// 2. Fetch order items for amount info.
+	items, err := s.repo.ListInvoiceOrderItems(ctx, invoiceRequestID)
+	if err != nil {
+		log.Printf("[Invoice] auto-issue: list items failed: invoice_id=%d err=%v", invoiceRequestID, err)
+		s.revertIssuingToApproved(ctx, invoiceRequestID, fmt.Sprintf("获取订单明细失败: %v", err))
+		return
+	}
+
+	// 3. Call Nuonuo API.
+	issueReq := &NuonuoIssueRequest{
+		InvoiceType:      req.InvoiceType,
+		OrderNo:          req.InvoiceRequestNo,
+		BuyerName:        req.InvoiceTitle,
+		BuyerTaxNo:       req.TaxNo,
+		BuyerAddress:     req.BuyerAddress,
+		BuyerPhone:       req.BuyerPhone,
+		BuyerBankName:    req.BuyerBankName,
+		BuyerBankAccount: req.BuyerBankAccount,
+		ReceiverEmail:    req.ReceiverEmail,
+		ItemName:         req.InvoiceItemName,
+		TotalAmountCNY:   req.AmountCNYTotal,
+	}
+	_ = items // items used for amount total which is already on the request
+
+	nuonuoResp, err := s.nuonuoService.IssueInvoice(ctx, issueReq)
+	if err != nil {
+		log.Printf("[Invoice] auto-issue: nuonuo API failed: invoice_id=%d err=%v", invoiceRequestID, err)
+		s.revertIssuingToApproved(ctx, invoiceRequestID, err.Error())
+		return
+	}
+
+	// 4. Save provider_invoice_id; status stays "issuing" until webhook arrives.
+	if err := s.withTx(ctx, func(txCtx context.Context) error {
+		r, err := s.repo.GetInvoiceRequestByID(txCtx, invoiceRequestID)
+		if err != nil {
+			return err
+		}
+		if r == nil {
+			return fmt.Errorf("invoice %d not found", invoiceRequestID)
+		}
+		r.ProviderInvoiceID = nuonuoResp.SerialNo
+		r.ProviderError = ""
+		return s.repo.UpdateInvoiceRequest(txCtx, r)
+	}); err != nil {
+		log.Printf("[Invoice] auto-issue: save serial_no failed: invoice_id=%d err=%v", invoiceRequestID, err)
+		s.revertIssuingToApproved(ctx, invoiceRequestID, fmt.Sprintf("保存流水号失败: %v", err))
+	}
+}
+
+func (s *InvoiceService) revertIssuingToApproved(ctx context.Context, invoiceRequestID int64, errMsg string) {
+	if err := s.withTx(ctx, func(txCtx context.Context) error {
+		r, err := s.repo.GetInvoiceRequestByID(txCtx, invoiceRequestID)
+		if err != nil {
+			return err
+		}
+		if r == nil {
+			return nil
+		}
+		r.Status = InvoiceStatusApproved
+		r.ProviderError = errMsg
+		return s.repo.UpdateInvoiceRequest(txCtx, r)
+	}); err != nil {
+		log.Printf("[Invoice] auto-issue: revert to approved failed: invoice_id=%d err=%v", invoiceRequestID, err)
+	}
+}
+
+// HandleNuonuoWebhook processes an incoming Nuonuo callback.
+func (s *InvoiceService) HandleNuonuoWebhook(ctx context.Context, payload *NuonuoWebhookPayload) error {
+	if s == nil || payload == nil {
+		return nil
+	}
+
+	// Verify signature.
+	if s.nuonuoService != nil && !s.nuonuoService.VerifyWebhookSignature(payload) {
+		return infraerrors.BadRequest("INVOICE_WEBHOOK_SIGNATURE_INVALID", "Invalid webhook signature.")
+	}
+
+	if payload.SerialNo == "" {
+		return infraerrors.BadRequest("INVOICE_WEBHOOK_MISSING_SERIAL", "Missing serialNo in webhook payload.")
+	}
+
+	req, err := s.repo.GetInvoiceRequestByProviderInvoiceID(ctx, payload.SerialNo)
+	if err != nil {
+		return err
+	}
+	if req == nil {
+		// Not found — could be from a different system. Return 200 to prevent Nuonuo retries.
+		log.Printf("[Invoice] webhook: unknown serial_no=%s, ignoring", payload.SerialNo)
+		return nil
+	}
+
+	// Idempotency: already issued.
+	if req.Status == InvoiceStatusIssued {
+		return nil
+	}
+
+	// Invoice failed on Nuonuo side.
+	if payload.InvoiceStatus == "4" {
+		errMsg := payload.ErrMsg
+		if errMsg == "" {
+			errMsg = "诺诺开票失败"
+		}
+		s.revertIssuingToApproved(ctx, req.ID, errMsg)
+		return nil
+	}
+
+	// Invoice succeeded — update to issued.
+	var receiverEmail string
+	if err := s.withTx(ctx, func(txCtx context.Context) error {
+		r, err := s.repo.GetInvoiceRequestByID(txCtx, req.ID)
+		if err != nil {
+			return err
+		}
+		if r == nil {
+			return nil
+		}
+		now := time.Now()
+		r.Status = InvoiceStatusIssued
+		r.IssuedAt = &now
+		r.InvoiceNumber = payload.InvoiceNo
+		r.InvoicePDFURL = payload.PDFURL
+		r.ProviderError = ""
+		if err := s.repo.UpdateInvoiceRequest(txCtx, r); err != nil {
+			return err
+		}
+		receiverEmail = r.ReceiverEmail
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	log.Printf("[Invoice] webhook: issued invoice_id=%d serial_no=%s invoice_no=%s", req.ID, payload.SerialNo, payload.InvoiceNo)
+
+	// Send email notification (best-effort).
+	if s.emailService != nil && receiverEmail != "" && payload.PDFURL != "" {
+		if err := s.emailService.SendEmail(ctx, receiverEmail, "发票已开具", fmt.Sprintf(
+			"您的发票已开具，下载链接：<a href=\"%s\">%s</a>", payload.PDFURL, payload.PDFURL,
+		)); err != nil && !errors.Is(err, ErrEmailNotConfigured) {
+			log.Printf("[Invoice] webhook: send email failed: invoice_id=%d to=%s err=%v", req.ID, receiverEmail, err)
+		}
+	}
+	return nil
+}
+
+// AdminRetryAutoIssue triggers auto-issue for a previously failed approved invoice.
+func (s *InvoiceService) AdminRetryAutoIssue(ctx context.Context, id int64) error {
+	if s == nil || s.repo == nil {
+		return nil
+	}
+	if !s.shouldAutoIssue() {
+		return infraerrors.BadRequest("INVOICE_AUTO_ISSUE_DISABLED", "Auto-issue is not enabled.")
+	}
+
+	req, err := s.repo.GetInvoiceRequestByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if req == nil {
+		return infraerrors.NotFound("INVOICE_NOT_FOUND", "Invoice request not found.")
+	}
+	if req.Status != InvoiceStatusApproved {
+		return infraerrors.BadRequest("INVOICE_CANNOT_RETRY", "Only approved invoice requests can be retried.")
+	}
+
+	go s.autoIssueInvoiceAsync(context.Background(), id)
+	return nil
 }
 
 func (s *InvoiceService) AdminRejectInvoiceRequest(ctx context.Context, adminID int64, id int64, reason string) (*InvoiceRequest, error) {

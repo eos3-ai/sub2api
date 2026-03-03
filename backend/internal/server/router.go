@@ -70,6 +70,8 @@ func registerRoutes(
 	routes.RegisterCommonRoutes(r)
 	// 支付渠道回调（无需认证）
 	routes.RegisterPaymentCallbackRoutes(r, h)
+	// 发票回调（无需认证）
+	routes.RegisterInvoiceWebhookRoutes(r, h)
 	// 钉钉机器人回调（无需认证）
 	routes.RegisterDingtalkBotRoutes(r, h)
 

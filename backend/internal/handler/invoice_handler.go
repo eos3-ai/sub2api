@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -10,6 +12,8 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+
+	"encoding/json"
 
 	"github.com/gin-gonic/gin"
 )
@@ -234,6 +238,30 @@ func (h *InvoiceHandler) GetProfile(c *gin.Context) {
 		return
 	}
 	response.Success(c, dto.InvoiceProfileFromService(profile))
+}
+
+// HandleNuonuoWebhook processes Nuonuo e-invoice callbacks (no auth required).
+// POST /api/invoice/webhook/nuonuo
+func (h *InvoiceHandler) HandleNuonuoWebhook(c *gin.Context) {
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		log.Printf("[Invoice] nuonuo webhook: read body error: %v", err)
+		c.Status(200) // Always return 200 to prevent Nuonuo retries on transport errors.
+		return
+	}
+
+	var payload service.NuonuoWebhookPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
+		log.Printf("[Invoice] nuonuo webhook: parse body error: %v (body: %.300s)", err, string(body))
+		c.Status(200)
+		return
+	}
+
+	if err := h.invoiceService.HandleNuonuoWebhook(c.Request.Context(), &payload); err != nil {
+		log.Printf("[Invoice] nuonuo webhook: handle error: %v", err)
+		// Still return 200 to avoid infinite retries; errors are logged.
+	}
+	c.Status(200)
 }
 
 // UpdateProfile updates current user's default invoice profile.

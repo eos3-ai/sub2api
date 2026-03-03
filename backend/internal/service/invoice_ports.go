@@ -29,6 +29,9 @@ type InvoiceRepository interface {
 	// ListInvoiceOrderNosByRequestIDs returns order numbers grouped by invoice request id.
 	// Used for admin export to avoid N+1 queries.
 	ListInvoiceOrderNosByRequestIDs(ctx context.Context, invoiceRequestIDs []int64) (map[int64][]string, error)
+	// GetInvoiceRequestByProviderInvoiceID looks up a request by third-party provider_invoice_id.
+	// Used for matching Nuonuo webhook callbacks.
+	GetInvoiceRequestByProviderInvoiceID(ctx context.Context, providerInvoiceID string) (*InvoiceRequest, error)
 
 	// User default profile
 	GetInvoiceProfile(ctx context.Context, userID int64) (*InvoiceProfile, error)

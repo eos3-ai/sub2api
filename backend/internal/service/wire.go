@@ -319,6 +319,15 @@ func ProvideBonusService(
 	return NewBonusService(calculator, issuer, recorder)
 }
 
+// ProvideNuonuoInvoiceService creates NuonuoInvoiceService from config.
+// Returns nil if Nuonuo is not enabled, which is handled nil-safely in InvoiceService.
+func ProvideNuonuoInvoiceService(cfg *config.Config) *NuonuoInvoiceService {
+	if cfg == nil {
+		return nil
+	}
+	return NewNuonuoInvoiceService(&cfg.Payment.Invoice.Nuonuo)
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -338,6 +347,7 @@ var ProviderSet = wire.NewSet(
 	NewDingtalkService,
 	ProvideBonusService,
 	NewPaymentService,
+	ProvideNuonuoInvoiceService,
 	NewInvoiceService,
 	NewZpayService,
 	NewStripeService,

@@ -269,6 +269,8 @@ function invoiceStatusLabel(value: string): string {
       return t('invoice.statusSubmitted')
     case 'approved':
       return t('invoice.statusApproved')
+    case 'issuing':
+      return t('invoice.statusIssuing')
     case 'rejected':
       return t('invoice.statusRejected')
     case 'issued':
