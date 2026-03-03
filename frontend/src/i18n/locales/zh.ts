@@ -289,7 +289,8 @@ export default {
     github: 'GitHub',
     mySubscriptions: '我的订阅',
     buySubscription: '购买订阅',
-    docs: '文档'
+    docs: '文档',
+    modelPricing: '模型价格'
   },
 
   // Promotion
@@ -4335,5 +4336,27 @@ export default {
           '<div style="line-height: 1.7;"><p style="margin-bottom: 12px;">点击确认创建您的 API 密钥。</p><div style="padding: 8px 12px; background: #fee2e2; border-left: 3px solid #ef4444; border-radius: 4px; font-size: 13px; margin-bottom: 12px;"><b>⚠️ 重要：</b><ul style="margin: 8px 0 0 16px;"><li>创建后请立即复制密钥（sk-xxx）</li><li>密钥只显示一次，丢失需重新生成</li></ul></div><p style="padding: 8px 12px; background: #f0fdf4; border-left: 3px solid #10b981; border-radius: 4px; font-size: 13px;"><b>🚀 如何使用：</b><br/>将密钥配置到支持 OpenAI 接口的任何客户端（如 ChatBox、OpenCat 等），即可开始使用！</p><p style="margin-top: 12px; color: #10b981; font-weight: 600;">👉 点击"创建"按钮</p></div>'
       }
     }
+  },
+
+  // Model Pricing
+  modelPricing: {
+    title: '模型价格',
+    description: '查看各模型定价信息',
+    tabs: {
+      claudeCode: 'Claude Code',
+      codex: 'Codex',
+      gemini: 'Gemini'
+    },
+    simpleFormula: '简易公式',
+    rateSection: '模型倍率',
+    fullFormula: '完整公式',
+    fullFormulaText: '官方价格（输入 token × 输入价格 + 输出 token × 输出价格 + 缓存创建 × 价格 + 缓存读取 × 价格）× 渠道折扣',
+    fullFormulaNote: '（仅展示文本，不参与实际计算）',
+    officialPrice: '官方价格',
+    officialPriceHint: '官方价格请参考对应官网',
+    officialPriceLink: '点击查看官网价格',
+    colType: '类型',
+    colFormula: '简易公式',
+    colRate: '模型倍率'
   }
 }

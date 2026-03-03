@@ -85,6 +85,11 @@ type PublicSettings struct {
 	PurchaseSubscriptionEnabled bool
 	PurchaseSubscriptionURL     string
 
+	// 模型价格官方链接
+	ClaudeOfficialURL string
+	CodexOfficialURL  string
+	GeminiOfficialURL string
+
 	LinuxDoOAuthEnabled bool
 	Version             string
 }

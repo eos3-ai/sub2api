@@ -50,6 +50,9 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		HideCcsImportButton:         settings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled: settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:     settings.PurchaseSubscriptionURL,
+		ClaudeOfficialURL:           settings.ClaudeOfficialURL,
+		CodexOfficialURL:            settings.CodexOfficialURL,
+		GeminiOfficialURL:           settings.GeminiOfficialURL,
 		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
 		Version:                     h.version,
 	})

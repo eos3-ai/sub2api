@@ -81,8 +81,14 @@ type PublicSettings struct {
 	HideCcsImportButton         bool   `json:"hide_ccs_import_button"`
 	PurchaseSubscriptionEnabled bool   `json:"purchase_subscription_enabled"`
 	PurchaseSubscriptionURL     string `json:"purchase_subscription_url"`
-	LinuxDoOAuthEnabled         bool   `json:"linuxdo_oauth_enabled"`
-	Version                     string `json:"version"`
+
+	// 模型价格官方链接
+	ClaudeOfficialURL string `json:"claude_official_url"`
+	CodexOfficialURL  string `json:"codex_official_url"`
+	GeminiOfficialURL string `json:"gemini_official_url"`
+
+	LinuxDoOAuthEnabled bool   `json:"linuxdo_oauth_enabled"`
+	Version             string `json:"version"`
 }
 
 // StreamTimeoutSettings 流超时处理配置 DTO

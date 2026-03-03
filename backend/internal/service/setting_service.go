@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -114,6 +115,9 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		HideCcsImportButton:         settings[SettingKeyHideCcsImportButton] == "true",
 		PurchaseSubscriptionEnabled: settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:     strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
+		ClaudeOfficialURL:           os.Getenv("CLAUDE_OFFICIAL_URL"),
+		CodexOfficialURL:            os.Getenv("CODEX_OFFICIAL_URL"),
+		GeminiOfficialURL:           os.Getenv("GEMINI_OFFICIAL_URL"),
 		LinuxDoOAuthEnabled:         linuxDoEnabled,
 	}, nil
 }
@@ -157,6 +161,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		HideCcsImportButton         bool   `json:"hide_ccs_import_button"`
 		PurchaseSubscriptionEnabled bool   `json:"purchase_subscription_enabled"`
 		PurchaseSubscriptionURL     string `json:"purchase_subscription_url,omitempty"`
+		ClaudeOfficialURL           string `json:"claude_official_url,omitempty"`
+		CodexOfficialURL            string `json:"codex_official_url,omitempty"`
+		GeminiOfficialURL           string `json:"gemini_official_url,omitempty"`
 		LinuxDoOAuthEnabled         bool   `json:"linuxdo_oauth_enabled"`
 		Version                     string `json:"version,omitempty"`
 	}{
@@ -178,6 +185,9 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		HideCcsImportButton:         settings.HideCcsImportButton,
 		PurchaseSubscriptionEnabled: settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:     settings.PurchaseSubscriptionURL,
+		ClaudeOfficialURL:           settings.ClaudeOfficialURL,
+		CodexOfficialURL:            settings.CodexOfficialURL,
+		GeminiOfficialURL:           settings.GeminiOfficialURL,
 		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
 		Version:                     s.version,
 	}, nil

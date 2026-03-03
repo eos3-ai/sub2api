@@ -327,6 +327,9 @@ export const useAppStore = defineStore('app', () => {
         hide_ccs_import_button: false,
         purchase_subscription_enabled: false,
         purchase_subscription_url: '',
+        claude_official_url: '',
+        codex_official_url: '',
+        gemini_official_url: '',
         linuxdo_oauth_enabled: false,
         version: siteVersion.value
       }
