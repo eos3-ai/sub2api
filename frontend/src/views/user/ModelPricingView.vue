@@ -1,14 +1,14 @@
 <template>
   <AppLayout>
-  <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+  <div class="space-y-6">
     <!-- Header -->
-    <div class="mb-6">
+    <div>
       <h1 class="text-2xl font-bold text-gray-900 dark:text-white">{{ t('modelPricing.title') }}</h1>
       <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ t('modelPricing.description') }}</p>
     </div>
 
     <!-- Tab switcher -->
-    <div class="mb-6 border-b border-gray-200 dark:border-dark-700">
+    <div class="border-b border-gray-200 dark:border-dark-700">
       <nav class="-mb-px flex space-x-6" aria-label="Model tabs">
         <button
           v-for="tab in tabs"
@@ -27,7 +27,7 @@
     </div>
 
     <!-- Tab content -->
-    <div v-for="tab in tabs" :key="tab.id" v-show="activeTab === tab.id" class="space-y-8">
+    <div v-for="tab in tabs" :key="tab.id" v-show="activeTab === tab.id" class="space-y-4">
 
       <!-- Section 1: 优惠计算公式 -->
       <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-dark-700 dark:bg-dark-800">
