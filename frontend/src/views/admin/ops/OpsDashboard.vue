@@ -180,8 +180,8 @@ const { t } = useI18n()
 
 const opsEnabled = computed(() => adminSettingsStore.opsMonitoringEnabled)
 
-type TimeRange = '5m' | '30m' | '1h' | '6h' | '24h' | 'custom'
-const allowedTimeRanges = new Set<TimeRange>(['5m', '30m', '1h', '6h', '24h', 'custom'])
+type TimeRange = '1h' | '1d' | '7d' | '30d' | 'custom'
+const allowedTimeRanges = new Set<TimeRange>(['1h', '1d', '7d', '30d', 'custom'])
 
 type QueryMode = 'auto' | 'raw' | 'preagg'
 const allowedQueryModes = new Set<QueryMode>(['auto', 'raw', 'preagg'])
