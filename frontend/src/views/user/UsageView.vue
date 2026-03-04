@@ -126,9 +126,9 @@
               <button @click="resetFilters" class="btn btn-secondary">
                 {{ t('common.reset') }}
               </button>
-              <button @click="exportBillingToCSV" :disabled="exportingBilling" class="btn btn-primary">
+              <button @click="exportBillingToCSV" :disabled="appStore.isExporting" class="btn btn-primary">
                 <svg
-                  v-if="exportingBilling"
+                  v-if="exportingType === 'billing'"
                   class="-ml-1 mr-2 h-4 w-4 animate-spin"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -147,11 +147,11 @@
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                {{ exportingBilling ? t('usage.exportingBilling') : t('usage.exportBilling') }}
+                {{ exportingType === 'billing' ? t('usage.exportingBilling') : t('usage.exportBilling') }}
               </button>
-              <button @click="exportToCSV" :disabled="exporting" class="btn btn-primary">
+              <button @click="exportToCSV" :disabled="appStore.isExporting" class="btn btn-primary">
                 <svg
-                  v-if="exporting"
+                  v-if="exportingType === 'csv'"
                   class="-ml-1 mr-2 h-4 w-4 animate-spin"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -170,7 +170,7 @@
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                {{ exporting ? t('usage.exporting') : t('usage.exportCsv') }}
+                {{ exportingType === 'csv' ? t('usage.exporting') : t('usage.exportCsv') }}
               </button>
             </div>
           </div>
@@ -572,8 +572,9 @@ const columns = computed<Column[]>(() => [
 const usageLogs = ref<UsageLog[]>([])
 const apiKeys = ref<ApiKey[]>([])
 const loading = ref(false)
-const exporting = ref(false)
-const exportingBilling = ref(false)
+// Local UI-only state: tracks which button shows the spinner.
+// Does NOT need to survive navigation — the global appStore.isExporting handles that.
+const exportingType = ref<'csv' | 'billing' | null>(null)
 
 const apiKeyOptions = computed(() => {
   return [
@@ -776,192 +777,108 @@ const escapeCSVValue = (value: unknown): string => {
   return str
 }
 
-const exportToCSV = async () => {
+const exportToCSV = () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
     return
   }
-
-  exporting.value = true
-  appStore.showInfo(t('usage.preparingExport'))
-
-  try {
-    const allLogs: UsageLog[] = []
-    const pageSize = 100 // Use a larger page size for export to reduce requests
-    const totalRequests = Math.ceil(pagination.total / pageSize)
-
-    for (let page = 1; page <= totalRequests; page++) {
-      const params: UsageQueryParams = {
-        page: page,
-        page_size: pageSize,
-        ...filters.value
-      }
-      const response = await usageAPI.query(params)
-      allLogs.push(...response.items)
-    }
-
-    if (allLogs.length === 0) {
-      appStore.showWarning(t('usage.noDataToExport'))
-      return
-    }
-
-    const headers = [
-      'Time',
-      'API Key Name',
-      'Model',
-      'Reasoning Effort',
-      'Type',
-      'Input Tokens',
-      'Output Tokens',
-      'Cache Read Tokens',
-      'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'First Token (ms)',
-      'Duration (ms)'
-    ]
-    const rows = allLogs.map((log) =>
-      [
-        log.created_at,
-        log.api_key?.name || '',
-        log.model,
-        formatReasoningEffort(log.reasoning_effort),
-        log.stream ? 'Stream' : 'Sync',
-        log.input_tokens,
-        log.output_tokens,
-        log.cache_read_tokens,
-        log.cache_creation_tokens,
-        log.rate_multiplier,
-        log.actual_cost.toFixed(8),
-        log.first_token_ms ?? '',
-        log.duration_ms
-      ].map(escapeCSVValue)
+  // Snapshot filters at click time so navigation doesn't affect the in-flight request.
+  const currentFilters = { ...filters.value }
+  const filename = `usage_${filters.value.start_date}_to_${filters.value.end_date}.csv`
+  exportingType.value = 'csv'
+  appStore
+    .startExport(
+      () => usageAPI.exportCsv(currentFilters),
+      filename,
+      { success: t('usage.exportSuccess'), error: t('usage.exportFailed') }
     )
-
-    const csvContent = [
-      headers.map(escapeCSVValue).join(','),
-      ...rows.map((row) => row.join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `usage_${filters.value.start_date}_to_${filters.value.end_date}.csv`
-    link.click()
-    window.URL.revokeObjectURL(url)
-
-    appStore.showSuccess(t('usage.exportSuccess'))
-  } catch (error) {
-    appStore.showError(t('usage.exportFailed'))
-    console.error('CSV Export failed:', error)
-  } finally {
-    exporting.value = false
-  }
+    .finally(() => {
+      exportingType.value = null
+    })
 }
 
-const exportBillingToCSV = async () => {
+// Fetches all records with the given filters and aggregates them into a billing CSV Blob.
+// This is the fetcher passed to appStore.startExport so it runs in the background.
+const createBillingCsvBlob = async (
+  total: number,
+  currentFilters: UsageQueryParams
+): Promise<Blob> => {
+  const allLogs: UsageLog[] = []
+  const pageSize = 100
+  const totalPages = Math.ceil(total / pageSize)
+  for (let page = 1; page <= totalPages; page++) {
+    const resp = await usageAPI.query({ page, page_size: pageSize, ...currentFilters })
+    allLogs.push(...resp.items)
+  }
+
+  if (allLogs.length === 0) throw new Error('No data to export')
+
+  interface ModelBilling {
+    apiKeyName: string
+    model: string
+    totalCost: number
+    totalTokens: number
+    totalRequests: number
+  }
+
+  const modelMap = new Map<string, ModelBilling>()
+  allLogs.forEach((log) => {
+    const apiKeyName = log.api_key?.name || ''
+    const key = `${apiKeyName}||${log.model}`
+    const existing = modelMap.get(key)
+    const totalTokens =
+      log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
+    if (existing) {
+      existing.totalCost += log.actual_cost
+      existing.totalTokens += totalTokens
+      existing.totalRequests += 1
+    } else {
+      modelMap.set(key, {
+        apiKeyName,
+        model: log.model,
+        totalCost: log.actual_cost,
+        totalTokens,
+        totalRequests: 1
+      })
+    }
+  })
+
+  const billingData = Array.from(modelMap.values()).sort((a, b) => b.totalCost - a.totalCost)
+  const headers = ['API Key Name', 'Model', 'Billed Cost', 'Total Tokens', 'Total Requests']
+  const rows = billingData.map((item) =>
+    [
+      item.apiKeyName,
+      item.model,
+      item.totalCost.toFixed(8),
+      item.totalTokens,
+      item.totalRequests
+    ].map(escapeCSVValue)
+  )
+  const csvContent = [
+    headers.map(escapeCSVValue).join(','),
+    ...rows.map((row) => row.join(','))
+  ].join('\n')
+  return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+}
+
+const exportBillingToCSV = () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
     return
   }
-
-  exportingBilling.value = true
-  appStore.showInfo(t('usage.preparingBillingExport'))
-
-  try {
-    const allLogs: UsageLog[] = []
-    const pageSize = 100 // Use a larger page size for export to reduce requests
-    const totalRequests = Math.ceil(pagination.total / pageSize)
-
-    for (let page = 1; page <= totalRequests; page++) {
-      const params: UsageQueryParams = {
-        page: page,
-        page_size: pageSize,
-        ...filters.value
-      }
-      const response = await usageAPI.query(params)
-      allLogs.push(...response.items)
-    }
-
-    if (allLogs.length === 0) {
-      appStore.showWarning(t('usage.noDataToExport'))
-      return
-    }
-
-    // Group by model and aggregate
-    interface ModelBilling {
-      apiKeyName: string
-      model: string
-      totalCost: number
-      totalTokens: number
-      totalRequests: number
-    }
-
-    const modelMap = new Map<string, ModelBilling>()
-
-    allLogs.forEach((log) => {
-      const apiKeyName = log.api_key?.name || ''
-      const key = `${apiKeyName}||${log.model}`
-      const existing = modelMap.get(key)
-      const totalTokens = log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
-
-      if (existing) {
-        existing.totalCost += log.actual_cost
-        existing.totalTokens += totalTokens
-        existing.totalRequests += 1
-      } else {
-        modelMap.set(key, {
-          apiKeyName,
-          model: log.model,
-          totalCost: log.actual_cost,
-          totalTokens: totalTokens,
-          totalRequests: 1
-        })
-      }
-    })
-
-    // Convert to array and sort by cost (descending)
-    const billingData = Array.from(modelMap.values()).sort((a, b) => b.totalCost - a.totalCost)
-
-    const headers = [
-      'API Key Name',
-      'Model',
-      'Billed Cost',
-      'Total Tokens',
-      'Total Requests'
-    ]
-
-    const rows = billingData.map((item) =>
-      [
-        item.apiKeyName,
-        item.model,
-        item.totalCost.toFixed(8),
-        item.totalTokens,
-        item.totalRequests
-      ].map(escapeCSVValue)
+  const currentTotal = pagination.total
+  const currentFilters = { ...filters.value }
+  const filename = `billing_${filters.value.start_date}_to_${filters.value.end_date}.csv`
+  exportingType.value = 'billing'
+  appStore
+    .startExport(
+      () => createBillingCsvBlob(currentTotal, currentFilters),
+      filename,
+      { success: t('usage.billingExportSuccess'), error: t('usage.billingExportFailed') }
     )
-
-    const csvContent = [
-      headers.map(escapeCSVValue).join(','),
-      ...rows.map((row) => row.join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `billing_${filters.value.start_date}_to_${filters.value.end_date}.csv`
-    link.click()
-    window.URL.revokeObjectURL(url)
-
-    appStore.showSuccess(t('usage.billingExportSuccess'))
-  } catch (error) {
-    appStore.showError(t('usage.billingExportFailed'))
-    console.error('Billing CSV Export failed:', error)
-  } finally {
-    exportingBilling.value = false
-  }
+    .finally(() => {
+      exportingType.value = null
+    })
 }
 
 // Tooltip functions

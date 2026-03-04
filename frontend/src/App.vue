@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { RouterView, useRouter, useRoute } from 'vue-router'
 import { onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import Toast from '@/components/common/Toast.vue'
 import NavigationProgress from '@/components/common/NavigationProgress.vue'
 import { useAppStore, useAuthStore, useSubscriptionStore } from '@/stores'
 import { getSetupStatus } from '@/api/setup'
+
+const { t } = useI18n()
 
 const router = useRouter()
 const route = useRoute()
@@ -78,4 +81,38 @@ onMounted(async () => {
   <NavigationProgress />
   <RouterView />
   <Toast />
+
+  <!-- Global background-export indicator — visible on all pages during export -->
+  <Transition name="export-indicator">
+    <div
+      v-if="appStore.isExporting"
+      class="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm text-gray-700 shadow-lg dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+    >
+      <svg
+        class="h-4 w-4 animate-spin text-primary-600"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+        <path
+          class="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+        />
+      </svg>
+      <span>{{ t('usage.exportingProgress') }}</span>
+    </div>
+  </Transition>
 </template>
+
+<style scoped>
+.export-indicator-enter-active,
+.export-indicator-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.export-indicator-enter-from,
+.export-indicator-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
+}
+</style>

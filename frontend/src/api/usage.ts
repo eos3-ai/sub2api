@@ -257,6 +257,22 @@ export async function getDashboardApiKeysUsage(
   return data
 }
 
+/**
+ * Export usage records as a CSV Blob.
+ * The backend generates the full CSV server-side (single request, no pagination loop).
+ * @param params - Filter params (same as query, without page/page_size)
+ * @returns Blob containing CSV data
+ */
+export async function exportCsv(
+  params: Omit<UsageQueryParams, 'page' | 'page_size'>
+): Promise<Blob> {
+  const { data } = await apiClient.get('/usage/export', {
+    params,
+    responseType: 'blob'
+  })
+  return data as Blob
+}
+
 export const usageAPI = {
   list,
   query,
@@ -264,6 +280,7 @@ export const usageAPI = {
   getStatsByDateRange,
   getByDateRange,
   getById,
+  exportCsv,
   // Dashboard
   getDashboardStats,
   getDashboardTrend,

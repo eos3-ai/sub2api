@@ -1,6 +1,10 @@
 package handler
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -399,4 +403,179 @@ func (h *UsageHandler) DashboardAPIKeysUsage(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"stats": stats})
+}
+
+// Export exports the current user's usage records as a CSV file.
+// GET /api/v1/usage/export
+// Accepts the same filter query params as List (api_key_id, model, stream,
+// billing_type, start_date, end_date, timezone).
+func (h *UsageHandler) Export(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	var apiKeyID int64
+	if apiKeyIDStr := c.Query("api_key_id"); apiKeyIDStr != "" {
+		id, err := strconv.ParseInt(apiKeyIDStr, 10, 64)
+		if err != nil {
+			response.BadRequest(c, "Invalid api_key_id")
+			return
+		}
+		apiKey, err := h.apiKeyService.GetByID(c.Request.Context(), id)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		if apiKey.UserID != subject.UserID {
+			response.Forbidden(c, "Not authorized to access this API key's usage records")
+			return
+		}
+		apiKeyID = id
+	}
+
+	model := c.Query("model")
+
+	var stream *bool
+	if streamStr := c.Query("stream"); streamStr != "" {
+		val, err := strconv.ParseBool(streamStr)
+		if err != nil {
+			response.BadRequest(c, "Invalid stream value, use true or false")
+			return
+		}
+		stream = &val
+	}
+
+	var billingType *int8
+	if billingTypeStr := c.Query("billing_type"); billingTypeStr != "" {
+		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
+		if err != nil {
+			response.BadRequest(c, "Invalid billing_type")
+			return
+		}
+		bt := int8(val)
+		billingType = &bt
+	}
+
+	userTZ := c.Query("timezone")
+	var startTime, endTime *time.Time
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		if err != nil {
+			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+			return
+		}
+		startTime = &t
+	}
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		if err != nil {
+			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+			return
+		}
+		t = t.Add(24*time.Hour - time.Nanosecond)
+		endTime = &t
+	}
+
+	filters := usagestats.UsageLogFilters{
+		UserID:      subject.UserID,
+		APIKeyID:    apiKeyID,
+		Model:       model,
+		Stream:      stream,
+		BillingType: billingType,
+		StartTime:   startTime,
+		EndTime:     endTime,
+	}
+
+	// Fetch all records server-side in batches to avoid N frontend requests.
+	const batchSize = 200
+	var all []service.UsageLog
+	for page := 1; page <= 10000; page++ {
+		params := pagination.PaginationParams{Page: page, PageSize: batchSize}
+		records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		all = append(all, records...)
+		if int64(len(all)) >= result.Total || len(records) == 0 {
+			break
+		}
+	}
+
+	var buf bytes.Buffer
+	w := csv.NewWriter(&buf)
+	_ = w.Write([]string{
+		"Time",
+		"API Key Name",
+		"Model",
+		"Reasoning Effort",
+		"Type",
+		"Input Tokens",
+		"Output Tokens",
+		"Cache Read Tokens",
+		"Cache Creation Tokens",
+		"Rate Multiplier",
+		"Billed Cost",
+		"First Token (ms)",
+		"Duration (ms)",
+	})
+
+	for i := range all {
+		rec := &all[i]
+
+		apiKeyName := ""
+		if rec.APIKey != nil {
+			apiKeyName = rec.APIKey.Name
+		}
+
+		reasoningEffort := ""
+		if rec.ReasoningEffort != nil {
+			reasoningEffort = *rec.ReasoningEffort
+		}
+
+		reqType := "Sync"
+		if rec.Stream {
+			reqType = "Stream"
+		}
+
+		firstTokenMs := ""
+		if rec.FirstTokenMs != nil {
+			firstTokenMs = strconv.Itoa(*rec.FirstTokenMs)
+		}
+
+		durationMs := ""
+		if rec.DurationMs != nil {
+			durationMs = strconv.Itoa(*rec.DurationMs)
+		}
+
+		_ = w.Write([]string{
+			rec.CreatedAt.Format(time.RFC3339),
+			apiKeyName,
+			rec.Model,
+			reasoningEffort,
+			reqType,
+			strconv.Itoa(rec.InputTokens),
+			strconv.Itoa(rec.OutputTokens),
+			strconv.Itoa(rec.CacheReadTokens),
+			strconv.Itoa(rec.CacheCreationTokens),
+			fmt.Sprintf("%.4f", rec.RateMultiplier),
+			fmt.Sprintf("%.8f", rec.ActualCost),
+			firstTokenMs,
+			durationMs,
+		})
+	}
+	w.Flush()
+
+	filename := "usage.csv"
+	if startTime != nil && endTime != nil {
+		filename = fmt.Sprintf("usage_%s_to_%s.csv",
+			startTime.Format("2006-01-02"),
+			endTime.Add(time.Nanosecond).Format("2006-01-02"))
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.String(http.StatusOK, buf.String())
 }

@@ -21,6 +21,9 @@ export const useAppStore = defineStore('app', () => {
   const loading = ref<boolean>(false)
   const toasts = ref<Toast[]>([])
 
+  // Background export state — survives page navigation
+  const isExporting = ref<boolean>(false)
+
   // Public settings cache state
   const publicSettingsLoaded = ref<boolean>(false)
   const publicSettingsLoading = ref<boolean>(false)
@@ -217,6 +220,37 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /**
+   * Run a background export: fetch a Blob via `fetcher`, then trigger a browser download.
+   * The export survives page navigation because the async operation is owned by the store,
+   * not the calling component. A floating indicator in App.vue shows progress globally.
+   * @param fetcher - Async function that resolves to the file Blob
+   * @param filename - Download filename
+   * @param messages - Translated success/error strings from the caller
+   */
+  async function startExport(
+    fetcher: () => Promise<Blob>,
+    filename: string,
+    messages: { success: string; error: string }
+  ): Promise<void> {
+    if (isExporting.value) return
+    isExporting.value = true
+    try {
+      const blob = await fetcher()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      window.URL.revokeObjectURL(url)
+      showSuccess(messages.success)
+    } catch {
+      showError(messages.error)
+    } finally {
+      isExporting.value = false
+    }
+  }
+
+  /**
    * Reset app state to defaults
    * Useful for cleanup or testing
    */
@@ -382,6 +416,7 @@ export const useAppStore = defineStore('app', () => {
     mobileOpen,
     loading,
     toasts,
+    isExporting,
 
     // Public settings state
     publicSettingsLoaded,
@@ -420,6 +455,7 @@ export const useAppStore = defineStore('app', () => {
     clearAllToasts,
     withLoading,
     withLoadingAndError,
+    startExport,
     reset,
 
     // Version actions
