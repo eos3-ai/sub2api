@@ -138,6 +138,20 @@ func (h *OpsHandler) GetErrorLogs(c *gin.Context) {
 		}
 		filter.AccountID = &id
 	}
+	if rawIDs := strings.TrimSpace(c.Query("account_ids")); rawIDs != "" {
+		for _, part := range strings.Split(rawIDs, ",") {
+			p := strings.TrimSpace(part)
+			if p == "" {
+				continue
+			}
+			id, err := strconv.ParseInt(p, 10, 64)
+			if err != nil || id <= 0 {
+				response.BadRequest(c, "Invalid account_ids")
+				return
+			}
+			filter.AccountIDs = append(filter.AccountIDs, id)
+		}
+	}
 
 	if v := strings.TrimSpace(c.Query("resolved")); v != "" {
 		switch strings.ToLower(v) {
@@ -238,6 +252,20 @@ func (h *OpsHandler) ListRequestErrors(c *gin.Context) {
 			return
 		}
 		filter.AccountID = &id
+	}
+	if rawIDs := strings.TrimSpace(c.Query("account_ids")); rawIDs != "" {
+		for _, part := range strings.Split(rawIDs, ",") {
+			p := strings.TrimSpace(part)
+			if p == "" {
+				continue
+			}
+			id, err := strconv.ParseInt(p, 10, 64)
+			if err != nil || id <= 0 {
+				response.BadRequest(c, "Invalid account_ids")
+				return
+			}
+			filter.AccountIDs = append(filter.AccountIDs, id)
+		}
 	}
 
 	if v := strings.TrimSpace(c.Query("resolved")); v != "" {
@@ -517,6 +545,20 @@ func (h *OpsHandler) ListUpstreamErrors(c *gin.Context) {
 			return
 		}
 		filter.AccountID = &id
+	}
+	if rawIDs := strings.TrimSpace(c.Query("account_ids")); rawIDs != "" {
+		for _, part := range strings.Split(rawIDs, ",") {
+			p := strings.TrimSpace(part)
+			if p == "" {
+				continue
+			}
+			id, err := strconv.ParseInt(p, 10, 64)
+			if err != nil || id <= 0 {
+				response.BadRequest(c, "Invalid account_ids")
+				return
+			}
+			filter.AccountIDs = append(filter.AccountIDs, id)
+		}
 	}
 
 	if v := strings.TrimSpace(c.Query("resolved")); v != "" {

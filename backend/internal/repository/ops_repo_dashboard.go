@@ -148,6 +148,11 @@ func (r *opsRepository) getDashboardOverviewPreaggregated(ctx context.Context, f
 		return nil, fmt.Errorf("nil filter")
 	}
 
+	// 预聚合表无账号维度；选择账号时强制降级为 raw
+	if len(filter.AccountIDs) > 0 {
+		return r.getDashboardOverviewRaw(ctx, filter)
+	}
+
 	start := filter.StartTime.UTC()
 	end := filter.EndTime.UTC()
 
@@ -921,14 +926,16 @@ FROM (
 func buildUsageWhere(filter *service.OpsDashboardFilter, start, end time.Time, startIndex int) (join string, where string, args []any, nextIndex int) {
 	platform := ""
 	groupID := (*int64)(nil)
+	var accountIDs []int64
 	if filter != nil {
 		platform = strings.TrimSpace(strings.ToLower(filter.Platform))
 		groupID = filter.GroupID
+		accountIDs = filter.AccountIDs
 	}
 
 	idx := startIndex
-	clauses := make([]string, 0, 4)
-	args = make([]any, 0, 4)
+	clauses := make([]string, 0, 6)
+	args = make([]any, 0, 6)
 
 	args = append(args, start)
 	clauses = append(clauses, fmt.Sprintf("ul.created_at >= $%d", idx))
@@ -950,6 +957,15 @@ func buildUsageWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 		clauses = append(clauses, fmt.Sprintf("COALESCE(NULLIF(g.platform,''), a.platform) = $%d", idx))
 		idx++
 	}
+	if len(accountIDs) > 0 {
+		placeholders := make([]string, len(accountIDs))
+		for i, id := range accountIDs {
+			args = append(args, id)
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			idx++
+		}
+		clauses = append(clauses, "ul.account_id IN ("+strings.Join(placeholders, ",")+")")
+	}
 
 	where = "WHERE " + strings.Join(clauses, " AND ")
 	return join, where, args, idx
@@ -958,14 +974,16 @@ func buildUsageWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 func buildErrorWhere(filter *service.OpsDashboardFilter, start, end time.Time, startIndex int) (where string, args []any, nextIndex int) {
 	platform := ""
 	groupID := (*int64)(nil)
+	var accountIDs []int64
 	if filter != nil {
 		platform = strings.TrimSpace(strings.ToLower(filter.Platform))
 		groupID = filter.GroupID
+		accountIDs = filter.AccountIDs
 	}
 
 	idx := startIndex
-	clauses := make([]string, 0, 5)
-	args = make([]any, 0, 5)
+	clauses := make([]string, 0, 7)
+	args = make([]any, 0, 7)
 
 	args = append(args, start)
 	clauses = append(clauses, fmt.Sprintf("created_at >= $%d", idx))
@@ -985,6 +1003,15 @@ func buildErrorWhere(filter *service.OpsDashboardFilter, start, end time.Time, s
 		args = append(args, platform)
 		clauses = append(clauses, fmt.Sprintf("platform = $%d", idx))
 		idx++
+	}
+	if len(accountIDs) > 0 {
+		placeholders := make([]string, len(accountIDs))
+		for i, id := range accountIDs {
+			args = append(args, id)
+			placeholders[i] = fmt.Sprintf("$%d", idx)
+			idx++
+		}
+		clauses = append(clauses, "account_id IN ("+strings.Join(placeholders, ",")+")")
 	}
 
 	where = "WHERE " + strings.Join(clauses, " AND ")

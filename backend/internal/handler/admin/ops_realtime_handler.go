@@ -226,12 +226,18 @@ func (h *OpsHandler) GetRealtimeTrafficSummary(c *gin.Context) {
 		return
 	}
 
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+
 	filter := &service.OpsDashboardFilter{
-		StartTime: startTime,
-		EndTime:   endTime,
-		Platform:  platform,
-		GroupID:   groupID,
-		QueryMode: service.OpsQueryModeRaw,
+		StartTime:  startTime,
+		EndTime:    endTime,
+		Platform:   platform,
+		GroupID:    groupID,
+		AccountIDs: accountIDs,
+		QueryMode:  service.OpsQueryModeRaw,
 	}
 
 	summary, err := h.opsService.GetRealtimeTrafficSummary(c.Request.Context(), filter)

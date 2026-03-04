@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Select from '@/components/common/Select.vue'
+import MultiSelect from '@/components/common/MultiSelect.vue'
 import HelpTooltip from '@/components/common/HelpTooltip.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -17,6 +18,7 @@ interface Props {
   overview?: OpsDashboardOverview | null
   platform: string
   groupId: number | null
+  accountIds: number[]
   timeRange: string
   queryMode: string
   loading: boolean
@@ -32,6 +34,7 @@ interface Props {
 interface Emits {
   (e: 'update:platform', value: string): void
   (e: 'update:group', value: number | null): void
+  (e: 'update:accountIds', value: number[]): void
   (e: 'update:timeRange', value: string): void
   (e: 'update:queryMode', value: string): void
   (e: 'update:customTimeRange', startTime: string, endTime: string): void
@@ -105,6 +108,7 @@ function formatCustomTimeRangeLabel(startTime: string, endTime: string): string 
 }
 
 const groups = ref<Array<{ id: number; name: string; platform: string }>>([])
+const accounts = ref<Array<{ id: number; name: string; platform: string }>>([])
 
 const platformOptions = computed(() => [
   { value: '', label: t('common.all') },
@@ -139,6 +143,12 @@ const groupOptions = computed(() => {
   return [{ value: null, label: t('common.all') }, ...filtered.map((g) => ({ value: g.id, label: g.name }))]
 })
 
+const accountOptions = computed(() => {
+  let list = accounts.value
+  if (props.platform) list = list.filter((a) => a.platform === props.platform)
+  return list.map((a) => ({ value: a.id, label: a.name }))
+})
+
 watch(
   () => props.platform,
   (newPlatform) => {
@@ -146,6 +156,14 @@ watch(
     const currentGroup = groups.value.find((g) => g.id === props.groupId)
     if (currentGroup && currentGroup.platform !== newPlatform) {
       emit('update:group', null)
+    }
+    // Clear accounts that don't belong to the new platform
+    if (props.accountIds.length > 0) {
+      const valid = new Set(accountOptions.value.map((o) => o.value))
+      const filtered = props.accountIds.filter((id) => valid.has(id))
+      if (filtered.length !== props.accountIds.length) {
+        emit('update:accountIds', filtered)
+      }
     }
   }
 )
@@ -157,6 +175,14 @@ onMounted(async () => {
   } catch (e) {
     console.error('[OpsDashboardHeader] Failed to load groups', e)
     groups.value = []
+  }
+  try {
+    // 分页加载前200条账号用于筛选
+    const res = await adminAPI.accounts.list(1, 200)
+    accounts.value = res.items.map((a) => ({ id: a.id, name: a.name, platform: String(a.platform) }))
+  } catch (e) {
+    console.error('[OpsDashboardHeader] Failed to load accounts', e)
+    accounts.value = []
   }
 })
 
@@ -171,6 +197,10 @@ function handleGroupChange(val: string | number | boolean | null) {
   }
   const id = typeof val === 'number' ? val : Number.parseInt(String(val), 10)
   emit('update:group', Number.isFinite(id) && id > 0 ? id : null)
+}
+
+function handleAccountIdsChange(val: (number | string)[]) {
+  emit('update:accountIds', val.map(Number).filter((n) => Number.isFinite(n) && n > 0))
 }
 
 function handleTimeRangeChange(val: string | number | boolean | null) {
@@ -301,7 +331,7 @@ async function loadRealtimeTrafficSummary() {
   }
   realtimeTrafficLoading.value = true
   try {
-    const res = await opsAPI.getRealtimeTrafficSummary(realtimeWindow.value, props.platform, props.groupId)
+    const res = await opsAPI.getRealtimeTrafficSummary(realtimeWindow.value, props.platform, props.groupId, props.accountIds)
     if (res && res.enabled === false) {
       adminSettingsStore.setOpsRealtimeMonitoringEnabledLocal(false)
     }
@@ -315,7 +345,7 @@ async function loadRealtimeTrafficSummary() {
 }
 
 watch(
-  () => [realtimeWindow.value, props.platform, props.groupId] as const,
+  () => [realtimeWindow.value, props.platform, props.groupId, props.accountIds.join(',')] as const,
   () => {
     loadRealtimeTrafficSummary()
   },
@@ -907,6 +937,15 @@ function handleToolbarRefresh() {
             :options="groupOptions"
             class="w-full sm:w-[160px]"
             @update:model-value="handleGroupChange"
+          />
+
+          <MultiSelect
+            v-if="accountOptions.length > 0"
+            :model-value="accountIds"
+            :options="accountOptions"
+            :placeholder="t('admin.ops.accounts')"
+            class="w-full sm:w-[160px]"
+            @update:model-value="handleAccountIdsChange"
           />
 
           <div class="mx-1 hidden h-4 w-[1px] bg-gray-200 dark:bg-dark-700 sm:block"></div>

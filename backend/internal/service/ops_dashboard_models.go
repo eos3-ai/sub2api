@@ -6,8 +6,9 @@ type OpsDashboardFilter struct {
 	StartTime time.Time
 	EndTime   time.Time
 
-	Platform string
-	GroupID  *int64
+	Platform   string
+	GroupID    *int64
+	AccountIDs []int64 // 多选账号过滤；非空时强制降级为 raw 模式
 
 	// QueryMode controls whether dashboard queries should use raw logs or pre-aggregated tables.
 	// Expected values: auto/raw/preagg (see OpsQueryMode).

@@ -230,6 +230,9 @@ export default {
     selectOption: 'Select an option',
     searchPlaceholder: 'Search...',
     noOptionsFound: 'No options found',
+    selectAll: 'Select All',
+    selected: 'selected',
+    clear: 'Clear',
     noGroupsAvailable: 'No groups available',
     unknownError: 'Unknown error occurred',
     saving: 'Saving...',
@@ -2823,6 +2826,7 @@ export default {
     ops: {
       title: 'Ops Monitoring',
       description: 'Operational monitoring and troubleshooting',
+      accounts: 'Accounts',
       // Dashboard
       systemHealth: 'System Health',
       overview: 'Overview',

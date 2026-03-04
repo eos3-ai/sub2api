@@ -230,6 +230,9 @@ export default {
     selectOption: '请选择',
     searchPlaceholder: '搜索...',
     noOptionsFound: '无匹配选项',
+    selectAll: '全选',
+    selected: '已选',
+    clear: '清空',
     noGroupsAvailable: '无可用分组',
     unknownError: '发生未知错误',
     saving: '保存中...',
@@ -2996,6 +2999,7 @@ export default {
     ops: {
       title: '运维监控',
       description: '运维监控与排障',
+      accounts: '账号',
       // Dashboard
       systemHealth: '系统健康',
       overview: '概览',

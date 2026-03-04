@@ -15,6 +15,7 @@
         :overview="overview"
         :platform="platform"
         :group-id="groupId"
+        :account-ids="accountIds"
         :time-range="timeRange"
         :query-mode="queryMode"
         :loading="loading"
@@ -28,6 +29,7 @@
         @update:time-range="onTimeRangeChange"
         @update:platform="onPlatformChange"
         @update:group="onGroupChange"
+        @update:account-ids="onAccountIdsChange"
         @update:query-mode="onQueryModeChange"
         @update:custom-time-range="onCustomTimeRangeChange"
         @refresh="fetchData"
@@ -192,6 +194,7 @@ const lastUpdated = ref<Date | null>(new Date())
 const timeRange = ref<TimeRange>('1h')
 const platform = ref<string>('')
 const groupId = ref<number | null>(null)
+const accountIds = ref<number[]>([])
 const queryMode = ref<QueryMode>('auto')
 const customStartTime = ref<string | null>(null)
 const customEndTime = ref<string | null>(null)
@@ -203,6 +206,7 @@ const QUERY_KEYS = {
   timeRange: 'tr',
   platform: 'platform',
   groupId: 'group_id',
+  accountIds: 'account_ids',
   queryMode: 'mode',
   fullscreen: 'fullscreen',
 
@@ -283,6 +287,16 @@ const applyRouteQueryToState = () => {
   const groupIdRaw = readQueryNumber(QUERY_KEYS.groupId)
   groupId.value = typeof groupIdRaw === 'number' && groupIdRaw > 0 ? groupIdRaw : null
 
+  const accountIdsRaw = readQueryString(QUERY_KEYS.accountIds)
+  if (accountIdsRaw) {
+    accountIds.value = accountIdsRaw
+      .split(',')
+      .map((s) => Number.parseInt(s.trim(), 10))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  } else {
+    accountIds.value = []
+  }
+
   const nextMode = readQueryString(QUERY_KEYS.queryMode)
   if (nextMode && allowedQueryModes.has(nextMode as QueryMode)) {
     queryMode.value = nextMode as QueryMode
@@ -322,6 +336,7 @@ const buildQueryFromState = () => {
   if (timeRange.value !== '1h') next[QUERY_KEYS.timeRange] = timeRange.value
   if (platform.value) next[QUERY_KEYS.platform] = platform.value
   if (typeof groupId.value === 'number' && groupId.value > 0) next[QUERY_KEYS.groupId] = String(groupId.value)
+  if (accountIds.value.length > 0) next[QUERY_KEYS.accountIds] = accountIds.value.join(',')
   if (queryMode.value !== 'auto') next[QUERY_KEYS.queryMode] = queryMode.value
 
   return next
@@ -494,6 +509,10 @@ function onQueryModeChange(v: string | number | boolean | null) {
   queryMode.value = v as QueryMode
 }
 
+function onAccountIdsChange(v: number[]) {
+  accountIds.value = v
+}
+
 function openError(id: number) {
   selectedErrorId.value = id
   // Ensure only one modal visible at a time.
@@ -506,6 +525,7 @@ function buildApiParams() {
   const params: any = {
     platform: platform.value || undefined,
     group_id: groupId.value ?? undefined,
+    account_ids: accountIds.value.length > 0 ? accountIds.value.join(',') : undefined,
     mode: queryMode.value
   }
 
@@ -694,7 +714,7 @@ async function fetchData() {
 }
 
 watch(
-  () => [timeRange.value, platform.value, groupId.value, queryMode.value] as const,
+  () => [timeRange.value, platform.value, groupId.value, accountIds.value, queryMode.value] as const,
   () => {
     if (isApplyingRouteQuery.value) return
     if (opsEnabled.value) {
@@ -712,13 +732,17 @@ watch(
     const prevTimeRange = timeRange.value
     const prevPlatform = platform.value
     const prevGroupId = groupId.value
+    const prevAccountIds = accountIds.value.join(',')
 
     isApplyingRouteQuery.value = true
     applyRouteQueryToState()
     isApplyingRouteQuery.value = false
 
     const changed =
-      prevTimeRange !== timeRange.value || prevPlatform !== platform.value || prevGroupId !== groupId.value
+      prevTimeRange !== timeRange.value ||
+      prevPlatform !== platform.value ||
+      prevGroupId !== groupId.value ||
+      prevAccountIds !== accountIds.value.join(',')
     if (changed) {
       if (opsEnabled.value) {
         fetchData()

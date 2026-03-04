@@ -486,7 +486,8 @@ export interface OpsRealtimeTrafficSummaryResponse {
 export async function getRealtimeTrafficSummary(
   window: string,
   platform?: string,
-  groupId?: number | null
+  groupId?: number | null,
+  accountIds?: number[]
 ): Promise<OpsRealtimeTrafficSummaryResponse> {
   const params: Record<string, any> = { window }
   if (platform) {
@@ -494,6 +495,9 @@ export async function getRealtimeTrafficSummary(
   }
   if (typeof groupId === 'number' && groupId > 0) {
     params.group_id = groupId
+  }
+  if (accountIds && accountIds.length > 0) {
+    params.account_ids = accountIds.join(',')
   }
 
   const { data } = await apiClient.get<OpsRealtimeTrafficSummaryResponse>('/admin/ops/realtime-traffic', { params })
@@ -993,6 +997,7 @@ export async function getDashboardOverview(
   end_time?: string
   platform?: string
   group_id?: number | null
+  account_ids?: string
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1011,6 +1016,7 @@ export async function getThroughputTrend(
   end_time?: string
   platform?: string
   group_id?: number | null
+  account_ids?: string
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1029,6 +1035,7 @@ export async function getLatencyHistogram(
   end_time?: string
   platform?: string
   group_id?: number | null
+  account_ids?: string
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1047,6 +1054,7 @@ export async function getErrorTrend(
   end_time?: string
   platform?: string
   group_id?: number | null
+  account_ids?: string
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1065,6 +1073,7 @@ export async function getErrorDistribution(
   end_time?: string
   platform?: string
   group_id?: number | null
+  account_ids?: string
   mode?: OpsQueryMode
   },
   options: OpsRequestOptions = {}
@@ -1098,6 +1107,7 @@ export type OpsErrorListQueryParams = {
   platform?: string
   group_id?: number | null
   account_id?: number | null
+  account_ids?: string
 
   phase?: string
   error_owner?: string

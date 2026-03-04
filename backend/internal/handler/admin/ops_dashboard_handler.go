@@ -44,6 +44,11 @@ func (h *OpsHandler) GetDashboardOverview(c *gin.Context) {
 		}
 		filter.GroupID = &id
 	}
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+	filter.AccountIDs = accountIDs
 
 	data, err := h.opsService.GetDashboardOverview(c.Request.Context(), filter)
 	if err != nil {
@@ -85,6 +90,11 @@ func (h *OpsHandler) GetDashboardThroughputTrend(c *gin.Context) {
 		}
 		filter.GroupID = &id
 	}
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+	filter.AccountIDs = accountIDs
 
 	bucketSeconds := pickThroughputBucketSeconds(endTime.Sub(startTime))
 	data, err := h.opsService.GetThroughputTrend(c.Request.Context(), filter, bucketSeconds)
@@ -127,6 +137,11 @@ func (h *OpsHandler) GetDashboardLatencyHistogram(c *gin.Context) {
 		}
 		filter.GroupID = &id
 	}
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+	filter.AccountIDs = accountIDs
 
 	data, err := h.opsService.GetLatencyHistogram(c.Request.Context(), filter)
 	if err != nil {
@@ -168,6 +183,11 @@ func (h *OpsHandler) GetDashboardErrorTrend(c *gin.Context) {
 		}
 		filter.GroupID = &id
 	}
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+	filter.AccountIDs = accountIDs
 
 	bucketSeconds := pickThroughputBucketSeconds(endTime.Sub(startTime))
 	data, err := h.opsService.GetErrorTrend(c.Request.Context(), filter, bucketSeconds)
@@ -210,6 +230,11 @@ func (h *OpsHandler) GetDashboardErrorDistribution(c *gin.Context) {
 		}
 		filter.GroupID = &id
 	}
+	accountIDs, ok := parseOpsDashboardAccountIDs(c)
+	if !ok {
+		return
+	}
+	filter.AccountIDs = accountIDs
 
 	data, err := h.opsService.GetErrorDistribution(c.Request.Context(), filter)
 	if err != nil {
@@ -338,6 +363,30 @@ func pickThroughputBucketSeconds(window time.Duration) int {
 	default:
 		return 3600
 	}
+}
+
+// parseOpsDashboardAccountIDs parses "account_ids=1,2,3" from the ops dashboard request query.
+// Returns (ids, ok); ok=false means validation failed and the handler should abort.
+func parseOpsDashboardAccountIDs(c *gin.Context) ([]int64, bool) {
+	raw := strings.TrimSpace(c.Query("account_ids"))
+	if raw == "" {
+		return nil, true
+	}
+	parts := strings.Split(raw, ",")
+	ids := make([]int64, 0, len(parts))
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p == "" {
+			continue
+		}
+		id, err := strconv.ParseInt(p, 10, 64)
+		if err != nil || id <= 0 {
+			response.BadRequest(c, "Invalid account_ids")
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return ids, true
 }
 
 func parseOpsQueryMode(c *gin.Context) service.OpsQueryMode {
