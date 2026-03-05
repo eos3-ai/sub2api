@@ -96,6 +96,8 @@ export interface PublicSettings {
   gemini_official_url?: string
   linuxdo_oauth_enabled: boolean
   version: string
+  baidu_tongji_id?: string
+  baidu_token?: string
 }
 
 export interface AuthResponse {

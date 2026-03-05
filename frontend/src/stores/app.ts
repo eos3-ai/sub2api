@@ -12,6 +12,7 @@ import {
   type ReleaseInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
+import { injectBaiduScripts } from '@/utils/baiduTracking'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -325,6 +326,7 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = config.api_base_url || ''
     docUrl.value = config.doc_url || ''
     publicSettingsLoaded.value = true
+    injectBaiduScripts(config.baidu_tongji_id || '', config.baidu_token || '')
   }
 
   /**

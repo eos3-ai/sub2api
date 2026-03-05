@@ -92,6 +92,10 @@ type PublicSettings struct {
 
 	LinuxDoOAuthEnabled bool
 	Version             string
+
+	// 百度营销埋码
+	BaiduTongjiID string
+	BaiduToken    string
 }
 
 // StreamTimeoutSettings 流超时处理配置（仅控制超时后的处理方式，超时判定由网关配置控制）
