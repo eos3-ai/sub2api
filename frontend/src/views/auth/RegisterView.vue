@@ -260,6 +260,7 @@
 	import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import { getPublicSettings, validatePromoCode, validateInvitationCode } from '@/api/auth'
+import { trackRegisterPageView, trackRegisterSubmit } from '@/utils/baiduTracking'
 
 const { t } = useI18n()
 
@@ -358,6 +359,7 @@ onMounted(async () => {
   } finally {
     settingsLoaded.value = true
   }
+  trackRegisterPageView()
 })
 
 onUnmounted(() => {
@@ -600,6 +602,7 @@ async function handleRegister(): Promise<void> {
   }
 
   isLoading.value = true
+  trackRegisterSubmit()
 
   try {
     // If email verification is enabled, redirect to verification page

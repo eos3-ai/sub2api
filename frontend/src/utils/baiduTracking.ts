@@ -34,6 +34,20 @@ export function injectBaiduScripts(tongjiId: string, token: string): void {
 }
 
 /**
+ * 上报进入注册页事件
+ */
+export function trackRegisterPageView(): void {
+  window._hmt?.push(['_trackEvent', '注册转化', 'view', 'register_page'])
+}
+
+/**
+ * 上报点击提交注册按钮事件
+ */
+export function trackRegisterSubmit(): void {
+  window._hmt?.push(['_trackEvent', '注册转化', 'submit', 'register_form'])
+}
+
+/**
  * 上报注册成功转化事件
  */
 export function trackRegisterSuccess(): void {
