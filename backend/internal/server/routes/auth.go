@@ -69,6 +69,12 @@ func RegisterAuthRoutes(
 		settings.GET("/public", h.Setting.GetPublicSettings)
 	}
 
+	// 公开追踪接口（无需认证）
+	public := v1.Group("/public")
+	{
+		public.POST("/ocpc", h.Setting.ReportOcpcEvent)
+	}
+
 	// 需要认证的当前用户信息
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))

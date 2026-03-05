@@ -1,36 +1,23 @@
 declare global {
   interface Window {
     _hmt: any[];
-    _agl: any[];
   }
 }
 
 let injected = false
 
 /**
- * 根据公开配置动态注入百度统计和营销追踪脚本
+ * 根据公开配置动态注入百度统计脚本
  * 由 applySettings 调用，只注入一次
  */
-export function injectBaiduScripts(tongjiId: string, token: string): void {
-  if (injected || (!tongjiId && !token)) return
+export function injectBaiduScripts(tongjiId: string): void {
+  if (injected || !tongjiId) return
   injected = true
 
-  if (tongjiId) {
-    window._hmt = window._hmt || []
-    const hm = document.createElement('script')
-    hm.src = `https://hm.baidu.com/hm.js?${tongjiId}`
-    document.head.appendChild(hm)
-  }
-
-  if (token) {
-    window._agl = window._agl || []
-    window._agl.push(['production', token])
-    const agl = document.createElement('script')
-    agl.type = 'text/javascript'
-    agl.async = true
-    agl.src = `https://fxgate.baidu.com/angelia/fcagl.js?production=${token}`
-    document.head.appendChild(agl)
-  }
+  window._hmt = window._hmt || []
+  const hm = document.createElement('script')
+  hm.src = `https://hm.baidu.com/hm.js?${tongjiId}`
+  document.head.appendChild(hm)
 }
 
 /**
@@ -48,9 +35,15 @@ export function trackRegisterSubmit(): void {
 }
 
 /**
- * 上报注册成功转化事件
+ * 读取百度广告 bd_vid（由落地页写入 localStorage）
  */
-export function trackRegisterSuccess(): void {
-  window._hmt?.push(['_trackEvent', '注册转化', 'success', 'register'])
-  window._agl?.push(['track', ['success', { t: 3 }]])
+export function getBdVid(): string {
+  return localStorage.getItem('bd_vid') || ''
+}
+
+/**
+ * 读取百度广告落地页 URL（由落地页写入 localStorage）
+ */
+export function getBdLandingUrl(): string {
+  return localStorage.getItem('bd_landing_url') || ''
 }

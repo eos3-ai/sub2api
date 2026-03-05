@@ -261,6 +261,7 @@
 import { useAuthStore, useAppStore } from '@/stores'
 import { getPublicSettings, validatePromoCode, validateInvitationCode } from '@/api/auth'
 import { trackRegisterPageView, trackRegisterSubmit } from '@/utils/baiduTracking'
+import { reportOcpcEvent } from '@/api/tracking'
 
 const { t } = useI18n()
 
@@ -360,6 +361,7 @@ onMounted(async () => {
     settingsLoaded.value = true
   }
   trackRegisterPageView()
+  reportOcpcEvent(1)
 })
 
 onUnmounted(() => {

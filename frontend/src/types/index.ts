@@ -51,6 +51,8 @@ export interface LoginRequest {
   email: string
   password: string
   turnstile_token?: string
+  bd_vid?: string
+  bd_landing_url?: string
 }
 
 export interface RegisterRequest {
@@ -61,6 +63,8 @@ export interface RegisterRequest {
   turnstile_token?: string
   promo_code?: string
   invitation_code?: string
+  bd_vid?: string
+  bd_landing_url?: string
 }
 
 export interface SendVerifyCodeRequest {
@@ -97,7 +101,6 @@ export interface PublicSettings {
   linuxdo_oauth_enabled: boolean
   version: string
   baidu_tongji_id?: string
-  baidu_token?: string
 }
 
 export interface AuthResponse {

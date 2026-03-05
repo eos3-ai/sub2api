@@ -326,7 +326,7 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = config.api_base_url || ''
     docUrl.value = config.doc_url || ''
     publicSettingsLoaded.value = true
-    injectBaiduScripts(config.baidu_tongji_id || '', config.baidu_token || '')
+    injectBaiduScripts(config.baidu_tongji_id || '')
   }
 
   /**

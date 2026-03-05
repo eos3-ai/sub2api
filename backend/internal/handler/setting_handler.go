@@ -8,6 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// OcpcEventRequest 百度 OCPC 转化事件上报请求
+type OcpcEventRequest struct {
+	BdVid      string `json:"bd_vid" binding:"required"`
+	LandingUrl string `json:"landing_url"`
+	NewType    int    `json:"new_type"`
+}
+
 // SettingHandler 公开设置处理器（无需认证）
 type SettingHandler struct {
 	settingService *service.SettingService
@@ -20,6 +27,23 @@ func NewSettingHandler(settingService *service.SettingService, version string) *
 		settingService: settingService,
 		version:        version,
 	}
+}
+
+// ReportOcpcEvent 上报百度 OCPC 转化事件（公开接口，仅允许 newType=1 关键页面浏览）
+// POST /api/v1/public/ocpc
+func (h *SettingHandler) ReportOcpcEvent(c *gin.Context) {
+	var req OcpcEventRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	// 仅允许上报关键页面浏览事件，防止公开接口被滥用
+	if req.NewType != 1 {
+		response.BadRequest(c, "Invalid new_type: only 1 (page view) is allowed via public API")
+		return
+	}
+	service.ReportBaiduOcpcEvent(req.BdVid, req.LandingUrl, req.NewType)
+	response.Success(c, gin.H{"ok": true})
 }
 
 // GetPublicSettings 获取公开设置
