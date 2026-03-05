@@ -1120,7 +1120,9 @@ export default {
       standard: 'Standard',
       noDataAvailable: 'No data available',
       recentUsage: 'Recent Usage',
-      failedToLoad: 'Failed to load dashboard statistics'
+      failedToLoad: 'Failed to load dashboard statistics',
+      dailyActiveUsers: 'Daily Active Users',
+      activeUserCount: 'Active Users'
     },
     paymentOrders: {
       title: 'Recharge Records',

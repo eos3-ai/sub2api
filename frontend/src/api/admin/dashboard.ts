@@ -9,7 +9,8 @@ import type {
   TrendDataPoint,
   ModelStat,
   ApiKeyUsageTrendPoint,
-  UserUsageTrendPoint
+  UserUsageTrendPoint,
+  ActiveUsersTrendPoint
 } from '@/types'
 
 /**
@@ -168,6 +169,27 @@ export async function getBatchUsersUsage(userIds: number[]): Promise<BatchUsersU
   return data
 }
 
+export interface ActiveUsersTrendResponse {
+  trend: ActiveUsersTrendPoint[]
+  start_date: string
+  end_date: string
+  granularity: string
+}
+
+/**
+ * Get active users trend data
+ * @param params - Query parameters for filtering
+ * @returns Active users trend data
+ */
+export async function getActiveUsersTrend(params?: {
+  start_date?: string
+  end_date?: string
+  granularity?: 'day' | 'hour'
+}): Promise<ActiveUsersTrendResponse> {
+  const { data } = await apiClient.get<ActiveUsersTrendResponse>('/admin/dashboard/active-users-trend', { params })
+  return data
+}
+
 export interface BatchApiKeyUsageStats {
   api_key_id: number
   today_actual_cost: number
@@ -202,6 +224,7 @@ export const dashboardAPI = {
   getModelStats,
   getApiKeyUsageTrend,
   getUserUsageTrend,
+  getActiveUsersTrend,
   getBatchUsersUsage,
   getBatchApiKeysUsage
 }

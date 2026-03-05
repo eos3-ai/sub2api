@@ -276,6 +276,22 @@
             <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
           </div>
 
+          <!-- Active Users Trend (Full Width) -->
+          <div class="card p-4">
+            <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.dashboard.dailyActiveUsers') }}
+            </h3>
+            <div class="h-48">
+              <Line v-if="activeUsersChartData" :data="activeUsersChartData" :options="activeUsersChartOptions" />
+              <div
+                v-else
+                class="flex h-full items-center justify-center text-sm text-gray-500 dark:text-gray-400"
+              >
+                {{ t('admin.dashboard.noDataAvailable') }}
+              </div>
+            </div>
+          </div>
+
           <!-- User Usage Trend (Full Width) -->
           <div class="card p-4">
             <h3 class="mb-4 text-sm font-semibold text-gray-900 dark:text-white">
@@ -304,7 +320,7 @@ import { useAppStore } from '@/stores/app'
 
 const { t } = useI18n()
 import { adminAPI } from '@/api/admin'
-import type { DashboardStats, TrendDataPoint, ModelStat, UserUsageTrendPoint } from '@/types'
+import type { DashboardStats, TrendDataPoint, ModelStat, UserUsageTrendPoint, ActiveUsersTrendPoint } from '@/types'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -347,6 +363,7 @@ const chartsLoading = ref(false)
 const trendData = ref<TrendDataPoint[]>([])
 const modelStats = ref<ModelStat[]>([])
 const userTrend = ref<UserUsageTrendPoint[]>([])
+const activeUsersTrend = ref<ActiveUsersTrendPoint[]>([])
 
 // Helper function to format date in local timezone
 const formatLocalDate = (date: Date): string => {
@@ -492,6 +509,62 @@ const userTrendChartData = computed(() => {
   }
 })
 
+// Active users chart data
+const activeUsersChartData = computed(() => {
+  if (!activeUsersTrend.value?.length) return null
+
+  return {
+    labels: activeUsersTrend.value.map((p) => p.date),
+    datasets: [
+      {
+        label: t('admin.dashboard.activeUserCount'),
+        data: activeUsersTrend.value.map((p) => p.active_users),
+        borderColor: '#8b5cf6',
+        backgroundColor: '#8b5cf620',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3
+      }
+    ]
+  }
+})
+
+// Active users chart options
+const activeUsersChartOptions = computed(() => ({
+  responsive: true,
+  maintainAspectRatio: false,
+  interaction: {
+    intersect: false,
+    mode: 'index' as const
+  },
+  plugins: {
+    legend: {
+      display: false
+    },
+    tooltip: {
+      callbacks: {
+        label: (context: any) => `${context.dataset.label}: ${context.raw}`
+      }
+    }
+  },
+  scales: {
+    x: {
+      grid: { color: chartColors.value.grid },
+      ticks: { color: chartColors.value.text, font: { size: 10 } }
+    },
+    y: {
+      grid: { color: chartColors.value.grid },
+      ticks: {
+        color: chartColors.value.text,
+        font: { size: 10 },
+        stepSize: 1,
+        callback: (value: string | number) => Math.floor(Number(value))
+      },
+      min: 0
+    }
+  }
+}))
+
 // Format helpers
 const formatTokens = (value: number | undefined): string => {
   if (value === undefined || value === null) return '0'
@@ -579,6 +652,13 @@ const loadChartData = async () => {
     trendData.value = trendResponse.trend || []
     modelStats.value = modelResponse.models || []
     userTrend.value = userResponse.trend || []
+
+    try {
+      const activeUsersResponse = await adminAPI.dashboard.getActiveUsersTrend(params)
+      activeUsersTrend.value = activeUsersResponse.trend || []
+    } catch (e) {
+      console.error('Error loading active users trend:', e)
+    }
   } catch (error) {
     console.error('Error loading chart data:', error)
   } finally {

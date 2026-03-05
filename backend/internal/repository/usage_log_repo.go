@@ -980,6 +980,9 @@ type UserUsageTrendPoint = usagestats.UserUsageTrendPoint
 // APIKeyUsageTrendPoint represents API key usage trend data point
 type APIKeyUsageTrendPoint = usagestats.APIKeyUsageTrendPoint
 
+// ActiveUsersTrendPoint represents daily/hourly active user count
+type ActiveUsersTrendPoint = usagestats.ActiveUsersTrendPoint
+
 // GetAPIKeyUsageTrend returns usage trend data grouped by API key and date
 func (r *usageLogRepository) GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) (results []APIKeyUsageTrendPoint, err error) {
 	dateFormat := safeDateFormat(granularity)
@@ -1081,6 +1084,45 @@ func (r *usageLogRepository) GetUserUsageTrend(ctx context.Context, startTime, e
 	for rows.Next() {
 		var row UserUsageTrendPoint
 		if err = rows.Scan(&row.Date, &row.UserID, &row.Email, &row.Requests, &row.Tokens, &row.Cost, &row.ActualCost); err != nil {
+			return nil, err
+		}
+		results = append(results, row)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// GetActiveUsersTrend returns daily or hourly active user counts by querying usage_logs directly.
+func (r *usageLogRepository) GetActiveUsersTrend(ctx context.Context, startTime, endTime time.Time, granularity string) (results []ActiveUsersTrendPoint, err error) {
+	dateFormat := safeDateFormat(granularity)
+	query := fmt.Sprintf(`
+		SELECT
+			TO_CHAR(created_at, '%s') AS date,
+			COUNT(DISTINCT user_id) AS active_users
+		FROM usage_logs
+		WHERE created_at >= $1 AND created_at < $2
+		GROUP BY 1
+		ORDER BY 1 ASC
+	`, dateFormat)
+
+	rows, err := r.sql.QueryContext(ctx, query, startTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			results = nil
+		}
+	}()
+
+	results = make([]ActiveUsersTrendPoint, 0)
+	for rows.Next() {
+		var row ActiveUsersTrendPoint
+		if err = rows.Scan(&row.Date, &row.ActiveUsers); err != nil {
 			return nil, err
 		}
 		results = append(results, row)

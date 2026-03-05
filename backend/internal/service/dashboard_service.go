@@ -319,6 +319,14 @@ func (s *DashboardService) GetUserUsageTrend(ctx context.Context, startTime, end
 	return trend, nil
 }
 
+func (s *DashboardService) GetActiveUsersTrend(ctx context.Context, startTime, endTime time.Time, granularity string) ([]usagestats.ActiveUsersTrendPoint, error) {
+	trend, err := s.usageRepo.GetActiveUsersTrend(ctx, startTime, endTime, granularity)
+	if err != nil {
+		return nil, fmt.Errorf("get active users trend: %w", err)
+	}
+	return trend, nil
+}
+
 func (s *DashboardService) GetBatchUserUsageStats(ctx context.Context, userIDs []int64, startTime, endTime time.Time) (map[int64]*usagestats.BatchUserUsageStats, error) {
 	stats, err := s.usageRepo.GetBatchUserUsageStats(ctx, userIDs, startTime, endTime)
 	if err != nil {

@@ -1122,6 +1122,11 @@ export interface ModelStat {
   actual_cost: number // 实际扣除
 }
 
+export interface ActiveUsersTrendPoint {
+  date: string
+  active_users: number
+}
+
 export interface UserUsageTrendPoint {
   date: string
   user_id: number

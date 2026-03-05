@@ -78,6 +78,12 @@ type ModelStat struct {
 	ActualCost   float64 `json:"actual_cost"` // 实际扣除
 }
 
+// ActiveUsersTrendPoint represents daily/hourly active user count
+type ActiveUsersTrendPoint struct {
+	Date        string `json:"date"`
+	ActiveUsers int64  `json:"active_users"`
+}
+
 // UserUsageTrendPoint represents user usage trend data point
 type UserUsageTrendPoint struct {
 	Date       string  `json:"date"`
