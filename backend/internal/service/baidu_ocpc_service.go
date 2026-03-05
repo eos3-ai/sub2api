@@ -15,8 +15,10 @@ const baiduOcpcURL = "https://ocpc.baidu.com/ocpcapi/api/uploadConvertData"
 func ReportBaiduOcpcEvent(bdVid, landingUrl string, newType int) {
 	token := os.Getenv("BAIDU_OCPC_TOKEN")
 	if token == "" || bdVid == "" {
+		slog.Info("baidu ocpc skip", "reason", map[string]bool{"no_token": token == "", "no_vid": bdVid == ""}, "new_type", newType)
 		return
 	}
+	slog.Info("baidu ocpc reporting", "new_type", newType, "bd_vid", bdVid[:min(8, len(bdVid))]+"...")
 	logidUrl := landingUrl
 	if logidUrl == "" {
 		logidUrl = "https://placeholder.invalid?bd_vid=" + bdVid
@@ -40,6 +42,8 @@ func ReportBaiduOcpcEvent(bdVid, landingUrl string, newType int) {
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			slog.Warn("baidu ocpc non-200 response", "status", resp.StatusCode)
+		} else {
+			slog.Info("baidu ocpc reported ok", "new_type", newType)
 		}
 	}()
 }
