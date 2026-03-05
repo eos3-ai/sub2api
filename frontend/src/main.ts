@@ -4,7 +4,18 @@ import App from './App.vue'
 import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
+import { getBdVid } from '@/utils/baiduTracking'
 import './style.css'
+
+// 兜底捕获 bd_vid：用户可能直接从百度广告进入 sub2api 页面而不经过落地页
+;(function captureBdVidIfPresent() {
+  const params = new URLSearchParams(window.location.search)
+  const vid = params.get('bd_vid')
+  if (vid && !getBdVid()) {
+    localStorage.setItem('bd_vid', vid)
+    localStorage.setItem('bd_landing_url', window.location.href)
+  }
+})()
 
 async function bootstrap() {
   const app = createApp(App)
