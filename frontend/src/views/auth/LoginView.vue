@@ -18,15 +18,7 @@
           >
             联系管理员
           </button>
-          老系统地址：
-          <a
-            href="https://archive.tokencloud.ai"
-            class="font-medium text-amber-800 underline underline-offset-2 transition-colors hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
-            target="_blank"
-            rel="noreferrer"
-          >
-            archive.tokencloud.ai 。
-          </a>
+          获取帮助。
         </p>
         <p class="mt-1 leading-relaxed">感谢大家的理解与支持～</p>
       </div>
