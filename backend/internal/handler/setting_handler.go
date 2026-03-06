@@ -79,5 +79,6 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		GeminiOfficialURL:           settings.GeminiOfficialURL,
 		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
 		Version:                     h.version,
+		BaiduTongjiID:               settings.BaiduTongjiID,
 	})
 }

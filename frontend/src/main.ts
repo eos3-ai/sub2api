@@ -11,9 +11,12 @@ import './style.css'
 ;(function captureBdVidIfPresent() {
   const params = new URLSearchParams(window.location.search)
   const vid = params.get('bd_vid')
-  if (vid && !getBdVid()) {
+  const landingUrl = params.get('bd_landing_url')
+  if (vid) {
     localStorage.setItem('bd_vid', vid)
-    localStorage.setItem('bd_landing_url', window.location.href)
+    localStorage.setItem('bd_landing_url', landingUrl || window.location.href)
+  } else if (!getBdVid() && landingUrl) {
+    localStorage.setItem('bd_landing_url', landingUrl)
   }
 })()
 

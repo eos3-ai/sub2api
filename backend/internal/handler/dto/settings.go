@@ -89,6 +89,7 @@ type PublicSettings struct {
 
 	LinuxDoOAuthEnabled bool   `json:"linuxdo_oauth_enabled"`
 	Version             string `json:"version"`
+	BaiduTongjiID       string `json:"baidu_tongji_id,omitempty"`
 }
 
 // StreamTimeoutSettings 流超时处理配置 DTO
