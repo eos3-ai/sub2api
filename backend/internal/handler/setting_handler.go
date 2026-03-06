@@ -29,7 +29,7 @@ func NewSettingHandler(settingService *service.SettingService, version string) *
 	}
 }
 
-// ReportOcpcEvent 上报百度 OCPC 转化事件（公开接口，仅允许 newType=1 关键页面浏览）
+// ReportOcpcEvent 上报百度 OCPC 转化事件（公开接口，仅允许关键页面浏览事件）
 // POST /api/v1/public/ocpc
 func (h *SettingHandler) ReportOcpcEvent(c *gin.Context) {
 	var req OcpcEventRequest
@@ -37,9 +37,10 @@ func (h *SettingHandler) ReportOcpcEvent(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	landingNewType := service.GetBaiduOcpcLandingNewType()
 	// 仅允许上报关键页面浏览事件，防止公开接口被滥用
-	if req.NewType != 1 {
-		response.BadRequest(c, "Invalid new_type: only 1 (page view) is allowed via public API")
+	if req.NewType != landingNewType {
+		response.BadRequest(c, "Invalid new_type: only configured landing new_type is allowed via public API")
 		return
 	}
 	service.ReportBaiduOcpcEvent(req.BdVid, req.LandingUrl, req.NewType)
@@ -80,5 +81,6 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
 		Version:                     h.version,
 		BaiduTongjiID:               settings.BaiduTongjiID,
+		BaiduOcpcLandingNewType:     settings.BaiduOcpcLandingNewType,
 	})
 }

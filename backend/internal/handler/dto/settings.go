@@ -87,9 +87,10 @@ type PublicSettings struct {
 	CodexOfficialURL  string `json:"codex_official_url"`
 	GeminiOfficialURL string `json:"gemini_official_url"`
 
-	LinuxDoOAuthEnabled bool   `json:"linuxdo_oauth_enabled"`
-	Version             string `json:"version"`
-	BaiduTongjiID       string `json:"baidu_tongji_id,omitempty"`
+	LinuxDoOAuthEnabled     bool   `json:"linuxdo_oauth_enabled"`
+	Version                 string `json:"version"`
+	BaiduTongjiID           string `json:"baidu_tongji_id,omitempty"`
+	BaiduOcpcLandingNewType int    `json:"baidu_ocpc_landing_new_type,omitempty"`
 }
 
 // StreamTimeoutSettings 流超时处理配置 DTO

@@ -120,6 +120,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		GeminiOfficialURL:           os.Getenv("GEMINI_OFFICIAL_URL"),
 		LinuxDoOAuthEnabled:         linuxDoEnabled,
 		BaiduTongjiID:               os.Getenv("BAIDU_TONGJI_ID"),
+		BaiduOcpcLandingNewType:     GetBaiduOcpcLandingNewType(),
 	}, nil
 }
 
@@ -168,6 +169,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		LinuxDoOAuthEnabled         bool   `json:"linuxdo_oauth_enabled"`
 		Version                     string `json:"version,omitempty"`
 		BaiduTongjiID               string `json:"baidu_tongji_id,omitempty"`
+		BaiduOcpcLandingNewType     int    `json:"baidu_ocpc_landing_new_type,omitempty"`
 	}{
 		RegistrationEnabled:         settings.RegistrationEnabled,
 		EmailVerifyEnabled:          settings.EmailVerifyEnabled,
@@ -193,6 +195,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		LinuxDoOAuthEnabled:         settings.LinuxDoOAuthEnabled,
 		Version:                     s.version,
 		BaiduTongjiID:               settings.BaiduTongjiID,
+		BaiduOcpcLandingNewType:     settings.BaiduOcpcLandingNewType,
 	}, nil
 }
 

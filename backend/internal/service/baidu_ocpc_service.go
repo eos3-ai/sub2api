@@ -6,12 +6,47 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
+	"strings"
 )
 
 const baiduOcpcURL = "https://ocpc.baidu.com/ocpcapi/api/uploadConvertData"
 
+const (
+	DefaultBaiduOcpcLandingNewType  = 1
+	DefaultBaiduOcpcRegisterNewType = 3
+	DefaultBaiduOcpcLoginNewType    = 5
+)
+
+func getBaiduOcpcNewType(envKey string, defaultValue int) int {
+	raw := strings.TrimSpace(os.Getenv(envKey))
+	if raw == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		slog.Warn("invalid baidu ocpc new_type config", "env", envKey, "value", raw, "default", defaultValue)
+		return defaultValue
+	}
+
+	return value
+}
+
+func GetBaiduOcpcLandingNewType() int {
+	return getBaiduOcpcNewType("BAIDU_OCPC_NEW_TYPE_LANDING", DefaultBaiduOcpcLandingNewType)
+}
+
+func GetBaiduOcpcRegisterNewType() int {
+	return getBaiduOcpcNewType("BAIDU_OCPC_NEW_TYPE_REGISTER", DefaultBaiduOcpcRegisterNewType)
+}
+
+func GetBaiduOcpcLoginNewType() int {
+	return getBaiduOcpcNewType("BAIDU_OCPC_NEW_TYPE_LOGIN", DefaultBaiduOcpcLoginNewType)
+}
+
 // ReportBaiduOcpcEvent 异步上报百度 OCPC 转化事件（goroutine 执行，不阻塞业务）
-// newType: 1=关键页面浏览 3=注册 5=登录
+// newType: 以百度后台配置为准（默认：1=关键页面浏览 3=注册 5=登录）
 func ReportBaiduOcpcEvent(bdVid, landingUrl string, newType int) {
 	token := os.Getenv("BAIDU_OCPC_TOKEN")
 	if token == "" || bdVid == "" {

@@ -101,6 +101,7 @@ export interface PublicSettings {
   linuxdo_oauth_enabled: boolean
   version: string
   baidu_tongji_id?: string
+  baidu_ocpc_landing_new_type?: number
 }
 
 export interface AuthResponse {

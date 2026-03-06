@@ -47,8 +47,8 @@ type RegisterRequest struct {
 	TurnstileToken string `json:"turnstile_token"`
 	PromoCode      string `json:"promo_code"`      // 注册优惠码
 	InvitationCode string `json:"invitation_code"` // 邀请码
-	BdVid          string `json:"bd_vid"`           // 百度广告 vid
-	BdLandingUrl   string `json:"bd_landing_url"`   // 百度落地页 URL
+	BdVid          string `json:"bd_vid"`          // 百度广告 vid
+	BdLandingUrl   string `json:"bd_landing_url"`  // 百度落地页 URL
 }
 
 // SendVerifyCodeRequest 发送验证码请求
@@ -131,7 +131,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingUrl, 3)
+	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingUrl, service.GetBaiduOcpcRegisterNewType())
 	h.respondWithTokenPair(c, user)
 }
 
@@ -201,7 +201,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingUrl, 5)
+	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingUrl, service.GetBaiduOcpcLoginNewType())
 	h.respondWithTokenPair(c, user)
 }
 

@@ -288,6 +288,7 @@ const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
 const siteName = ref<string>('Sub2API')
 const linuxdoOAuthEnabled = ref<boolean>(false)
+const ocpcLandingNewType = ref<number>(1)
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
@@ -340,6 +341,7 @@ onMounted(async () => {
     turnstileSiteKey.value = settings.turnstile_site_key || ''
     siteName.value = settings.site_name || 'Sub2API'
     linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
+    ocpcLandingNewType.value = settings.baidu_ocpc_landing_new_type || 1
 
     const inviter = String(route.query.inviter || '').trim()
     if (inviter) {
@@ -361,7 +363,7 @@ onMounted(async () => {
     settingsLoaded.value = true
   }
   trackRegisterPageView()
-  reportOcpcEvent(1)
+  reportOcpcEvent(ocpcLandingNewType.value)
 })
 
 onUnmounted(() => {
