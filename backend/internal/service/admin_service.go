@@ -1571,7 +1571,6 @@ func (s *adminServiceImpl) SetAccountError(ctx context.Context, id int64, errorM
 	if err != nil || account == nil {
 		return nil
 	}
-	s.accountAlert.NotifyAccountStatusError(account, "admin", errorMsg, map[string]string{"category": "manual"})
 	return nil
 }
 

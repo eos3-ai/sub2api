@@ -234,10 +234,11 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	soraMediaCleanupService := service.ProvideSoraMediaCleanupService(soraMediaStorage, configConfig)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, soraAccountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig)
 	anthropicAPIKeyMonitorService := service.ProvideAnthropicAPIKeyMonitorService(accountRepository, httpUpstream, redisClient, configConfig)
+	openaiAPIKeyMonitorService := service.ProvideOpenAIAPIKeyMonitorService(accountRepository, httpUpstream, redisClient, configConfig)
 	accountExpiryService := service.ProvideAccountExpiryService(accountRepository)
 	subscriptionExpiryService := service.ProvideSubscriptionExpiryService(userSubscriptionRepository)
 	paymentMaintenanceService := service.ProvidePaymentMaintenanceService(configConfig, paymentService)
-	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, soraMediaCleanupService, schedulerSnapshotService, tokenRefreshService, anthropicAPIKeyMonitorService, accountExpiryService, subscriptionExpiryService, usageCleanupService, idempotencyCleanupService, pricingService, emailQueueService, billingCacheService, usageRecordWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
+	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, soraMediaCleanupService, schedulerSnapshotService, tokenRefreshService, anthropicAPIKeyMonitorService, openaiAPIKeyMonitorService, accountExpiryService, subscriptionExpiryService, usageCleanupService, idempotencyCleanupService, pricingService, emailQueueService, billingCacheService, usageRecordWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -272,6 +273,7 @@ func provideCleanup(
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
 	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
+	openaiAPIKeyMonitor *service.OpenAIAPIKeyMonitorService,
 	accountExpiry *service.AccountExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
@@ -366,6 +368,12 @@ func provideCleanup(
 			{"AnthropicAPIKeyMonitorService", func() error {
 				if anthropicAPIKeyMonitor != nil {
 					anthropicAPIKeyMonitor.Stop()
+				}
+				return nil
+			}},
+			{"OpenAIAPIKeyMonitorService", func() error {
+				if openaiAPIKeyMonitor != nil {
+					openaiAPIKeyMonitor.Stop()
 				}
 				return nil
 			}},

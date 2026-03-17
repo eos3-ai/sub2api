@@ -357,9 +357,6 @@ func (s *RateLimitService) handleAuthError(ctx context.Context, account *Account
 	}
 	account.Status = StatusError
 	account.ErrorMessage = errorMsg
-	if s.accountAlert != nil {
-		s.accountAlert.NotifyAccountStatusError(account, "ratelimit", errorMsg, map[string]string{"category": "auth_error"})
-	}
 	slog.Warn("account_disabled_auth_error", "account_id", account.ID, "error", errorMsg)
 }
 
@@ -372,12 +369,6 @@ func (s *RateLimitService) handleCustomErrorCode(ctx context.Context, account *A
 	}
 	account.Status = StatusError
 	account.ErrorMessage = msg
-	if s.accountAlert != nil {
-		s.accountAlert.NotifyAccountStatusError(account, "ratelimit", msg, map[string]string{
-			"category":    "custom_error_code",
-			"status_code": strconv.Itoa(statusCode),
-		})
-	}
 	slog.Warn("account_disabled_custom_error", "account_id", account.ID, "status_code", statusCode, "error", errorMsg)
 }
 
@@ -1070,12 +1061,6 @@ func (s *RateLimitService) triggerStreamTimeoutError(ctx context.Context, accoun
 	}
 	account.Status = StatusError
 	account.ErrorMessage = errorMsg
-	if s.accountAlert != nil {
-		s.accountAlert.NotifyAccountStatusError(account, "stream_timeout", errorMsg, map[string]string{
-			"category": "stream_timeout",
-			"model":    model,
-		})
-	}
 
 	// 重置超时计数
 	if s.timeoutCounterCache != nil {

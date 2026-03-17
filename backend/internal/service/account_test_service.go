@@ -171,7 +171,7 @@ func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int
 
 	// Route to platform-specific test method
 	if account.IsOpenAI() {
-		return s.testOpenAIAccountConnection(c, account, modelID)
+		return s.testOpenAIAccountConnection(c, account, modelID, 0)
 	}
 
 	if account.IsGemini() {
@@ -329,7 +329,7 @@ func (s *AccountTestService) enableTLSFingerprintForClaudeAccount(account *Accou
 }
 
 // testOpenAIAccountConnection tests an OpenAI account's connection
-func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account *Account, modelID string) error {
+func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account *Account, modelID string, maxOutputTokensOverride int) error {
 	ctx := c.Request.Context()
 
 	// Default to openai.DefaultTestModel for OpenAI testing
@@ -393,7 +393,7 @@ func (s *AccountTestService) testOpenAIAccountConnection(c *gin.Context, account
 	c.Writer.Flush()
 
 	// Create OpenAI Responses API payload
-	payload := createOpenAITestPayload(testModelID, isOAuth)
+	payload := createOpenAITestPayload(testModelID, isOAuth, maxOutputTokensOverride)
 	payloadBytes, _ := json.Marshal(payload)
 
 	// Send test_start event
@@ -1340,7 +1340,7 @@ func (s *AccountTestService) processGeminiStream(c *gin.Context, body io.Reader)
 }
 
 // createOpenAITestPayload creates a test payload for OpenAI Responses API
-func createOpenAITestPayload(modelID string, isOAuth bool) map[string]any {
+func createOpenAITestPayload(modelID string, isOAuth bool, maxOutputTokensOverride int) map[string]any {
 	payload := map[string]any{
 		"model": modelID,
 		"input": []map[string]any{
@@ -1355,6 +1355,10 @@ func createOpenAITestPayload(modelID string, isOAuth bool) map[string]any {
 			},
 		},
 		"stream": true,
+	}
+
+	if maxOutputTokensOverride > 0 {
+		payload["max_output_tokens"] = maxOutputTokensOverride
 	}
 
 	// OAuth accounts using ChatGPT internal API require store: false

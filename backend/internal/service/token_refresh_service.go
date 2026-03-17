@@ -267,12 +267,9 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 					"account_id", account.ID,
 					"error", setErr,
 				)
-			} else if s.accountAlert != nil {
+			} else {
 				account.Status = StatusError
 				account.ErrorMessage = errorMsg
-				s.accountAlert.NotifyAccountStatusError(account, "token_refresh", errorMsg, map[string]string{
-					"category": "non_retryable",
-				})
 			}
 			return err
 		}
@@ -308,13 +305,9 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 				"account_id", account.ID,
 				"error", err,
 			)
-		} else if s.accountAlert != nil {
+		} else {
 			account.Status = StatusError
 			account.ErrorMessage = errorMsg
-			s.accountAlert.NotifyAccountStatusError(account, "token_refresh", errorMsg, map[string]string{
-				"category":    "retries_exhausted",
-				"max_retries": fmt.Sprintf("%d", s.cfg.MaxRetries),
-			})
 		}
 	}
 

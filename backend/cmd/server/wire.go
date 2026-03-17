@@ -72,6 +72,7 @@ func provideCleanup(
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
 	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
+	openaiAPIKeyMonitor *service.OpenAIAPIKeyMonitorService,
 	accountExpiry *service.AccountExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
@@ -167,6 +168,12 @@ func provideCleanup(
 			{"AnthropicAPIKeyMonitorService", func() error {
 				if anthropicAPIKeyMonitor != nil {
 					anthropicAPIKeyMonitor.Stop()
+				}
+				return nil
+			}},
+			{"OpenAIAPIKeyMonitorService", func() error {
+				if openaiAPIKeyMonitor != nil {
+					openaiAPIKeyMonitor.Stop()
 				}
 				return nil
 			}},
