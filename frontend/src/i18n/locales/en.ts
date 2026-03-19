@@ -1883,6 +1883,12 @@ export default {
       resetStatus: 'Reset Status',
       statusReset: 'Account status reset successfully',
       failedToResetStatus: 'Failed to reset account status',
+      resetQuota: 'Reset Quota',
+      recoverState: 'Recover State',
+      recoverStateHint:
+        'Clear error, rate-limit, overload, and temporary unschedulable states to restore account scheduling availability.',
+      recoverStateSuccess: 'Account state recovered successfully',
+      recoverStateFailed: 'Failed to recover account state',
       failedToLoad: 'Failed to load accounts',
       failedToRefresh: 'Failed to refresh token',
       failedToDelete: 'Failed to delete account',
@@ -2513,6 +2519,49 @@ export default {
       },
       ineligibleWarning:
         'This account is not eligible for Antigravity, but API forwarding still works. Use at your own risk.'
+    },
+
+    // Scheduled Tests
+    scheduledTests: {
+      title: 'Scheduled Tests',
+      schedule: 'Schedule Test',
+      addPlan: 'Add Plan',
+      editPlan: 'Edit Plan',
+      deletePlan: 'Delete Plan',
+      model: 'Test Model',
+      cronExpression: 'Cron Expression',
+      cronHelp: 'Use 5-field cron format, for example */30 * * * *',
+      cronTooltipTitle: 'Cron Expression Guide',
+      cronTooltipMeaning: 'Format: minute hour day month weekday (5 fields)',
+      cronTooltipExampleEvery30Min: 'Every 30 minutes: */30 * * * *',
+      cronTooltipExampleHourly: 'Every hour: 0 * * * *',
+      cronTooltipExampleDaily: 'Daily at 03:00: 0 3 * * *',
+      cronTooltipExampleWeekly: 'Every Monday at 03:00: 0 3 * * 1',
+      cronTooltipRange: 'Supports *, */n, comma-separated values, and ranges',
+      maxResults: 'Max Stored Results',
+      maxResultsTooltipTitle: 'Result Retention',
+      maxResultsTooltipMeaning: 'Each plan keeps at most the latest N results',
+      maxResultsTooltipBody: 'Older records are pruned automatically to prevent unlimited growth',
+      maxResultsTooltipExample: 'For example, set 100 to keep up to 100 records per plan',
+      maxResultsTooltipRange: 'Recommended range: 1-1000',
+      enabled: 'Enabled',
+      autoRecover: 'Auto Recover',
+      autoRecoverHelp:
+        'Automatically clear recoverable runtime states after a successful test (error/rate-limit/overload/temp-unschedulable).',
+      noPlans: 'No scheduled test plans',
+      lastRun: 'Last Run',
+      nextRun: 'Next Run',
+      results: 'Results',
+      noResults: 'No results yet',
+      success: 'Success',
+      running: 'Running',
+      failed: 'Failed',
+      errorMessage: 'Error Message',
+      responseText: 'Response Text',
+      confirmDelete: 'Are you sure you want to delete this scheduled test plan?',
+      createSuccess: 'Plan created successfully',
+      updateSuccess: 'Plan updated successfully',
+      deleteSuccess: 'Plan deleted successfully'
     },
 
     // Proxies
