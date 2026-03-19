@@ -76,10 +76,16 @@ type modelRateLimitCall struct {
 	resetAt   time.Time
 }
 
+type extraUpdateCall struct {
+	accountID int64
+	updates   map[string]any
+}
+
 type stubAntigravityAccountRepo struct {
 	AccountRepository
 	rateCalls           []rateLimitCall
 	modelRateLimitCalls []modelRateLimitCall
+	extraUpdateCalls    []extraUpdateCall
 }
 
 func (s *stubAntigravityAccountRepo) SetRateLimited(ctx context.Context, id int64, resetAt time.Time) error {
@@ -89,6 +95,11 @@ func (s *stubAntigravityAccountRepo) SetRateLimited(ctx context.Context, id int6
 
 func (s *stubAntigravityAccountRepo) SetModelRateLimit(ctx context.Context, id int64, modelKey string, resetAt time.Time) error {
 	s.modelRateLimitCalls = append(s.modelRateLimitCalls, modelRateLimitCall{accountID: id, modelKey: modelKey, resetAt: resetAt})
+	return nil
+}
+
+func (s *stubAntigravityAccountRepo) UpdateExtra(ctx context.Context, id int64, updates map[string]any) error {
+	s.extraUpdateCalls = append(s.extraUpdateCalls, extraUpdateCall{accountID: id, updates: updates})
 	return nil
 }
 
@@ -195,6 +206,22 @@ func TestHandleUpstreamError_429_NonModelRateLimit(t *testing.T) {
 	require.Nil(t, result)
 	require.Len(t, repo.modelRateLimitCalls, 1)
 	require.Equal(t, "claude-sonnet-4-5", repo.modelRateLimitCalls[0].modelKey)
+}
+
+// TestHandleUpstreamError_429_NonModelRateLimit_UsesMappedModelKey 测试 429 非模型限流场景
+// 验证：requestedModel 会被映射到 Antigravity 最终模型（例如 claude-opus-4-6 -> claude-opus-4-6-thinking）
+func TestHandleUpstreamError_429_NonModelRateLimit_UsesMappedModelKey(t *testing.T) {
+	repo := &stubAntigravityAccountRepo{}
+	svc := &AntigravityGatewayService{accountRepo: repo}
+	account := &Account{ID: 20, Name: "acc-20", Platform: PlatformAntigravity}
+
+	body := buildGeminiRateLimitBody("5s")
+
+	result := svc.handleUpstreamError(context.Background(), "[test]", account, http.StatusTooManyRequests, http.Header{}, body, "claude-opus-4-6", 0, "", false)
+
+	require.Nil(t, result)
+	require.Len(t, repo.modelRateLimitCalls, 1)
+	require.Equal(t, "claude-opus-4-6-thinking", repo.modelRateLimitCalls[0].modelKey)
 }
 
 // TestHandleUpstreamError_503_ModelCapacityExhausted 测试 503 模型容量不足场景

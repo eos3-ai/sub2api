@@ -15,7 +15,9 @@ import type {
   AccountUsageStatsResponse,
   TempUnschedulableStatus,
   AdminDataPayload,
-  AdminDataImportResult
+  AdminDataImportResult,
+  CheckMixedChannelRequest,
+  CheckMixedChannelResponse
 } from '@/types'
 
 /**
@@ -34,6 +36,7 @@ export async function list(
     status?: string
     group?: string
     search?: string
+    lite?: string
   },
   options?: {
     signal?: AbortSignal
@@ -64,6 +67,7 @@ export async function listWithEtag(
     type?: string
     status?: string
     search?: string
+    lite?: string
   },
   options?: {
     signal?: AbortSignal
@@ -130,6 +134,16 @@ export async function create(accountData: CreateAccountRequest): Promise<Account
  */
 export async function update(id: number, updates: UpdateAccountRequest): Promise<Account> {
   const { data } = await apiClient.put<Account>(`/admin/accounts/${id}`, updates)
+  return data
+}
+
+/**
+ * Check mixed-channel risk for account-group binding.
+ */
+export async function checkMixedChannelRisk(
+  payload: CheckMixedChannelRequest
+): Promise<CheckMixedChannelResponse> {
+  const { data } = await apiClient.post<CheckMixedChannelResponse>('/admin/accounts/check-mixed-channel', payload)
   return data
 }
 
@@ -222,6 +236,28 @@ export async function getUsage(id: number): Promise<AccountUsageInfo> {
 export async function clearRateLimit(id: number): Promise<Account> {
   const { data } = await apiClient.post<Account>(
     `/admin/accounts/${id}/clear-rate-limit`
+  )
+  return data
+}
+
+/**
+ * Recover account runtime state in one call
+ * @param id - Account ID
+ * @returns Updated account
+ */
+export async function recoverState(id: number): Promise<Account> {
+  const { data } = await apiClient.post<Account>(`/admin/accounts/${id}/recover-state`)
+  return data
+}
+
+/**
+ * Reset account quota usage
+ * @param id - Account ID
+ * @returns Updated account
+ */
+export async function resetAccountQuota(id: number): Promise<Account> {
+  const { data } = await apiClient.post<Account>(
+    `/admin/accounts/${id}/reset-quota`
   )
   return data
 }
@@ -354,6 +390,22 @@ export async function bulkUpdate(
  */
 export async function getTodayStats(id: number): Promise<WindowStats> {
   const { data } = await apiClient.get<WindowStats>(`/admin/accounts/${id}/today-stats`)
+  return data
+}
+
+export interface BatchTodayStatsResponse {
+  stats: Record<string, WindowStats>
+}
+
+/**
+ * 批量获取多个账号的今日统计
+ * @param accountIds - 账号 ID 列表
+ * @returns 以账号 ID（字符串）为键的统计映射
+ */
+export async function getBatchTodayStats(accountIds: number[]): Promise<BatchTodayStatsResponse> {
+  const { data } = await apiClient.post<BatchTodayStatsResponse>('/admin/accounts/today-stats/batch', {
+    account_ids: accountIds
+  })
   return data
 }
 
@@ -529,12 +581,50 @@ export async function validateSoraSessionToken(
   return data
 }
 
+/**
+ * Batch operation result type
+ */
+export interface BatchOperationResult {
+  total: number
+  success: number
+  failed: number
+  errors?: Array<{ account_id: number; error: string }>
+  warnings?: Array<{ account_id: number; warning: string }>
+}
+
+/**
+ * Batch clear account errors
+ * @param accountIds - Array of account IDs
+ * @returns Batch operation result
+ */
+export async function batchClearError(accountIds: number[]): Promise<BatchOperationResult> {
+  const { data } = await apiClient.post<BatchOperationResult>('/admin/accounts/batch-clear-error', {
+    account_ids: accountIds
+  })
+  return data
+}
+
+/**
+ * Batch refresh account credentials
+ * @param accountIds - Array of account IDs
+ * @returns Batch operation result
+ */
+export async function batchRefresh(accountIds: number[]): Promise<BatchOperationResult> {
+  const { data } = await apiClient.post<BatchOperationResult>('/admin/accounts/batch-refresh', {
+    account_ids: accountIds,
+  }, {
+    timeout: 120000  // 120s timeout for large batch refreshes
+  })
+  return data
+}
+
 export const accountsAPI = {
   list,
   listWithEtag,
   getById,
   create,
   update,
+  checkMixedChannelRisk,
   delete: deleteAccount,
   toggleStatus,
   testAccount,
@@ -543,7 +633,10 @@ export const accountsAPI = {
   clearError,
   getUsage,
   getTodayStats,
+  getBatchTodayStats,
   clearRateLimit,
+  recoverState,
+  resetAccountQuota,
   getTempUnschedulableStatus,
   resetTempUnschedulable,
   setSchedulable,
@@ -559,7 +652,9 @@ export const accountsAPI = {
   syncFromCrs,
   exportData,
   importData,
-  getAntigravityDefaultModelMapping
+  getAntigravityDefaultModelMapping,
+  batchClearError,
+  batchRefresh
 }
 
 export default accountsAPI

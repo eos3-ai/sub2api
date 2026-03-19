@@ -33,7 +33,7 @@
       </div>
 
       <!-- LinuxDo Connect OAuth 登录 -->
-      <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled" :disabled="isLoading" />
+      <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled && !backendModeEnabled" :disabled="isLoading" />
 
       <!-- Login Form -->
       <form @submit.prevent="handleLogin" class="space-y-5">
@@ -99,7 +99,7 @@
             </p>
             <span v-else></span>
             <router-link
-              v-if="passwordResetEnabled"
+              v-if="passwordResetEnabled && !backendModeEnabled"
               to="/forgot-password"
               class="text-sm font-medium text-primary-600 transition-colors hover:text-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
             >
@@ -189,7 +189,7 @@
     </Modal>
 
     <!-- Footer -->
-    <template #footer>
+    <template v-if="!backendModeEnabled" #footer>
       <p class="text-gray-500 dark:text-dark-400">
         {{ t('auth.dontHaveAccount') }}
         <router-link
@@ -247,6 +247,7 @@ const adminQrUrl = '/admin-qr.png'
 const turnstileEnabled = ref<boolean>(false)
 const turnstileSiteKey = ref<string>('')
 const linuxdoOAuthEnabled = ref<boolean>(false)
+const backendModeEnabled = ref<boolean>(false)
 const passwordResetEnabled = ref<boolean>(false)
 
 // Turnstile
@@ -286,6 +287,7 @@ onMounted(async () => {
     turnstileEnabled.value = settings.turnstile_enabled
     turnstileSiteKey.value = settings.turnstile_site_key || ''
     linuxdoOAuthEnabled.value = settings.linuxdo_oauth_enabled
+    backendModeEnabled.value = settings.backend_mode_enabled
     passwordResetEnabled.value = settings.password_reset_enabled
   } catch (error) {
     console.error('Failed to load public settings:', error)
