@@ -1,6 +1,11 @@
 package service
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var errRefreshSkipped = errors.New("refresh skipped")
 
 // ProviderRefreshErrorAction 定义 provider 在刷新失败时的处理动作。
 type ProviderRefreshErrorAction int

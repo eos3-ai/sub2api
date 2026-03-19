@@ -1277,13 +1277,16 @@ type SettingsForm = SystemSettings & {
 const form = reactive<SettingsForm>({
   registration_enabled: true,
   email_verify_enabled: false,
+  registration_email_suffix_whitelist: [],
   promo_code_enabled: true,
   invitation_code_enabled: false,
   password_reset_enabled: false,
+  frontend_url: '',
   totp_enabled: false,
   totp_encryption_key_configured: false,
   default_balance: 0,
   default_concurrency: 1,
+  default_subscriptions: [],
   site_name: 'Sub2API',
   site_logo: '',
   site_subtitle: 'Subscription to API Conversion Platform',
@@ -1294,6 +1297,9 @@ const form = reactive<SettingsForm>({
   hide_ccs_import_button: false,
   purchase_subscription_enabled: false,
   purchase_subscription_url: '',
+  sora_client_enabled: false,
+  backend_mode_enabled: false,
+  custom_menu_items: [],
   smtp_host: '',
   smtp_port: 587,
   smtp_username: '',
@@ -1326,7 +1332,9 @@ const form = reactive<SettingsForm>({
   ops_monitoring_enabled: true,
   ops_realtime_monitoring_enabled: true,
   ops_query_mode_default: 'auto',
-  ops_metrics_interval_seconds: 60
+  ops_metrics_interval_seconds: 60,
+  min_claude_code_version: '',
+  allow_ungrouped_key_scheduling: false
 })
 
 // LinuxDo OAuth redirect URL suggestion
@@ -1406,12 +1414,15 @@ async function saveSettings() {
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
       email_verify_enabled: form.email_verify_enabled,
+      registration_email_suffix_whitelist: form.registration_email_suffix_whitelist,
       promo_code_enabled: form.promo_code_enabled,
       invitation_code_enabled: form.invitation_code_enabled,
       password_reset_enabled: form.password_reset_enabled,
+      frontend_url: form.frontend_url,
       totp_enabled: form.totp_enabled,
       default_balance: form.default_balance,
       default_concurrency: form.default_concurrency,
+      default_subscriptions: form.default_subscriptions,
       site_name: form.site_name,
       site_logo: form.site_logo,
       site_subtitle: form.site_subtitle,
@@ -1422,6 +1433,9 @@ async function saveSettings() {
       hide_ccs_import_button: form.hide_ccs_import_button,
       purchase_subscription_enabled: form.purchase_subscription_enabled,
       purchase_subscription_url: form.purchase_subscription_url,
+      sora_client_enabled: form.sora_client_enabled,
+      backend_mode_enabled: form.backend_mode_enabled,
+      custom_menu_items: form.custom_menu_items,
       smtp_host: form.smtp_host,
       smtp_port: form.smtp_port,
       smtp_username: form.smtp_username,
@@ -1442,7 +1456,13 @@ async function saveSettings() {
       fallback_model_gemini: form.fallback_model_gemini,
       fallback_model_antigravity: form.fallback_model_antigravity,
       enable_identity_patch: form.enable_identity_patch,
-      identity_patch_prompt: form.identity_patch_prompt
+      identity_patch_prompt: form.identity_patch_prompt,
+      ops_monitoring_enabled: form.ops_monitoring_enabled,
+      ops_realtime_monitoring_enabled: form.ops_realtime_monitoring_enabled,
+      ops_query_mode_default: form.ops_query_mode_default,
+      ops_metrics_interval_seconds: form.ops_metrics_interval_seconds,
+      min_claude_code_version: form.min_claude_code_version,
+      allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling
     }
     const updated = await adminAPI.settings.updateSettings(payload)
     Object.assign(form, updated)

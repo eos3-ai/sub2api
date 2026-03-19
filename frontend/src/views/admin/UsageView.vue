@@ -18,7 +18,7 @@
         </div>
       </div>
       <UsageFilters v-model="filters" v-model:startDate="startDate" v-model:endDate="endDate" :exporting="exporting" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel" />
-      <UsageTable :data="usageLogs" :loading="loading" />
+      <UsageTable :data="usageLogs" :loading="loading" :columns="visibleColumns" />
       <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
     </div>
   </AppLayout>
@@ -44,6 +44,7 @@ import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageEx
 import UsageCleanupDialog from '@/components/admin/usage/UsageCleanupDialog.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'; import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
 import type { AdminUsageLog, TrendDataPoint, ModelStat } from '@/types'; import type { AdminUsageStatsResponse, AdminUsageQueryParams } from '@/api/admin/usage'
+import type { Column } from '@/components/common/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -54,6 +55,23 @@ const exportProgress = reactive({ show: false, progress: 0, current: 0, total: 0
 const cleanupDialogVisible = ref(false)
 
 const granularityOptions = computed(() => [{ value: 'day', label: t('admin.dashboard.day') }, { value: 'hour', label: t('admin.dashboard.hour') }])
+const visibleColumns = computed<Column[]>(() => [
+  { key: 'user', label: t('admin.usage.user'), sortable: false },
+  { key: 'api_key', label: t('usage.apiKeyFilter'), sortable: false },
+  { key: 'account', label: t('admin.usage.account'), sortable: false },
+  { key: 'model', label: t('usage.model'), sortable: true },
+  { key: 'reasoning_effort', label: t('usage.reasoningEffort'), sortable: false },
+  { key: 'endpoint', label: t('usage.endpoint'), sortable: false },
+  { key: 'group', label: t('admin.usage.group'), sortable: false },
+  { key: 'stream', label: t('usage.type'), sortable: false },
+  { key: 'tokens', label: t('usage.tokens'), sortable: false },
+  { key: 'cost', label: t('usage.cost'), sortable: false },
+  { key: 'first_token', label: t('usage.firstToken'), sortable: false },
+  { key: 'duration', label: t('usage.duration'), sortable: false },
+  { key: 'created_at', label: t('usage.time'), sortable: true },
+  { key: 'user_agent', label: t('usage.userAgent'), sortable: false },
+  { key: 'ip_address', label: t('admin.usage.ipAddress'), sortable: false }
+])
 // Use local timezone to avoid UTC timezone issues
 const formatLD = (d: Date) => {
   const year = d.getFullYear()

@@ -318,6 +318,12 @@ func (m *monitorRepoStub) ListSchedulableByPlatforms(ctx context.Context, platfo
 func (m *monitorRepoStub) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]Account, error) {
 	panic("unexpected ListSchedulableByGroupIDAndPlatforms")
 }
+func (m *monitorRepoStub) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]Account, error) {
+	panic("unexpected ListSchedulableUngroupedByPlatform")
+}
+func (m *monitorRepoStub) ListSchedulableUngroupedByPlatforms(ctx context.Context, platforms []string) ([]Account, error) {
+	panic("unexpected ListSchedulableUngroupedByPlatforms")
+}
 func (m *monitorRepoStub) SetRateLimited(ctx context.Context, id int64, resetAt time.Time) error {
 	panic("unexpected SetRateLimited")
 }
@@ -347,6 +353,12 @@ func (m *monitorRepoStub) UpdateSessionWindow(ctx context.Context, id int64, sta
 }
 func (m *monitorRepoStub) BulkUpdate(ctx context.Context, ids []int64, updates AccountBulkUpdate) (int64, error) {
 	panic("unexpected BulkUpdate")
+}
+func (m *monitorRepoStub) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) error {
+	panic("unexpected IncrementQuotaUsed")
+}
+func (m *monitorRepoStub) ResetQuotaUsed(ctx context.Context, id int64) error {
+	panic("unexpected ResetQuotaUsed")
 }
 
 // TestAnthropicAPIKeyMonitor_ApplyResult_ClearsErrorOnConsecutiveSuccesses verifies that

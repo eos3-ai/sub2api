@@ -1,33 +1,33 @@
-# Merge Report: `v0.1.103` into `zyp-dev`
+# 合并报告：`v0.1.103` 到 `zyp-dev`
 
-## 1. Merge Context
+## 1. 合并背景
 
-- Merge date: 2026-03-19 (UTC)
-- Target branch: `zyp-dev`
-- Source tag: `v0.1.103` (`3cedfcd827809cb9d76196ee67dcc3480b5100b7`)
-- Target HEAD before merge: `6facef2858e477e9017e24c2080ee792ea2f88ed`
-- Merge-base: `7be5e1734c1c0882c851f9fd1c2ee70cc62b7d29`
-- Divergence (`git rev-list --left-right --count HEAD...v0.1.103`):
-  - Current branch unique commits: `287`
-  - Tag unique commits: `649`
+- 合并日期：2026-03-19（UTC）
+- 目标分支：`zyp-dev`
+- 来源标签：`v0.1.103`（`3cedfcd827809cb9d76196ee67dcc3480b5100b7`）
+- 合并前目标分支 HEAD：`6facef2858e477e9017e24c2080ee792ea2f88ed`
+- 共同祖先（merge-base）：`7be5e1734c1c0882c851f9fd1c2ee70cc62b7d29`
+- 分叉规模（`git rev-list --left-right --count HEAD...v0.1.103`）：
+- 当前分支独有提交：`287`
+- Tag 独有提交：`649`
 
-## 2. Safety and Resolution Strategy
+## 2. 安全措施与冲突处理策略
 
-- Backup branch created before merge: `backup/pre-merge-v0.1.103-20260319`
-- Merge command: `git merge --no-commit --no-ff v0.1.103`
-- Conflict handling principle: **do not overwrite current branch changes**.
-- Actual conflict resolution:
-  - All `UU` (both modified) files: resolved with `ours` (keep `zyp-dev` content)
-  - `DU` (deleted by us, modified by tag) file: keep deletion on current branch
+- 合并前已创建备份分支：`backup/pre-merge-v0.1.103-20260319`
+- 实际合并命令：`git merge --no-commit --no-ff v0.1.103`
+- 处理原则：**确保当前分支已有修改不被覆盖**
+- 冲突解决方式：
+- 所有 `UU`（双方都修改）：统一采用 `ours`，保留 `zyp-dev` 版本
+- `DU`（当前分支删除、tag 修改）：保留当前分支删除结果
 
-## 3. Conflict Points
+## 3. 冲突点清单
 
-Total conflicts: `55`
+冲突总数：`55`
 
-- `UU` (both modified): `54`
-- `DU` (deleted by current branch, modified by tag): `1`
+- `UU`（双方都修改）：`54`
+- `DU`（当前分支删除、tag 修改）：`1`
 
-### 3.1 Infra / Build / Deploy Conflicts
+### 3.1 基础设施 / 构建 / 部署类冲突
 
 - `UU` `.gitignore`
 - `UU` `backend/cmd/jwtgen/main.go`
@@ -38,7 +38,7 @@ Total conflicts: `55`
 - `UU` `deploy/docker-compose.yml`
 - `DU` `tools/check_pnpm_audit_exceptions.py`
 
-### 3.2 Backend Business / Routing / Service Conflicts
+### 3.2 后端业务 / 路由 / 服务层冲突
 
 - `UU` `backend/internal/config/config.go`
 - `UU` `backend/internal/handler/admin/setting_handler.go`
@@ -65,7 +65,7 @@ Total conflicts: `55`
 - `UU` `backend/internal/web/embed_on.go`
 - `UU` `backend/resources/model-pricing/model_prices_and_context_window.json`
 
-### 3.3 Frontend UI / State / i18n Conflicts
+### 3.3 前端 UI / 状态管理 / 多语言冲突
 
 - `UU` `frontend/src/App.vue`
 - `UU` `frontend/src/api/admin/dashboard.ts`
@@ -91,41 +91,147 @@ Total conflicts: `55`
 - `UU` `frontend/src/views/auth/RegisterView.vue`
 - `UU` `frontend/src/views/user/UsageView.vue`
 
-## 4. Why These Conflicts Happened
+## 4. 冲突原因分析
 
-- Long-lived branch divergence: both sides evolved significantly from merge-base.
-- Cross-cutting feature overlap: both sides changed shared hotspots (`service`, `route`, `dashboard`, `usage`, `settings`).
-- Lock/config churn: dependency and deployment files (`go.sum`, `docker-compose`, config templates) are naturally conflict-prone.
-- Frontend shared shell changes: app bootstrap, layout, store, i18n and admin pages were modified by both sides.
-- Lifecycle mismatch (`DU`): current branch removed a tooling script while tag side kept updating it.
+- 分支长期并行开发，和共同祖先相比双边改动都很大。
+- 改动集中在同一批热点文件（`service`、`route`、`dashboard`、`usage`、`settings`），重叠概率高。
+- 依赖锁文件和部署配置（如 `go.sum`、`docker-compose`、配置模板）本身冲突概率就高。
+- 前端入口、布局、状态管理、i18n 与管理台页面均被双方同时修改。
+- 生命周期差异导致 `DU` 冲突：当前分支已删除某工具脚本，而 tag 侧仍在继续修改该文件。
 
-## 5. Recommended Conflict Resolution Plan
+## 5. 建议的后续处理方案
 
-Current merge resolution already guarantees no overwrite of current-branch logic on conflicted files. To safely absorb important upstream behavior from `v0.1.103`, apply selective follow-up merges:
+当前合并策略已保证“冲突文件不覆盖当前分支逻辑”。如需吸收 `v0.1.103` 中有价值的改动，建议做二次选择性回补：
 
-1. Feature re-apply by topic (recommended)
-- Topic A: usage/upstream-model tracking
-- Topic B: admin settings and dashboard changes
-- Topic C: deploy/runtime adjustments
-- For each topic, inspect tag diff and cherry-pick only validated hunks into `zyp-dev`.
+1. 按主题回补（推荐）
+- 主题 A：用量统计与上游模型追踪能力
+- 主题 B：管理端设置与仪表盘改动
+- 主题 C：部署与运行时配置调整
+- 做法：按主题比对 tag 差异，仅挑选已验证的 hunk/cherry-pick 回补到 `zyp-dev`
 
-2. High-risk file review priority
-- Backend: `backend/internal/repository/usage_log_repo.go`, `backend/internal/service/dashboard_service.go`, `backend/internal/service/setting_service.go`, `backend/internal/service/ratelimit_service.go`
-- Frontend: `frontend/src/views/admin/UsageView.vue`, `frontend/src/views/admin/DashboardView.vue`, `frontend/src/api/admin/dashboard.ts`, `frontend/src/api/admin/settings.ts`
-- Deploy: `deploy/docker-compose.yml`, `deploy/config.example.yaml`
+2. 优先复核高风险文件
+- Backend：`backend/internal/repository/usage_log_repo.go`
+- Backend：`backend/internal/service/dashboard_service.go`
+- Backend：`backend/internal/service/setting_service.go`
+- Backend：`backend/internal/service/ratelimit_service.go`
+- Frontend：`frontend/src/views/admin/UsageView.vue`
+- Frontend：`frontend/src/views/admin/DashboardView.vue`
+- Frontend：`frontend/src/api/admin/dashboard.ts`
+- Frontend：`frontend/src/api/admin/settings.ts`
+- Deploy：`deploy/docker-compose.yml`
+- Deploy：`deploy/config.example.yaml`
 
-3. Validation checklist after merge commit
-- Backend unit/integration tests
-- Frontend unit tests and build
-- End-to-end smoke for admin dashboard/usage/settings
-- Config and docker compose startup check
+3. 合并后验证清单
+- 执行后端单测与集成测试
+- 执行前端单测与构建
+- 覆盖 admin 的 `dashboard/usage/settings` 冒烟验证
+- 验证配置文件与 docker compose 启动流程
 
-## 6. Practical Commands for Follow-up (Optional)
+## 6. 后续可用命令（可选）
 
-- Compare a conflicted file against tag version:
-  - `git diff HEAD v0.1.103 -- <file>`
-- Restore only one file from tag into working tree for manual merge:
-  - `git checkout v0.1.103 -- <file>`
-- Review merge resolution for conflicted files:
-  - `git log --oneline --merges -n 5`
+- 对比某个冲突文件与 tag 版本差异：
+- `git diff HEAD v0.1.103 -- <file>`
+- 临时取 tag 版本文件做人工三方整合：
+- `git checkout v0.1.103 -- <file>`
+- 查看最近 merge 记录：
+- `git log --oneline --merges -n 5`
 
+## 7. 账号自动检测冲突专题（本次补充）
+
+### 7.1 `v0.1.103` 的账号自动检测逻辑
+
+- 采用“**定时自动检测（Scheduled Test）**”链路：
+- 后端按计划（plan）周期性执行账号连通性测试（`ScheduledTestRunnerService`）
+- 测试结果落库（plan/result）
+- 可通过账号恢复接口统一清理 runtime 异常状态（rate limit、overload、temp unsched、error）
+
+### 7.2 当前分支原有逻辑
+
+- 存在“**监控器（monitor）自动检测**”链路：
+- `AnthropicAPIKeyMonitorService`
+- `OpenAIAPIKeyMonitorService`
+- 监控器依据连续成功/失败阈值自动切换可调度状态。
+
+### 7.3 是否存在冲突
+
+- 结论：**存在潜在冲突**（双链路同时写账号 runtime 状态）。
+- 冲突表现：
+- 同一账号可能被 monitor 与 scheduled runner 同时判定并改写状态
+- 状态抖动风险上升（重复恢复、重复暂停、窗口期不一致）
+
+### 7.4 本次已执行的合并处理
+
+- 已将当前分支 monitor 逻辑在 DI 层临时禁用（provider 返回 `nil`）：
+- `backend/internal/service/wire.go`
+- `ProvideAnthropicAPIKeyMonitorService`
+- `ProvideOpenAIAPIKeyMonitorService`
+- 已补齐 `v0.1.103` 定时自动检测主链路：
+- 定时计划路由与处理器接入（admin 路由）
+- 定时 runner 注入与启动（wire provider + cleanup stop）
+- 账号恢复/配额重置接口接入
+- 前端账号页补齐定时检测面板与动作菜单接线（schedule/recover/reset-quota）
+
+### 7.5 “是否会完全覆盖当前分支已有账号检测逻辑”结论
+
+- 从机制上：`v0.1.103` 的 scheduled test **不会天然“自动覆盖”** monitor 逻辑；两者可并存并冲突。
+- 从本次落地结果：已**显式禁用 monitor**，因此运行时由 scheduled test 链路主导，避免双写冲突。
+
+## 8. 本轮按文档落地结果（2026-03-19 UTC）
+
+### 8.1 已完成合并补齐项
+
+- 已补齐 `AccountRepository` 接口缺失实现：
+- `ListSchedulableUngroupedByPlatform`
+- `ListSchedulableUngroupedByPlatforms`
+- 已对齐 dashboard 查询链路签名与能力：
+- `GetUsageTrendWithFilters` / `GetModelStatsWithFilters` 增加 `request_type` 参数
+- 增加 `GetModelStatsWithFiltersBySource`（支持 `requested/upstream/mapping`）
+- 增加 `GetGroupStatsWithFilters`
+- 增加 `GetGroupUsageSummary`（调用 `GetAllGroupUsageSummary`）
+- 已补齐 group 输入字段并落库映射：
+- `SoraStorageQuotaBytes`
+- `AllowMessagesDispatch`
+- `DefaultMappedModel`
+- 已补齐 AdminService 分组倍率能力：
+- `GetGroupRateMultipliers`
+- `ClearGroupRateMultipliers`
+- `BatchSetGroupRateMultipliers`
+- 已补齐用户输入字段并接入更新：
+- `CreateUserInput/UpdateUserInput` 增加 `SoraStorageQuotaBytes`
+- 已补齐 LinuxDo OAuth 邀请码注册链路所需能力：
+- `ErrOAuthInvitationRequired`
+- `LoginOrRegisterOAuthWithTokenPair(ctx, email, username, invitationCode)`
+- `CreatePendingOAuthToken`
+- `VerifyPendingOAuthToken`
+- 已补回 OpenAI Chat Completions 依赖的 handler 通用方法：
+- `recoverResponsesPanic`
+- `ensureResponsesDependencies` / `missingResponsesDependencies`
+- `acquireResponsesUserSlot`
+- `acquireResponsesAccountSlot`
+- `ensureOpenAIPoolModeSessionHash`
+- 已修正 gateway 路由注册签名漂移：
+- `registerRoutes` 调用 `RegisterGatewayRoutes` 参数对齐
+
+### 8.2 编译验证
+
+- 已执行：
+- `cd backend && GOCACHE=/tmp/go-build GOMODCACHE=/tmp/go-modcache GOPATH=/tmp/go go build ./cmd/server`
+- 结果：**通过（exit code 0）**
+- 已执行：
+- `pnpm -C frontend build`
+- 结果：**通过（exit code 0）**
+
+### 8.3 测试回归
+
+- 已执行：
+- `cd backend && go test -count=1 ./...`
+- 结果：**通过（exit code 0）**
+- 说明：该命令在受限沙箱中会因 `httptest` 监听本地端口被拒绝；切换到非沙箱环境后已完整通过。
+
+### 8.4 当前结论
+
+- 文档中“按主题回补并完成构建/测试验证”的合并项已落地。
+- 当前状态为：
+- 后端全量单测通过
+- 前端构建通过
+- 用户未跟踪文件（`deploy/docker-compose-db.yaml`、`skill/sub2api.config`）未被修改/覆盖。

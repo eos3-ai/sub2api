@@ -8,9 +8,13 @@ import type {
   DashboardStats,
   TrendDataPoint,
   ModelStat,
+  GroupStat,
   ApiKeyUsageTrendPoint,
   UserUsageTrendPoint,
-  ActiveUsersTrendPoint
+  ActiveUsersTrendPoint,
+  UserSpendingRankingResponse,
+  UserBreakdownItem,
+  UsageRequestType
 } from '@/types'
 
 /**
@@ -50,6 +54,7 @@ export interface TrendParams {
   model?: string
   account_id?: number
   group_id?: number
+  request_type?: UsageRequestType
   stream?: boolean
   billing_type?: number | null
 }
@@ -77,8 +82,10 @@ export interface ModelStatsParams {
   user_id?: number
   api_key_id?: number
   model?: string
+  model_source?: 'requested' | 'upstream' | 'mapping'
   account_id?: number
   group_id?: number
+  request_type?: UsageRequestType
   stream?: boolean
   billing_type?: number | null
 }
@@ -96,6 +103,93 @@ export interface ModelStatsResponse {
  */
 export async function getModelStats(params?: ModelStatsParams): Promise<ModelStatsResponse> {
   const { data } = await apiClient.get<ModelStatsResponse>('/admin/dashboard/models', { params })
+  return data
+}
+
+export interface GroupStatsParams {
+  start_date?: string
+  end_date?: string
+  user_id?: number
+  api_key_id?: number
+  account_id?: number
+  group_id?: number
+  request_type?: UsageRequestType
+  stream?: boolean
+  billing_type?: number | null
+}
+
+export interface GroupStatsResponse {
+  groups: GroupStat[]
+  start_date: string
+  end_date: string
+}
+
+export interface DashboardSnapshotV2Params extends TrendParams {
+  include_stats?: boolean
+  include_trend?: boolean
+  include_model_stats?: boolean
+  include_group_stats?: boolean
+  include_users_trend?: boolean
+  users_trend_limit?: number
+}
+
+export interface DashboardSnapshotV2Stats extends DashboardStats {
+  uptime: number
+}
+
+export interface DashboardSnapshotV2Response {
+  generated_at: string
+  start_date: string
+  end_date: string
+  granularity: string
+  stats?: DashboardSnapshotV2Stats
+  trend?: TrendDataPoint[]
+  models?: ModelStat[]
+  groups?: GroupStat[]
+  users_trend?: UserUsageTrendPoint[]
+}
+
+/**
+ * Get group usage statistics
+ * @param params - Query parameters for filtering
+ * @returns Group usage statistics
+ */
+export async function getGroupStats(params?: GroupStatsParams): Promise<GroupStatsResponse> {
+  const { data } = await apiClient.get<GroupStatsResponse>('/admin/dashboard/groups', { params })
+  return data
+}
+
+export interface UserBreakdownParams {
+  start_date?: string
+  end_date?: string
+  group_id?: number
+  model?: string
+  model_source?: 'requested' | 'upstream' | 'mapping'
+  endpoint?: string
+  endpoint_type?: 'inbound' | 'upstream' | 'path'
+  limit?: number
+}
+
+export interface UserBreakdownResponse {
+  users: UserBreakdownItem[]
+  start_date: string
+  end_date: string
+}
+
+export async function getUserBreakdown(params: UserBreakdownParams): Promise<UserBreakdownResponse> {
+  const { data } = await apiClient.get<UserBreakdownResponse>('/admin/dashboard/user-breakdown', {
+    params
+  })
+  return data
+}
+
+/**
+ * Get dashboard snapshot v2 (aggregated response for heavy admin pages).
+ */
+export async function getSnapshotV2(params?: DashboardSnapshotV2Params): Promise<DashboardSnapshotV2Response> {
+  const { data } = await apiClient.get<DashboardSnapshotV2Response>('/admin/dashboard/snapshot-v2', {
+    params
+  })
   return data
 }
 
@@ -135,6 +229,18 @@ export interface UserTrendResponse {
   granularity: string
 }
 
+export interface ActiveUsersTrendResponse {
+  trend: ActiveUsersTrendPoint[]
+  start_date: string
+  end_date: string
+  granularity: string
+}
+
+export interface UserSpendingRankingParams
+  extends Pick<TrendParams, 'start_date' | 'end_date'> {
+  limit?: number
+}
+
 /**
  * Get user usage trend data
  * @param params - Query parameters for filtering
@@ -142,6 +248,37 @@ export interface UserTrendResponse {
  */
 export async function getUserUsageTrend(params?: UserTrendParams): Promise<UserTrendResponse> {
   const { data } = await apiClient.get<UserTrendResponse>('/admin/dashboard/users-trend', {
+    params
+  })
+  return data
+}
+
+/**
+ * Get active users trend data
+ * @param params - Query parameters for filtering
+ * @returns Active users trend data
+ */
+export async function getActiveUsersTrend(params?: {
+  start_date?: string
+  end_date?: string
+  granularity?: 'day' | 'hour'
+}): Promise<ActiveUsersTrendResponse> {
+  const { data } = await apiClient.get<ActiveUsersTrendResponse>(
+    '/admin/dashboard/active-users-trend',
+    { params }
+  )
+  return data
+}
+
+/**
+ * Get user spending ranking data
+ * @param params - Query parameters for filtering
+ * @returns User spending ranking data
+ */
+export async function getUserSpendingRanking(
+  params?: UserSpendingRankingParams
+): Promise<UserSpendingRankingResponse> {
+  const { data } = await apiClient.get<UserSpendingRankingResponse>('/admin/dashboard/users-ranking', {
     params
   })
   return data
@@ -166,27 +303,6 @@ export async function getBatchUsersUsage(userIds: number[]): Promise<BatchUsersU
   const { data } = await apiClient.post<BatchUsersUsageResponse>('/admin/dashboard/users-usage', {
     user_ids: userIds
   })
-  return data
-}
-
-export interface ActiveUsersTrendResponse {
-  trend: ActiveUsersTrendPoint[]
-  start_date: string
-  end_date: string
-  granularity: string
-}
-
-/**
- * Get active users trend data
- * @param params - Query parameters for filtering
- * @returns Active users trend data
- */
-export async function getActiveUsersTrend(params?: {
-  start_date?: string
-  end_date?: string
-  granularity?: 'day' | 'hour'
-}): Promise<ActiveUsersTrendResponse> {
-  const { data } = await apiClient.get<ActiveUsersTrendResponse>('/admin/dashboard/active-users-trend', { params })
   return data
 }
 
@@ -222,9 +338,12 @@ export const dashboardAPI = {
   getRealtimeMetrics,
   getUsageTrend,
   getModelStats,
+  getGroupStats,
+  getSnapshotV2,
   getApiKeyUsageTrend,
   getUserUsageTrend,
   getActiveUsersTrend,
+  getUserSpendingRanking,
   getBatchUsersUsage,
   getBatchApiKeysUsage
 }

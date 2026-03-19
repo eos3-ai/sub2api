@@ -61,7 +61,7 @@ func disableOpenAITraining(ctx context.Context, clientFactory PrivacyClientFacto
 	}
 
 	if !resp.IsSuccessState() {
-		slog.Warn("openai_privacy_failed", "status", resp.StatusCode, "body", truncate(resp.String(), 200))
+		slog.Warn("openai_privacy_failed", "status", resp.StatusCode, "body", truncatePrivacy(resp.String(), 200))
 		return PrivacyModeFailed
 	}
 
@@ -69,7 +69,7 @@ func disableOpenAITraining(ctx context.Context, clientFactory PrivacyClientFacto
 	return PrivacyModeTrainingOff
 }
 
-func truncate(s string, n int) string {
+func truncatePrivacy(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}

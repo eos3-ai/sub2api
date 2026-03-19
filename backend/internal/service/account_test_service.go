@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"regexp"
 	"strings"
@@ -160,7 +161,10 @@ func createTestPayload(modelID string) (map[string]any, error) {
 // TestAccountConnection tests an account's connection by sending a test request
 // All account types use full Claude Code client characteristics, only auth header differs
 // modelID is optional - if empty, defaults to claude.DefaultTestModel
-func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string) error {
+func (s *AccountTestService) TestAccountConnection(c *gin.Context, accountID int64, modelID string, prompt string) error {
+	// Keep request contract compatible with existing API payload; currently test payload uses fixed prompt.
+	_ = prompt
+
 	ctx := c.Request.Context()
 
 	// Get account
@@ -1494,4 +1498,61 @@ func (s *AccountTestService) sendErrorAndEnd(c *gin.Context, errorMsg string) er
 	log.Printf("Account test error: %s", errorMsg)
 	s.sendEvent(c, TestEvent{Type: "error", Error: errorMsg})
 	return fmt.Errorf("%s", errorMsg)
+}
+
+// RunTestBackground executes an account test in-memory and parses the SSE output into a scheduled-test result.
+func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID int64, modelID string) (*ScheduledTestResult, error) {
+	startedAt := time.Now()
+
+	w := httptest.NewRecorder()
+	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx.Request = (&http.Request{}).WithContext(ctx)
+
+	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, "")
+
+	finishedAt := time.Now()
+	body := w.Body.String()
+	responseText, errMsg := parseTestSSEOutput(body)
+
+	status := "success"
+	if testErr != nil || errMsg != "" {
+		status = "failed"
+		if errMsg == "" && testErr != nil {
+			errMsg = testErr.Error()
+		}
+	}
+
+	return &ScheduledTestResult{
+		Status:       status,
+		ResponseText: responseText,
+		ErrorMessage: errMsg,
+		LatencyMs:    finishedAt.Sub(startedAt).Milliseconds(),
+		StartedAt:    startedAt,
+		FinishedAt:   finishedAt,
+	}, nil
+}
+
+func parseTestSSEOutput(body string) (responseText, errMsg string) {
+	var texts []string
+	for _, line := range strings.Split(body, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "data: ") {
+			continue
+		}
+		jsonStr := strings.TrimPrefix(line, "data: ")
+		var event TestEvent
+		if err := json.Unmarshal([]byte(jsonStr), &event); err != nil {
+			continue
+		}
+		switch event.Type {
+		case "content":
+			if event.Text != "" {
+				texts = append(texts, event.Text)
+			}
+		case "error":
+			errMsg = event.Error
+		}
+	}
+	responseText = strings.Join(texts, "")
+	return
 }

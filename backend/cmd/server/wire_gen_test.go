@@ -37,7 +37,6 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		nil,
 		nil,
 		cfg,
-		nil,
 	)
 	accountExpirySvc := service.NewAccountExpiryService(nil, time.Second)
 	subscriptionExpirySvc := service.NewSubscriptionExpiryService(nil, time.Second)
@@ -47,6 +46,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 	idempotencyCleanupSvc := service.NewIdempotencyCleanupService(nil, cfg)
 	schedulerSnapshotSvc := service.NewSchedulerSnapshotService(nil, nil, nil, nil, cfg)
 	opsSystemLogSinkSvc := service.NewOpsSystemLogSink(nil)
+	paymentMaintenanceSvc := service.NewPaymentMaintenanceService(nil, time.Second)
 
 	cleanup := provideCleanup(
 		nil, // entClient
@@ -60,6 +60,9 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		&service.SoraMediaCleanupService{},
 		schedulerSnapshotSvc,
 		tokenRefreshSvc,
+		nil, // anthropicAPIKeyMonitor
+		nil, // openaiAPIKeyMonitor
+		nil, // scheduledTestRunner
 		accountExpirySvc,
 		subscriptionExpirySvc,
 		&service.UsageCleanupService{},
@@ -73,9 +76,7 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		openAIOAuthSvc,
 		geminiOAuthSvc,
 		antigravityOAuthSvc,
-		nil, // openAIGateway
-		nil, // scheduledTestRunner
-		nil, // backupSvc
+		paymentMaintenanceSvc,
 	)
 
 	require.NotPanics(t, func() {

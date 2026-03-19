@@ -379,6 +379,21 @@ func buildUsageCleanupWhere(filters service.UsageCleanupFilters) (string, []any)
 	return strings.Join(conditions, " AND "), args
 }
 
+func buildRequestTypeFilterCondition(idx int, requestType int16) (string, []any) {
+	normalized := service.RequestTypeFromInt16(requestType)
+	requestTypeArg := int16(normalized)
+	switch normalized {
+	case service.RequestTypeSync:
+		return fmt.Sprintf("(request_type = $%d OR (request_type = %d AND stream = FALSE AND openai_ws_mode = FALSE))", idx, int16(service.RequestTypeUnknown)), []any{requestTypeArg}
+	case service.RequestTypeStream:
+		return fmt.Sprintf("(request_type = $%d OR (request_type = %d AND stream = TRUE AND openai_ws_mode = FALSE))", idx, int16(service.RequestTypeUnknown)), []any{requestTypeArg}
+	case service.RequestTypeWSV2:
+		return fmt.Sprintf("(request_type = $%d OR (request_type = %d AND openai_ws_mode = TRUE))", idx, int16(service.RequestTypeUnknown)), []any{requestTypeArg}
+	default:
+		return fmt.Sprintf("request_type = $%d", idx), []any{requestTypeArg}
+	}
+}
+
 func (r *usageCleanupRepository) createTaskWithEnt(ctx context.Context, task *service.UsageCleanupTask) error {
 	client := clientFromContext(ctx, r.client)
 	filtersJSON, err := json.Marshal(task.Filters)

@@ -20,23 +20,24 @@ import (
 )
 
 var (
-	ErrInvalidCredentials     = infraerrors.Unauthorized("INVALID_CREDENTIALS", "invalid email or password")
-	ErrUserNotActive          = infraerrors.Forbidden("USER_NOT_ACTIVE", "user is not active")
-	ErrEmailExists            = infraerrors.Conflict("EMAIL_EXISTS", "email already exists")
-	ErrEmailReserved          = infraerrors.BadRequest("EMAIL_RESERVED", "email is reserved")
-	ErrInvalidToken           = infraerrors.Unauthorized("INVALID_TOKEN", "invalid token")
-	ErrTokenExpired           = infraerrors.Unauthorized("TOKEN_EXPIRED", "token has expired")
-	ErrAccessTokenExpired     = infraerrors.Unauthorized("ACCESS_TOKEN_EXPIRED", "access token has expired")
-	ErrTokenTooLarge          = infraerrors.BadRequest("TOKEN_TOO_LARGE", "token too large")
-	ErrTokenRevoked           = infraerrors.Unauthorized("TOKEN_REVOKED", "token has been revoked")
-	ErrRefreshTokenInvalid    = infraerrors.Unauthorized("REFRESH_TOKEN_INVALID", "invalid refresh token")
-	ErrRefreshTokenExpired    = infraerrors.Unauthorized("REFRESH_TOKEN_EXPIRED", "refresh token has expired")
-	ErrRefreshTokenReused     = infraerrors.Unauthorized("REFRESH_TOKEN_REUSED", "refresh token has been reused")
-	ErrEmailVerifyRequired    = infraerrors.BadRequest("EMAIL_VERIFY_REQUIRED", "email verification is required")
-	ErrRegDisabled            = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
-	ErrServiceUnavailable     = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
-	ErrInvitationCodeRequired = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
-	ErrInvitationCodeInvalid  = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
+	ErrInvalidCredentials      = infraerrors.Unauthorized("INVALID_CREDENTIALS", "invalid email or password")
+	ErrUserNotActive           = infraerrors.Forbidden("USER_NOT_ACTIVE", "user is not active")
+	ErrEmailExists             = infraerrors.Conflict("EMAIL_EXISTS", "email already exists")
+	ErrEmailReserved           = infraerrors.BadRequest("EMAIL_RESERVED", "email is reserved")
+	ErrInvalidToken            = infraerrors.Unauthorized("INVALID_TOKEN", "invalid token")
+	ErrTokenExpired            = infraerrors.Unauthorized("TOKEN_EXPIRED", "token has expired")
+	ErrAccessTokenExpired      = infraerrors.Unauthorized("ACCESS_TOKEN_EXPIRED", "access token has expired")
+	ErrTokenTooLarge           = infraerrors.BadRequest("TOKEN_TOO_LARGE", "token too large")
+	ErrTokenRevoked            = infraerrors.Unauthorized("TOKEN_REVOKED", "token has been revoked")
+	ErrRefreshTokenInvalid     = infraerrors.Unauthorized("REFRESH_TOKEN_INVALID", "invalid refresh token")
+	ErrRefreshTokenExpired     = infraerrors.Unauthorized("REFRESH_TOKEN_EXPIRED", "refresh token has expired")
+	ErrRefreshTokenReused      = infraerrors.Unauthorized("REFRESH_TOKEN_REUSED", "refresh token has been reused")
+	ErrEmailVerifyRequired     = infraerrors.BadRequest("EMAIL_VERIFY_REQUIRED", "email verification is required")
+	ErrRegDisabled             = infraerrors.Forbidden("REGISTRATION_DISABLED", "registration is currently disabled")
+	ErrServiceUnavailable      = infraerrors.ServiceUnavailable("SERVICE_UNAVAILABLE", "service temporarily unavailable")
+	ErrInvitationCodeRequired  = infraerrors.BadRequest("INVITATION_CODE_REQUIRED", "invitation code is required")
+	ErrInvitationCodeInvalid   = infraerrors.BadRequest("INVITATION_CODE_INVALID", "invalid or used invitation code")
+	ErrOAuthInvitationRequired = infraerrors.Forbidden("OAUTH_INVITATION_REQUIRED", "invitation code required to complete oauth registration")
 )
 
 // maxTokenLength 限制 token 大小，避免超长 header 触发解析时的异常内存分配。
@@ -525,9 +526,9 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, email, username 
 	return token, user, nil
 }
 
-// LoginOrRegisterOAuthWithTokenPair 用于第三方 OAuth/SSO 登录，返回完整的 TokenPair
-// 与 LoginOrRegisterOAuth 功能相同，但返回 TokenPair 而非单个 token
-func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, email, username string) (*TokenPair, *User, error) {
+// LoginOrRegisterOAuthWithTokenPair 用于第三方 OAuth/SSO 登录，返回完整的 TokenPair。
+// invitationCode 仅在邀请码注册模式下新用户注册时使用；已有账号登录时忽略。
+func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, email, username, invitationCode string) (*TokenPair, *User, error) {
 	// 检查 refreshTokenCache 是否可用
 	if s.refreshTokenCache == nil {
 		return nil, nil, errors.New("refresh token cache not configured")
@@ -552,6 +553,22 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 			// OAuth 首次登录视为注册
 			if s.settingService == nil || !s.settingService.IsRegistrationEnabled(ctx) {
 				return nil, nil, ErrRegDisabled
+			}
+
+			// 邀请码模式下，新 OAuth 用户注册必须提供邀请码。
+			var invitationRedeemCode *RedeemCode
+			if s.settingService != nil && s.settingService.IsInvitationCodeEnabled(ctx) {
+				if invitationCode == "" {
+					return nil, nil, ErrOAuthInvitationRequired
+				}
+				redeemCode, err := s.redeemRepo.GetByCode(ctx, invitationCode)
+				if err != nil {
+					return nil, nil, ErrInvitationCodeInvalid
+				}
+				if redeemCode.Type != RedeemTypeInvitation || redeemCode.Status != StatusUnused {
+					return nil, nil, ErrInvitationCodeInvalid
+				}
+				invitationRedeemCode = redeemCode
 			}
 
 			randomPassword, err := randomHexString(32)
@@ -594,6 +611,11 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				}
 			} else {
 				user = newUser
+				if invitationRedeemCode != nil {
+					if err := s.redeemRepo.Use(ctx, invitationRedeemCode.ID, user.ID); err != nil {
+						return nil, nil, ErrInvitationCodeInvalid
+					}
+				}
 			}
 		} else {
 			logger.LegacyPrintf("service.auth", "[Auth] Database error during oauth login: %v", err)
@@ -617,6 +639,61 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 		return nil, nil, fmt.Errorf("generate token pair: %w", err)
 	}
 	return tokenPair, user, nil
+}
+
+const (
+	pendingOAuthTokenTTL = 10 * time.Minute
+	pendingOAuthPurpose  = "pending_oauth_registration"
+)
+
+type pendingOAuthClaims struct {
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Purpose  string `json:"purpose"`
+	jwt.RegisteredClaims
+}
+
+// CreatePendingOAuthToken generates a short-lived JWT carrying OAuth identity
+// while waiting for invitation code confirmation.
+func (s *AuthService) CreatePendingOAuthToken(email, username string) (string, error) {
+	now := time.Now()
+	claims := &pendingOAuthClaims{
+		Email:    email,
+		Username: username,
+		Purpose:  pendingOAuthPurpose,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(now.Add(pendingOAuthTokenTTL)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(s.cfg.JWT.Secret))
+}
+
+// VerifyPendingOAuthToken validates a pending OAuth token and returns embedded identity.
+func (s *AuthService) VerifyPendingOAuthToken(tokenStr string) (email, username string, err error) {
+	if len(tokenStr) > maxTokenLength {
+		return "", "", ErrInvalidToken
+	}
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Name}))
+	token, parseErr := parser.ParseWithClaims(tokenStr, &pendingOAuthClaims{}, func(t *jwt.Token) (any, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(s.cfg.JWT.Secret), nil
+	})
+	if parseErr != nil {
+		return "", "", ErrInvalidToken
+	}
+	claims, ok := token.Claims.(*pendingOAuthClaims)
+	if !ok || !token.Valid {
+		return "", "", ErrInvalidToken
+	}
+	if claims.Purpose != pendingOAuthPurpose {
+		return "", "", ErrInvalidToken
+	}
+	return claims.Email, claims.Username, nil
 }
 
 // ValidateToken 验证JWT token并返回用户声明

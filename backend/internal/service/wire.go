@@ -63,9 +63,12 @@ func ProvideAnthropicAPIKeyMonitorService(
 	redisClient *redis.Client,
 	cfg *config.Config,
 ) *AnthropicAPIKeyMonitorService {
-	svc := NewAnthropicAPIKeyMonitorService(accountRepo, httpUpstream, redisClient, cfg)
-	svc.Start()
-	return svc
+	// Temporarily disabled: use scheduled-test based account detection/recovery chain from v0.1.103.
+	_ = accountRepo
+	_ = httpUpstream
+	_ = redisClient
+	_ = cfg
+	return nil
 }
 
 // ProvideOpenAIAPIKeyMonitorService creates and starts OpenAIAPIKeyMonitorService.
@@ -75,9 +78,12 @@ func ProvideOpenAIAPIKeyMonitorService(
 	redisClient *redis.Client,
 	cfg *config.Config,
 ) *OpenAIAPIKeyMonitorService {
-	svc := NewOpenAIAPIKeyMonitorService(accountRepo, httpUpstream, redisClient, cfg)
-	svc.Start()
-	return svc
+	// Temporarily disabled: use scheduled-test based account detection/recovery chain from v0.1.103.
+	_ = accountRepo
+	_ = httpUpstream
+	_ = redisClient
+	_ = cfg
+	return nil
 }
 
 // ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
@@ -130,6 +136,15 @@ func ProvideConcurrencyService(cache ConcurrencyCache, accountRepo AccountReposi
 	svc := NewConcurrencyService(cache)
 	if cfg != nil {
 		svc.StartSlotCleanupWorker(accountRepo, cfg.Gateway.Scheduling.SlotCleanupInterval)
+	}
+	return svc
+}
+
+// ProvideUserMessageQueueService creates UserMessageQueueService and starts cleanup worker.
+func ProvideUserMessageQueueService(cache UserMsgQueueCache, rpmCache RPMCache, cfg *config.Config) *UserMessageQueueService {
+	svc := NewUserMessageQueueService(cache, rpmCache, &cfg.Gateway.UserMessageQueue)
+	if cfg.Gateway.UserMessageQueue.CleanupIntervalSeconds > 0 {
+		svc.StartCleanupWorker(time.Duration(cfg.Gateway.UserMessageQueue.CleanupIntervalSeconds) * time.Second)
 	}
 	return svc
 }
@@ -236,8 +251,8 @@ func ProvideSoraDirectClient(
 	tokenProvider *OpenAITokenProvider,
 	accountRepo AccountRepository,
 	soraAccountRepo SoraAccountRepository,
-) *SoraDirectClient {
-	client := NewSoraDirectClient(cfg, httpUpstream, tokenProvider)
+) *SoraSDKClient {
+	client := NewSoraSDKClient(cfg, httpUpstream, tokenProvider)
 	client.SetAccountRepositories(accountRepo, soraAccountRepo)
 	return client
 }
@@ -288,6 +303,27 @@ func ProvideIdempotencyCleanupService(repo IdempotencyRepository, cfg *config.Co
 	return svc
 }
 
+// ProvideScheduledTestService creates ScheduledTestService.
+func ProvideScheduledTestService(
+	planRepo ScheduledTestPlanRepository,
+	resultRepo ScheduledTestResultRepository,
+) *ScheduledTestService {
+	return NewScheduledTestService(planRepo, resultRepo)
+}
+
+// ProvideScheduledTestRunnerService creates and starts ScheduledTestRunnerService.
+func ProvideScheduledTestRunnerService(
+	planRepo ScheduledTestPlanRepository,
+	scheduledSvc *ScheduledTestService,
+	accountTestSvc *AccountTestService,
+	rateLimitSvc *RateLimitService,
+	cfg *config.Config,
+) *ScheduledTestRunnerService {
+	svc := NewScheduledTestRunnerService(planRepo, scheduledSvc, accountTestSvc, rateLimitSvc, cfg)
+	svc.Start()
+	return svc
+}
+
 // ProvideOpsScheduledReportService creates and starts OpsScheduledReportService.
 func ProvideOpsScheduledReportService(
 	opsService *OpsService,
@@ -297,6 +333,19 @@ func ProvideOpsScheduledReportService(
 	cfg *config.Config,
 ) *OpsScheduledReportService {
 	svc := NewOpsScheduledReportService(opsService, userService, emailService, redisClient, cfg)
+	svc.Start()
+	return svc
+}
+
+// ProvideBackupService creates and starts BackupService.
+func ProvideBackupService(
+	settingRepo SettingRepository,
+	cfg *config.Config,
+	encryptor SecretEncryptor,
+	storeFactory BackupObjectStoreFactory,
+	dumper DBDumper,
+) *BackupService {
+	svc := NewBackupService(settingRepo, cfg, encryptor, storeFactory, dumper)
 	svc.Start()
 	return svc
 }
@@ -373,8 +422,11 @@ var ProviderSet = wire.NewSet(
 	ProvideSoraMediaStorage,
 	ProvideSoraMediaCleanupService,
 	ProvideSoraDirectClient,
-	wire.Bind(new(SoraClient), new(*SoraDirectClient)),
+	wire.Bind(new(SoraClient), new(*SoraSDKClient)),
 	NewSoraGatewayService,
+	NewSoraQuotaService,
+	NewSoraS3Storage,
+	NewSoraGenerationService,
 	NewOpenAIGatewayService,
 	NewOAuthService,
 	NewOpenAIOAuthService,
@@ -392,6 +444,8 @@ var ProviderSet = wire.NewSet(
 	ProvideRateLimitService,
 	NewAccountUsageService,
 	NewAccountTestService,
+	NewDataManagementService,
+	ProvideBackupService,
 	NewSettingService,
 	ProvideOpsSystemLogSink,
 	NewOpsService,
@@ -405,6 +459,7 @@ var ProviderSet = wire.NewSet(
 	NewTurnstileService,
 	NewSubscriptionService,
 	ProvideConcurrencyService,
+	ProvideUserMessageQueueService,
 	NewUsageRecordWorkerPool,
 	ProvideSchedulerSnapshotService,
 	NewIdentityService,
@@ -429,4 +484,7 @@ var ProviderSet = wire.NewSet(
 	ProvideIdempotencyCoordinator,
 	ProvideSystemOperationLockService,
 	ProvideIdempotencyCleanupService,
+	ProvideScheduledTestService,
+	ProvideScheduledTestRunnerService,
+	NewGroupCapacityService,
 )

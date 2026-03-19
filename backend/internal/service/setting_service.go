@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -199,6 +200,47 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 	}, nil
 }
 
+// GetFrameSrcOrigins returns deduplicated http(s) origins for dynamic CSP frame-src injection.
+func (s *SettingService) GetFrameSrcOrigins(ctx context.Context) ([]string, error) {
+	settings, err := s.GetPublicSettings(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[string]struct{})
+	var origins []string
+	addOrigin := func(rawURL string) {
+		if origin := extractOriginFromURL(rawURL); origin != "" {
+			if _, ok := seen[origin]; !ok {
+				seen[origin] = struct{}{}
+				origins = append(origins, origin)
+			}
+		}
+	}
+
+	if settings.PurchaseSubscriptionEnabled {
+		addOrigin(settings.PurchaseSubscriptionURL)
+	}
+
+	return origins, nil
+}
+
+// extractOriginFromURL returns scheme+host for http(s) URLs, otherwise empty string.
+func extractOriginFromURL(rawURL string) string {
+	rawURL = strings.TrimSpace(rawURL)
+	if rawURL == "" {
+		return ""
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return ""
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 // UpdateSettings 更新系统设置
 func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSettings) error {
 	updates := make(map[string]string)
@@ -284,6 +326,15 @@ func (s *SettingService) IsRegistrationEnabled(ctx context.Context) bool {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyRegistrationEnabled)
 	if err != nil {
 		// 安全默认：如果设置不存在或查询出错，默认关闭注册
+		return false
+	}
+	return value == "true"
+}
+
+// IsBackendModeEnabled checks whether backend mode is enabled.
+func (s *SettingService) IsBackendModeEnabled(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyBackendModeEnabled)
+	if err != nil {
 		return false
 	}
 	return value == "true"
@@ -840,6 +891,172 @@ func (s *SettingService) GetLinuxDoConnectOAuthConfig(ctx context.Context) (conf
 	return effective, nil
 }
 
+// GetOverloadCooldownSettings 获取529过载冷却配置
+func (s *SettingService) GetOverloadCooldownSettings(ctx context.Context) (*OverloadCooldownSettings, error) {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyOverloadCooldownSettings)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return DefaultOverloadCooldownSettings(), nil
+		}
+		return nil, fmt.Errorf("get overload cooldown settings: %w", err)
+	}
+	if value == "" {
+		return DefaultOverloadCooldownSettings(), nil
+	}
+
+	var settings OverloadCooldownSettings
+	if err := json.Unmarshal([]byte(value), &settings); err != nil {
+		return DefaultOverloadCooldownSettings(), nil
+	}
+
+	if settings.CooldownMinutes < 1 {
+		settings.CooldownMinutes = 1
+	}
+	if settings.CooldownMinutes > 120 {
+		settings.CooldownMinutes = 120
+	}
+
+	return &settings, nil
+}
+
+// SetOverloadCooldownSettings 设置529过载冷却配置
+func (s *SettingService) SetOverloadCooldownSettings(ctx context.Context, settings *OverloadCooldownSettings) error {
+	if settings == nil {
+		return fmt.Errorf("settings cannot be nil")
+	}
+
+	if settings.CooldownMinutes < 1 || settings.CooldownMinutes > 120 {
+		if settings.Enabled {
+			return fmt.Errorf("cooldown_minutes must be between 1-120")
+		}
+		settings.CooldownMinutes = 10
+	}
+
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal overload cooldown settings: %w", err)
+	}
+
+	return s.settingRepo.Set(ctx, SettingKeyOverloadCooldownSettings, string(data))
+}
+
+// IsUngroupedKeySchedulingAllowed 查询是否允许未分组 Key 调度。
+func (s *SettingService) IsUngroupedKeySchedulingAllowed(ctx context.Context) bool {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyAllowUngroupedKeyScheduling)
+	if err != nil {
+		return false
+	}
+	return value == "true"
+}
+
+// GetMinClaudeCodeVersion 获取最低 Claude Code 版本号要求。
+// 返回空字符串表示不做版本检查。
+func (s *SettingService) GetMinClaudeCodeVersion(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyMinClaudeCodeVersion)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(value)
+}
+
+// GetBetaPolicySettings 获取 Beta 策略配置
+func (s *SettingService) GetBetaPolicySettings(ctx context.Context) (*BetaPolicySettings, error) {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyBetaPolicySettings)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return DefaultBetaPolicySettings(), nil
+		}
+		return nil, fmt.Errorf("get beta policy settings: %w", err)
+	}
+	if value == "" {
+		return DefaultBetaPolicySettings(), nil
+	}
+
+	var settings BetaPolicySettings
+	if err := json.Unmarshal([]byte(value), &settings); err != nil {
+		return DefaultBetaPolicySettings(), nil
+	}
+	return &settings, nil
+}
+
+// SetBetaPolicySettings 设置 Beta 策略配置
+func (s *SettingService) SetBetaPolicySettings(ctx context.Context, settings *BetaPolicySettings) error {
+	if settings == nil {
+		return fmt.Errorf("settings cannot be nil")
+	}
+
+	validActions := map[string]bool{
+		BetaPolicyActionPass: true, BetaPolicyActionFilter: true, BetaPolicyActionBlock: true,
+	}
+	validScopes := map[string]bool{
+		BetaPolicyScopeAll: true, BetaPolicyScopeOAuth: true, BetaPolicyScopeAPIKey: true, BetaPolicyScopeBedrock: true,
+	}
+
+	for i, rule := range settings.Rules {
+		if strings.TrimSpace(rule.BetaToken) == "" {
+			return fmt.Errorf("rule[%d]: beta_token cannot be empty", i)
+		}
+		if !validActions[rule.Action] {
+			return fmt.Errorf("rule[%d]: invalid action %q", i, rule.Action)
+		}
+		if !validScopes[rule.Scope] {
+			return fmt.Errorf("rule[%d]: invalid scope %q", i, rule.Scope)
+		}
+	}
+
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal beta policy settings: %w", err)
+	}
+	return s.settingRepo.Set(ctx, SettingKeyBetaPolicySettings, string(data))
+}
+
+// GetSoraS3Settings 获取 Sora S3 存储配置。
+func (s *SettingService) GetSoraS3Settings(ctx context.Context) (*SoraS3Settings, error) {
+	keys := []string{
+		SettingKeySoraS3Enabled,
+		SettingKeySoraS3Endpoint,
+		SettingKeySoraS3Region,
+		SettingKeySoraS3Bucket,
+		SettingKeySoraS3AccessKeyID,
+		SettingKeySoraS3SecretAccessKey,
+		SettingKeySoraS3Prefix,
+		SettingKeySoraS3ForcePathStyle,
+		SettingKeySoraS3CDNURL,
+		SettingKeySoraDefaultStorageQuotaBytes,
+	}
+	settings, err := s.settingRepo.GetMultiple(ctx, keys)
+	if err != nil {
+		return nil, fmt.Errorf("get sora s3 settings: %w", err)
+	}
+
+	cfg := &SoraS3Settings{
+		Enabled:        settings[SettingKeySoraS3Enabled] == "true",
+		Endpoint:       strings.TrimSpace(settings[SettingKeySoraS3Endpoint]),
+		Region:         strings.TrimSpace(settings[SettingKeySoraS3Region]),
+		Bucket:         strings.TrimSpace(settings[SettingKeySoraS3Bucket]),
+		AccessKeyID:    strings.TrimSpace(settings[SettingKeySoraS3AccessKeyID]),
+		Prefix:         strings.TrimSpace(settings[SettingKeySoraS3Prefix]),
+		ForcePathStyle: settings[SettingKeySoraS3ForcePathStyle] == "true",
+		CDNURL:         strings.TrimSpace(settings[SettingKeySoraS3CDNURL]),
+	}
+
+	if secret := strings.TrimSpace(settings[SettingKeySoraS3SecretAccessKey]); secret != "" {
+		cfg.SecretAccessKey = secret
+		cfg.SecretAccessKeyConfigured = true
+	}
+	if cfg.Region == "" {
+		cfg.Region = "auto"
+	}
+	if rawQuota := strings.TrimSpace(settings[SettingKeySoraDefaultStorageQuotaBytes]); rawQuota != "" {
+		if v, parseErr := strconv.ParseInt(rawQuota, 10, 64); parseErr == nil && v >= 0 {
+			cfg.DefaultStorageQuotaBytes = v
+		}
+	}
+
+	return cfg, nil
+}
+
 // GetStreamTimeoutSettings 获取流超时处理配置
 func (s *SettingService) GetStreamTimeoutSettings(ctx context.Context) (*StreamTimeoutSettings, error) {
 	value, err := s.settingRepo.GetValue(ctx, SettingKeyStreamTimeoutSettings)
@@ -919,6 +1136,59 @@ func (s *SettingService) SetStreamTimeoutSettings(ctx context.Context, settings 
 	}
 
 	return s.settingRepo.Set(ctx, SettingKeyStreamTimeoutSettings, string(data))
+}
+
+// GetRectifierSettings 获取请求整流器配置
+func (s *SettingService) GetRectifierSettings(ctx context.Context) (*RectifierSettings, error) {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyRectifierSettings)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return DefaultRectifierSettings(), nil
+		}
+		return nil, fmt.Errorf("get rectifier settings: %w", err)
+	}
+	if value == "" {
+		return DefaultRectifierSettings(), nil
+	}
+
+	var settings RectifierSettings
+	if err := json.Unmarshal([]byte(value), &settings); err != nil {
+		return DefaultRectifierSettings(), nil
+	}
+
+	return &settings, nil
+}
+
+// SetRectifierSettings 设置请求整流器配置
+func (s *SettingService) SetRectifierSettings(ctx context.Context, settings *RectifierSettings) error {
+	if settings == nil {
+		return fmt.Errorf("settings cannot be nil")
+	}
+
+	data, err := json.Marshal(settings)
+	if err != nil {
+		return fmt.Errorf("marshal rectifier settings: %w", err)
+	}
+
+	return s.settingRepo.Set(ctx, SettingKeyRectifierSettings, string(data))
+}
+
+// IsSignatureRectifierEnabled 判断签名整流是否启用（总开关 && 签名子开关）
+func (s *SettingService) IsSignatureRectifierEnabled(ctx context.Context) bool {
+	settings, err := s.GetRectifierSettings(ctx)
+	if err != nil {
+		return true // fail-open: 查询失败时默认启用
+	}
+	return settings.Enabled && settings.ThinkingSignatureEnabled
+}
+
+// IsBudgetRectifierEnabled 判断 Budget 整流是否启用（总开关 && Budget 子开关）
+func (s *SettingService) IsBudgetRectifierEnabled(ctx context.Context) bool {
+	settings, err := s.GetRectifierSettings(ctx)
+	if err != nil {
+		return true // fail-open: 查询失败时默认启用
+	}
+	return settings.Enabled && settings.ThinkingBudgetEnabled
 }
 
 // GetInvoiceDefaultItemName 获取默认发票项目名称

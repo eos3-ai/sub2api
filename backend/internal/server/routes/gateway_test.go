@@ -30,7 +30,6 @@ func newGatewayRoutesTestRouter() *gin.Engine {
 		nil,
 		nil,
 		nil,
-		nil,
 		&config.Config{},
 	)
 

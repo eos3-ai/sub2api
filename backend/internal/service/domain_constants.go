@@ -32,6 +32,7 @@ const (
 	AccountTypeOAuth      = domain.AccountTypeOAuth      // OAuth类型账号（full scope: profile + inference）
 	AccountTypeSetupToken = domain.AccountTypeSetupToken // Setup Token类型账号（inference only scope）
 	AccountTypeAPIKey     = domain.AccountTypeAPIKey     // API Key类型账号
+	AccountTypeBedrock    = domain.AccountTypeBedrock    // AWS Bedrock 类型账号（SigV4 或 API Key）
 	AccountTypeUpstream   = domain.AccountTypeUpstream   // 上游透传类型账号（通过 Base URL + API Key 连接上游）
 )
 
@@ -170,11 +171,66 @@ const (
 	SettingKeyOpsRuntimeLogConfig = "ops_runtime_log_config"
 
 	// =========================
+	// Overload Cooldown (529)
+	// =========================
+
+	// SettingKeyOverloadCooldownSettings stores JSON config for 529 overload cooldown handling.
+	SettingKeyOverloadCooldownSettings = "overload_cooldown_settings"
+
+	// =========================
 	// Stream Timeout Handling
 	// =========================
 
 	// SettingKeyStreamTimeoutSettings stores JSON config for stream timeout handling.
 	SettingKeyStreamTimeoutSettings = "stream_timeout_settings"
+
+	// =========================
+	// Request Rectifier (请求整流器)
+	// =========================
+
+	// SettingKeyRectifierSettings stores JSON config for gateway request rectifier.
+	SettingKeyRectifierSettings = "rectifier_settings"
+
+	// =========================
+	// Beta Policy Settings
+	// =========================
+
+	// SettingKeyBetaPolicySettings stores JSON config for beta policy rules.
+	SettingKeyBetaPolicySettings = "beta_policy_settings"
+
+	// =========================
+	// Sora S3 存储配置
+	// =========================
+
+	SettingKeySoraS3Enabled         = "sora_s3_enabled"           // 是否启用 Sora S3 存储
+	SettingKeySoraS3Endpoint        = "sora_s3_endpoint"          // S3 端点地址
+	SettingKeySoraS3Region          = "sora_s3_region"            // S3 区域
+	SettingKeySoraS3Bucket          = "sora_s3_bucket"            // S3 存储桶名称
+	SettingKeySoraS3AccessKeyID     = "sora_s3_access_key_id"     // S3 Access Key ID
+	SettingKeySoraS3SecretAccessKey = "sora_s3_secret_access_key" // S3 Secret Access Key（加密存储）
+	SettingKeySoraS3Prefix          = "sora_s3_prefix"            // S3 对象键前缀
+	SettingKeySoraS3ForcePathStyle  = "sora_s3_force_path_style"  // 是否强制 Path Style（兼容 MinIO 等）
+	SettingKeySoraS3CDNURL          = "sora_s3_cdn_url"           // CDN 加速 URL（可选）
+	SettingKeySoraS3Profiles        = "sora_s3_profiles"          // Sora S3 多配置（JSON）
+
+	// =========================
+	// Sora 用户存储配额
+	// =========================
+
+	SettingKeySoraDefaultStorageQuotaBytes = "sora_default_storage_quota_bytes" // 新用户默认 Sora 存储配额（字节）
+
+	// =========================
+	// Runtime Behavior Flags
+	// =========================
+
+	// SettingKeyMinClaudeCodeVersion 最低 Claude Code 版本号要求 (semver, 如 "2.1.0"，空值=不检查)
+	SettingKeyMinClaudeCodeVersion = "min_claude_code_version"
+
+	// SettingKeyAllowUngroupedKeyScheduling 允许未分组 API Key 调度（默认 false：未分组 Key 返回 403）
+	SettingKeyAllowUngroupedKeyScheduling = "allow_ungrouped_key_scheduling"
+
+	// SettingKeyBackendModeEnabled Backend 模式：禁用用户注册和自助服务，仅管理员可登录
+	SettingKeyBackendModeEnabled = "backend_mode_enabled"
 )
 
 // Admin API key prefixes (distinct from user "sk-" keys).

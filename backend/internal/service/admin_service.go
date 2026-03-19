@@ -42,6 +42,9 @@ type AdminService interface {
 	DeleteGroup(ctx context.Context, id int64) error
 	GetGroupAPIKeys(ctx context.Context, groupID int64, page, pageSize int) ([]APIKey, int64, error)
 	UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error
+	GetGroupRateMultipliers(ctx context.Context, groupID int64) ([]UserGroupRateEntry, error)
+	ClearGroupRateMultipliers(ctx context.Context, groupID int64) error
+	BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error
 
 	// Account management
 	ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64) ([]Account, int64, error)
@@ -55,6 +58,10 @@ type AdminService interface {
 	SetAccountError(ctx context.Context, id int64, errorMsg string) error
 	SetAccountSchedulable(ctx context.Context, id int64, schedulable bool) (*Account, error)
 	BulkUpdateAccounts(ctx context.Context, input *BulkUpdateAccountsInput) (*BulkUpdateAccountsResult, error)
+	CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error
+	EnsureOpenAIPrivacy(ctx context.Context, account *Account) string
+	ResetAccountQuota(ctx context.Context, id int64) error
+	AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error)
 
 	// Proxy management
 	ListProxies(ctx context.Context, page, pageSize int, protocol, status, search string) ([]Proxy, int64, error)
@@ -83,24 +90,26 @@ type AdminService interface {
 
 // CreateUserInput represents input for creating a new user via admin operations.
 type CreateUserInput struct {
-	Email         string
-	Password      string
-	Username      string
-	Notes         string
-	Balance       float64
-	Concurrency   int
-	AllowedGroups []int64
+	Email                 string
+	Password              string
+	Username              string
+	Notes                 string
+	Balance               float64
+	Concurrency           int
+	SoraStorageQuotaBytes int64
+	AllowedGroups         []int64
 }
 
 type UpdateUserInput struct {
-	Email         string
-	Password      string
-	Username      *string
-	Notes         *string
-	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
-	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
-	Status        string
-	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
+	Email                 string
+	Password              string
+	Username              *string
+	Notes                 *string
+	Balance               *float64 // 使用指针区分"未提供"和"设置为0"
+	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
+	SoraStorageQuotaBytes *int64
+	Status                string
+	AllowedGroups         *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64
@@ -134,7 +143,10 @@ type CreateGroupInput struct {
 	ModelRoutingEnabled bool // 是否启用模型路由
 	MCPXMLInject        *bool
 	// 支持的模型系列（仅 antigravity 平台使用）
-	SupportedModelScopes []string
+	SupportedModelScopes  []string
+	SoraStorageQuotaBytes int64
+	AllowMessagesDispatch bool
+	DefaultMappedModel    string
 	// 从指定分组复制账号（创建分组后在同一事务内绑定）
 	CopyAccountsFromGroupIDs []int64
 }
@@ -168,7 +180,10 @@ type UpdateGroupInput struct {
 	ModelRoutingEnabled *bool // 是否启用模型路由
 	MCPXMLInject        *bool
 	// 支持的模型系列（仅 antigravity 平台使用）
-	SupportedModelScopes *[]string
+	SupportedModelScopes  *[]string
+	SoraStorageQuotaBytes *int64
+	AllowMessagesDispatch *bool
+	DefaultMappedModel    *string
 	// 从指定分组复制账号（同步操作：先清空当前分组的账号绑定，再绑定源分组的账号）
 	CopyAccountsFromGroupIDs []int64
 }
@@ -183,6 +198,7 @@ type CreateAccountInput struct {
 	ProxyID            *int64
 	Concurrency        int
 	Priority           int
+	LoadFactor         *int
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
 	GroupIDs           []int64
 	ExpiresAt          *int64
@@ -201,8 +217,9 @@ type UpdateAccountInput struct {
 	Credentials           map[string]any
 	Extra                 map[string]any
 	ProxyID               *int64
-	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
-	Priority              *int     // 使用指针区分"未提供"和"设置为0"
+	Concurrency           *int // 使用指针区分"未提供"和"设置为0"
+	Priority              *int // 使用指针区分"未提供"和"设置为0"
+	LoadFactor            *int
 	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
 	Status                string
 	GroupIDs              *[]int64
@@ -218,6 +235,7 @@ type BulkUpdateAccountsInput struct {
 	ProxyID        *int64
 	Concurrency    *int
 	Priority       *int
+	LoadFactor     *int
 	RateMultiplier *float64 // 账号计费倍率（>=0，允许 0）
 	Status         string
 	Schedulable    *bool
@@ -243,6 +261,14 @@ type BulkUpdateAccountsResult struct {
 	SuccessIDs []int64                   `json:"success_ids"`
 	FailedIDs  []int64                   `json:"failed_ids"`
 	Results    []BulkUpdateAccountResult `json:"results"`
+}
+
+// AdminUpdateAPIKeyGroupIDResult describes admin API key group binding update result.
+type AdminUpdateAPIKeyGroupIDResult struct {
+	APIKey                 *APIKey `json:"api_key"`
+	AutoGrantedGroupAccess bool    `json:"auto_granted_group_access"`
+	GrantedGroupID         *int64  `json:"granted_group_id,omitempty"`
+	GrantedGroupName       string  `json:"granted_group_name,omitempty"`
 }
 
 type CreateProxyInput struct {
@@ -484,14 +510,15 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
 	user := &User{
-		Email:         input.Email,
-		Username:      input.Username,
-		Notes:         input.Notes,
-		Role:          RoleUser, // Always create as regular user, never admin
-		Balance:       input.Balance,
-		Concurrency:   input.Concurrency,
-		Status:        StatusActive,
-		AllowedGroups: input.AllowedGroups,
+		Email:                 input.Email,
+		Username:              input.Username,
+		Notes:                 input.Notes,
+		Role:                  RoleUser, // Always create as regular user, never admin
+		Balance:               input.Balance,
+		Concurrency:           input.Concurrency,
+		SoraStorageQuotaBytes: input.SoraStorageQuotaBytes,
+		Status:                StatusActive,
+		AllowedGroups:         input.AllowedGroups,
 	}
 	if err := user.SetPassword(input.Password); err != nil {
 		return nil, err
@@ -539,6 +566,9 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if input.Concurrency != nil {
 		user.Concurrency = *input.Concurrency
+	}
+	if input.SoraStorageQuotaBytes != nil {
+		user.SoraStorageQuotaBytes = *input.SoraStorageQuotaBytes
 	}
 
 	if input.AllowedGroups != nil {
@@ -753,7 +783,7 @@ func adminTimePtr(t time.Time) *time.Time { return &t }
 
 func (s *adminServiceImpl) GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int) ([]APIKey, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize}
-	keys, result, err := s.apiKeyRepo.ListByUserID(ctx, userID, params)
+	keys, result, err := s.apiKeyRepo.ListByUserID(ctx, userID, params, APIKeyListFilters{})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -913,6 +943,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		ModelRoutingEnabled:             input.ModelRoutingEnabled,
 		MCPXMLInject:                    mcpXMLInject,
 		SupportedModelScopes:            input.SupportedModelScopes,
+		SoraStorageQuotaBytes:           input.SoraStorageQuotaBytes,
+		AllowMessagesDispatch:           input.AllowMessagesDispatch,
+		DefaultMappedModel:              input.DefaultMappedModel,
 	}
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		return nil, err
@@ -1058,7 +1091,6 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 		group.SoraVideoPricePerRequestHD = normalizePrice(input.SoraVideoPricePerRequestHD)
 	}
 
-
 	// Claude Code 客户端限制
 	if input.ClaudeCodeOnly != nil {
 		group.ClaudeCodeOnly = *input.ClaudeCodeOnly
@@ -1104,6 +1136,15 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	// 支持的模型系列（仅 antigravity 平台使用）
 	if input.SupportedModelScopes != nil {
 		group.SupportedModelScopes = *input.SupportedModelScopes
+	}
+	if input.SoraStorageQuotaBytes != nil {
+		group.SoraStorageQuotaBytes = *input.SoraStorageQuotaBytes
+	}
+	if input.AllowMessagesDispatch != nil {
+		group.AllowMessagesDispatch = *input.AllowMessagesDispatch
+	}
+	if input.DefaultMappedModel != nil {
+		group.DefaultMappedModel = strings.TrimSpace(*input.DefaultMappedModel)
 	}
 
 	if err := s.groupRepo.Update(ctx, group); err != nil {
@@ -1209,6 +1250,27 @@ func (s *adminServiceImpl) GetGroupAPIKeys(ctx context.Context, groupID int64, p
 	return keys, result.Total, nil
 }
 
+func (s *adminServiceImpl) GetGroupRateMultipliers(ctx context.Context, groupID int64) ([]UserGroupRateEntry, error) {
+	if s.userGroupRateRepo == nil {
+		return nil, nil
+	}
+	return s.userGroupRateRepo.GetByGroupID(ctx, groupID)
+}
+
+func (s *adminServiceImpl) ClearGroupRateMultipliers(ctx context.Context, groupID int64) error {
+	if s.userGroupRateRepo == nil {
+		return nil
+	}
+	return s.userGroupRateRepo.DeleteByGroupID(ctx, groupID)
+}
+
+func (s *adminServiceImpl) BatchSetGroupRateMultipliers(ctx context.Context, groupID int64, entries []GroupRateMultiplierInput) error {
+	if s.userGroupRateRepo == nil {
+		return nil
+	}
+	return s.userGroupRateRepo.SyncGroupRateMultipliers(ctx, groupID, entries)
+}
+
 func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []GroupSortOrderUpdate) error {
 	return s.groupRepo.UpdateSortOrders(ctx, updates)
 }
@@ -1219,6 +1281,10 @@ func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int,
 	accounts, result, err := s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search, groupID)
 	if err != nil {
 		return nil, 0, err
+	}
+	now := time.Now()
+	for i := range accounts {
+		syncOpenAICodexRateLimitFromExtra(ctx, s.accountRepo, &accounts[i], now)
 	}
 	return accounts, result.Total, nil
 }
@@ -1274,6 +1340,7 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		ProxyID:     input.ProxyID,
 		Concurrency: input.Concurrency,
 		Priority:    input.Priority,
+		LoadFactor:  input.LoadFactor,
 		Status:      StatusActive,
 		Schedulable: true,
 	}
@@ -1355,6 +1422,9 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	// 只在指针非 nil 时更新 Priority（支持设置为 0）
 	if input.Priority != nil {
 		account.Priority = *input.Priority
+	}
+	if input.LoadFactor != nil {
+		account.LoadFactor = input.LoadFactor
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier < 0 {
@@ -1466,6 +1536,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	}
 	if input.Priority != nil {
 		repoUpdates.Priority = input.Priority
+	}
+	if input.LoadFactor != nil {
+		repoUpdates.LoadFactor = input.LoadFactor
 	}
 	if input.RateMultiplier != nil {
 		repoUpdates.RateMultiplier = input.RateMultiplier
@@ -1917,7 +1990,6 @@ func (s *adminServiceImpl) CheckProxyQuality(ctx context.Context, id int64) (*Pr
 		ProxyURL:              proxyURL,
 		Timeout:               proxyQualityRequestTimeout,
 		ResponseHeaderTimeout: proxyQualityResponseHeaderTimeout,
-		ProxyStrict:           true,
 	})
 	if err != nil {
 		result.Items = append(result.Items, ProxyQualityCheckItem{
@@ -2294,4 +2366,63 @@ type MixedChannelError struct {
 func (e *MixedChannelError) Error() string {
 	return fmt.Sprintf("mixed_channel_warning: Group '%s' contains both %s and %s accounts. Using mixed channels in the same context may cause thinking block signature validation issues, which will fallback to non-thinking mode for historical messages.",
 		e.GroupName, e.CurrentPlatform, e.OtherPlatform)
+}
+
+// CheckMixedChannelRisk exposes mixed-channel validation for handler precheck endpoints.
+func (s *adminServiceImpl) CheckMixedChannelRisk(ctx context.Context, currentAccountID int64, currentAccountPlatform string, groupIDs []int64) error {
+	return s.checkMixedChannelRisk(ctx, currentAccountID, currentAccountPlatform, groupIDs)
+}
+
+// EnsureOpenAIPrivacy keeps backward compatibility for handlers that expect a privacy result.
+// Current branch does not enforce this operation during account updates, so this is a no-op.
+func (s *adminServiceImpl) EnsureOpenAIPrivacy(ctx context.Context, account *Account) string {
+	_ = ctx
+	_ = account
+	return ""
+}
+
+// ResetAccountQuota resets account-level quota usage counters.
+func (s *adminServiceImpl) ResetAccountQuota(ctx context.Context, id int64) error {
+	return s.accountRepo.ResetQuotaUsed(ctx, id)
+}
+
+// AdminUpdateAPIKeyGroupID updates group binding of an API key.
+func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error) {
+	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey == nil {
+		return nil, ErrAPIKeyNotFound
+	}
+
+	if groupID != nil {
+		switch {
+		case *groupID <= 0:
+			apiKey.GroupID = nil
+		default:
+			group, err := s.groupRepo.GetByID(ctx, *groupID)
+			if err != nil {
+				return nil, err
+			}
+			if group == nil {
+				return nil, ErrGroupNotFound
+			}
+			value := *groupID
+			apiKey.GroupID = &value
+		}
+		if err := s.apiKeyRepo.Update(ctx, apiKey); err != nil {
+			return nil, err
+		}
+		if s.authCacheInvalidator != nil {
+			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, apiKey.Key)
+		}
+	}
+
+	return &AdminUpdateAPIKeyGroupIDResult{
+		APIKey:                 apiKey,
+		AutoGrantedGroupAccess: false,
+		GrantedGroupID:         nil,
+		GrantedGroupName:       "",
+	}, nil
 }

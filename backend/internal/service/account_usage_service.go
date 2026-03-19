@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
@@ -32,8 +33,10 @@ type UsageLogRepository interface {
 
 	// Admin dashboard stats
 	GetDashboardStats(ctx context.Context) (*usagestats.DashboardStats, error)
-	GetUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, stream *bool, billingType *int8) ([]usagestats.TrendDataPoint, error)
-	GetModelStatsWithFilters(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, stream *bool, billingType *int8) ([]usagestats.ModelStat, error)
+	GetUsageTrendWithFilters(ctx context.Context, startTime, endTime time.Time, granularity string, userID, apiKeyID, accountID, groupID int64, model string, requestType *int16, stream *bool, billingType *int8) ([]usagestats.TrendDataPoint, error)
+	GetModelStatsWithFilters(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, requestType *int16, stream *bool, billingType *int8) ([]usagestats.ModelStat, error)
+	GetGroupStatsWithFilters(ctx context.Context, startTime, endTime time.Time, userID, apiKeyID, accountID, groupID int64, requestType *int16, stream *bool, billingType *int8) ([]usagestats.GroupStat, error)
+	GetAllGroupUsageSummary(ctx context.Context, todayStart time.Time) ([]usagestats.GroupUsageSummary, error)
 	GetAPIKeyUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.APIKeyUsageTrendPoint, error)
 	GetUserUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int) ([]usagestats.UserUsageTrendPoint, error)
 	GetActiveUsersTrend(ctx context.Context, startTime, endTime time.Time, granularity string) ([]usagestats.ActiveUsersTrendPoint, error)
@@ -83,6 +86,7 @@ type antigravityUsageCache struct {
 const (
 	apiCacheTTL         = 3 * time.Minute
 	windowStatsCacheTTL = 1 * time.Minute
+	openAIProbeCacheTTL = 10 * time.Minute
 )
 
 // UsageCache 封装账户使用量相关的缓存
@@ -126,6 +130,25 @@ type AntigravityModelQuota struct {
 	ResetTime   string `json:"reset_time"`  // 重置时间 ISO8601
 }
 
+// AntigravityModelDetail Antigravity 单个模型的详细能力信息
+type AntigravityModelDetail struct {
+	DisplayName        string          `json:"display_name,omitempty"`
+	SupportsImages     *bool           `json:"supports_images,omitempty"`
+	SupportsThinking   *bool           `json:"supports_thinking,omitempty"`
+	ThinkingBudget     *int            `json:"thinking_budget,omitempty"`
+	Recommended        *bool           `json:"recommended,omitempty"`
+	MaxTokens          *int            `json:"max_tokens,omitempty"`
+	MaxOutputTokens    *int            `json:"max_output_tokens,omitempty"`
+	SupportedMimeTypes map[string]bool `json:"supported_mime_types,omitempty"`
+}
+
+// AICredit 表示 Antigravity 账号的 AI Credits 余额信息。
+type AICredit struct {
+	CreditType     string  `json:"credit_type,omitempty"`
+	Amount         float64 `json:"amount,omitempty"`
+	MinimumBalance float64 `json:"minimum_balance,omitempty"`
+}
+
 // UsageInfo 账号使用量信息
 type UsageInfo struct {
 	UpdatedAt          *time.Time     `json:"updated_at,omitempty"`           // 更新时间
@@ -141,6 +164,36 @@ type UsageInfo struct {
 
 	// Antigravity 多模型配额
 	AntigravityQuota map[string]*AntigravityModelQuota `json:"antigravity_quota,omitempty"`
+
+	// Antigravity 账号级信息
+	SubscriptionTier    string `json:"subscription_tier,omitempty"`     // 归一化订阅等级: FREE/PRO/ULTRA/UNKNOWN
+	SubscriptionTierRaw string `json:"subscription_tier_raw,omitempty"` // 上游原始订阅等级名称
+
+	// Antigravity 模型详细能力信息（与 antigravity_quota 同 key）
+	AntigravityQuotaDetails map[string]*AntigravityModelDetail `json:"antigravity_quota_details,omitempty"`
+
+	// Antigravity AI Credits 余额
+	AICredits []AICredit `json:"ai_credits,omitempty"`
+
+	// Antigravity 废弃模型转发规则 (old_model_id -> new_model_id)
+	ModelForwardingRules map[string]string `json:"model_forwarding_rules,omitempty"`
+
+	// Antigravity 账号是否被上游禁止 (HTTP 403)
+	IsForbidden     bool   `json:"is_forbidden,omitempty"`
+	ForbiddenReason string `json:"forbidden_reason,omitempty"`
+	ForbiddenType   string `json:"forbidden_type,omitempty"` // "validation" / "violation" / "forbidden"
+	ValidationURL   string `json:"validation_url,omitempty"` // 验证/申诉链接
+
+	// 状态标记（从 ForbiddenType / HTTP 错误码推导）
+	NeedsVerify bool `json:"needs_verify,omitempty"` // 需要人工验证（forbidden_type=validation）
+	IsBanned    bool `json:"is_banned,omitempty"`    // 账号被封（forbidden_type=violation）
+	NeedsReauth bool `json:"needs_reauth,omitempty"` // token 失效需重新授权（401）
+
+	// 错误码（机器可读）：forbidden / unauthenticated / rate_limited / network_error
+	ErrorCode string `json:"error_code,omitempty"`
+
+	// 获取 usage 时的错误信息（降级返回，而非 500）
+	Error string `json:"error,omitempty"`
 }
 
 // ClaudeUsageResponse Anthropic API返回的usage结构
@@ -288,7 +341,7 @@ func (s *AccountUsageService) getGeminiUsage(ctx context.Context, account *Accou
 	}
 
 	dayStart := geminiDailyWindowStart(now)
-	stats, err := s.usageLogRepo.GetModelStatsWithFilters(ctx, dayStart, now, 0, 0, account.ID, 0, nil, nil)
+	stats, err := s.usageLogRepo.GetModelStatsWithFilters(ctx, dayStart, now, 0, 0, account.ID, 0, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get gemini usage stats failed: %w", err)
 	}
@@ -310,7 +363,7 @@ func (s *AccountUsageService) getGeminiUsage(ctx context.Context, account *Accou
 	// Minute window (RPM) - fixed-window approximation: current minute [truncate(now), truncate(now)+1m)
 	minuteStart := now.Truncate(time.Minute)
 	minuteResetAt := minuteStart.Add(time.Minute)
-	minuteStats, err := s.usageLogRepo.GetModelStatsWithFilters(ctx, minuteStart, now, 0, 0, account.ID, 0, nil, nil)
+	minuteStats, err := s.usageLogRepo.GetModelStatsWithFilters(ctx, minuteStart, now, 0, 0, account.ID, 0, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("get gemini minute usage stats failed: %w", err)
 	}
@@ -431,6 +484,28 @@ func (s *AccountUsageService) GetTodayStats(ctx context.Context, accountID int64
 	}, nil
 }
 
+// GetTodayStatsBatch 获取多个账号今日统计。
+func (s *AccountUsageService) GetTodayStatsBatch(ctx context.Context, accountIDs []int64) (map[int64]*WindowStats, error) {
+	result := make(map[int64]*WindowStats, len(accountIDs))
+	seen := make(map[int64]struct{}, len(accountIDs))
+	for _, accountID := range accountIDs {
+		if accountID <= 0 {
+			continue
+		}
+		if _, ok := seen[accountID]; ok {
+			continue
+		}
+		seen[accountID] = struct{}{}
+		stats, err := s.GetTodayStats(ctx, accountID)
+		if err != nil {
+			result[accountID] = &WindowStats{}
+			continue
+		}
+		result[accountID] = stats
+	}
+	return result, nil
+}
+
 func (s *AccountUsageService) GetAccountUsageStats(ctx context.Context, accountID int64, startTime, endTime time.Time) (*usagestats.AccountUsageStatsResponse, error) {
 	stats, err := s.usageLogRepo.GetAccountUsageStats(ctx, accountID, startTime, endTime)
 	if err != nil {
@@ -469,6 +544,143 @@ func (s *AccountUsageService) fetchOAuthUsageRaw(ctx context.Context, account *A
 	}
 
 	return s.usageFetcher.FetchUsageWithOptions(ctx, opts)
+}
+
+func shouldRefreshOpenAICodexSnapshot(account *Account, usage *UsageInfo, now time.Time) bool {
+	if account == nil {
+		return false
+	}
+	if usage == nil {
+		return true
+	}
+	if usage.FiveHour == nil || usage.SevenDay == nil {
+		return true
+	}
+	if account.IsRateLimited() {
+		return true
+	}
+	return isOpenAICodexSnapshotStale(account, now)
+}
+
+func isOpenAICodexSnapshotStale(account *Account, now time.Time) bool {
+	if account == nil || !account.IsOpenAIOAuth() || !account.IsOpenAIResponsesWebSocketV2Enabled() {
+		return false
+	}
+	if account.Extra == nil {
+		return true
+	}
+	raw, ok := account.Extra["codex_usage_updated_at"]
+	if !ok {
+		return true
+	}
+	ts, err := parseTime(fmt.Sprint(raw))
+	if err != nil {
+		return true
+	}
+	return now.Sub(ts) >= openAIProbeCacheTTL
+}
+
+func extractOpenAICodexProbeUpdates(resp *http.Response) (map[string]any, error) {
+	updates, _, err := extractOpenAICodexProbeSnapshot(resp)
+	return updates, err
+}
+
+func extractOpenAICodexProbeSnapshot(resp *http.Response) (map[string]any, *time.Time, error) {
+	if resp == nil || resp.Header == nil {
+		return nil, nil, nil
+	}
+	snapshot := ParseCodexRateLimitHeaders(resp.Header)
+	if snapshot == nil {
+		return nil, nil, nil
+	}
+	now := time.Now()
+	updates := buildCodexUsageExtraUpdates(snapshot, now)
+	resetAt := codexRateLimitResetAtFromSnapshot(snapshot, now)
+	return updates, resetAt, nil
+}
+
+func (s *AccountUsageService) persistOpenAICodexProbeSnapshot(accountID int64, updates map[string]any, resetAt *time.Time) {
+	if s == nil || s.accountRepo == nil || accountID <= 0 {
+		return
+	}
+	if len(updates) == 0 && resetAt == nil {
+		return
+	}
+
+	go func() {
+		updateCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if len(updates) > 0 {
+			_ = s.accountRepo.UpdateExtra(updateCtx, accountID, updates)
+		}
+		if resetAt != nil {
+			_ = s.accountRepo.SetRateLimited(updateCtx, accountID, resetAt.UTC())
+		}
+	}()
+}
+
+func buildCodexUsageProgressFromExtra(extra map[string]any, window string, now time.Time) *UsageProgress {
+	if len(extra) == 0 {
+		return nil
+	}
+
+	var (
+		usedPercentKey string
+		resetAfterKey  string
+		resetAtKey     string
+	)
+
+	switch window {
+	case "5h":
+		usedPercentKey = "codex_5h_used_percent"
+		resetAfterKey = "codex_5h_reset_after_seconds"
+		resetAtKey = "codex_5h_reset_at"
+	case "7d":
+		usedPercentKey = "codex_7d_used_percent"
+		resetAfterKey = "codex_7d_reset_after_seconds"
+		resetAtKey = "codex_7d_reset_at"
+	default:
+		return nil
+	}
+
+	usedRaw, ok := extra[usedPercentKey]
+	if !ok {
+		return nil
+	}
+
+	progress := &UsageProgress{Utilization: parseExtraFloat64(usedRaw)}
+	if resetAtRaw, ok := extra[resetAtKey]; ok {
+		if resetAt, err := parseTime(fmt.Sprint(resetAtRaw)); err == nil {
+			progress.ResetsAt = &resetAt
+			progress.RemainingSeconds = int(time.Until(resetAt).Seconds())
+			if progress.RemainingSeconds < 0 {
+				progress.RemainingSeconds = 0
+			}
+		}
+	}
+	if progress.ResetsAt == nil {
+		if resetAfterSeconds := parseExtraInt(extra[resetAfterKey]); resetAfterSeconds > 0 {
+			base := now
+			if updatedAtRaw, ok := extra["codex_usage_updated_at"]; ok {
+				if updatedAt, err := parseTime(fmt.Sprint(updatedAtRaw)); err == nil {
+					base = updatedAt
+				}
+			}
+			resetAt := base.Add(time.Duration(resetAfterSeconds) * time.Second)
+			progress.ResetsAt = &resetAt
+			progress.RemainingSeconds = int(time.Until(resetAt).Seconds())
+			if progress.RemainingSeconds < 0 {
+				progress.RemainingSeconds = 0
+			}
+		}
+	}
+
+	// 窗口已过期（resetAt 在 now 之前）→ 额度已重置，归零
+	if progress.ResetsAt != nil && !now.Before(*progress.ResetsAt) {
+		progress.Utilization = 0
+	}
+
+	return progress
 }
 
 // parseTime 尝试多种格式解析时间

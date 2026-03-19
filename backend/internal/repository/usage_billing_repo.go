@@ -255,8 +255,8 @@ func incrementUsageBillingAccountQuota(ctx context.Context, tx *sql.Tx, accountI
 					'quota_daily_start',
 					CASE WHEN COALESCE((extra->>'quota_daily_start')::timestamptz, '1970-01-01'::timestamptz)
 						+ '24 hours'::interval <= NOW()
-					THEN `+nowUTC+`
-					ELSE COALESCE(extra->>'quota_daily_start', `+nowUTC+`) END
+					THEN to_char(timezone('UTC', NOW()), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+					ELSE COALESCE(extra->>'quota_daily_start', to_char(timezone('UTC', NOW()), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) END
 				)
 			ELSE '{}'::jsonb END
 			|| CASE WHEN COALESCE((extra->>'quota_weekly_limit')::numeric, 0) > 0 THEN
@@ -269,8 +269,8 @@ func incrementUsageBillingAccountQuota(ctx context.Context, tx *sql.Tx, accountI
 					'quota_weekly_start',
 					CASE WHEN COALESCE((extra->>'quota_weekly_start')::timestamptz, '1970-01-01'::timestamptz)
 						+ '168 hours'::interval <= NOW()
-					THEN `+nowUTC+`
-					ELSE COALESCE(extra->>'quota_weekly_start', `+nowUTC+`) END
+					THEN to_char(timezone('UTC', NOW()), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+					ELSE COALESCE(extra->>'quota_weekly_start', to_char(timezone('UTC', NOW()), 'YYYY-MM-DD"T"HH24:MI:SS"Z"')) END
 				)
 			ELSE '{}'::jsonb END
 		), updated_at = NOW()

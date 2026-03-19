@@ -823,6 +823,34 @@ func (r *accountRepository) ListSchedulableByPlatforms(ctx context.Context, plat
 	return r.accountsToService(ctx, accounts)
 }
 
+func (r *accountRepository) ListSchedulableUngroupedByPlatform(ctx context.Context, platform string) ([]service.Account, error) {
+	accounts, err := r.ListSchedulableByPlatform(ctx, platform)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]service.Account, 0, len(accounts))
+	for i := range accounts {
+		if len(accounts[i].GroupIDs) == 0 {
+			filtered = append(filtered, accounts[i])
+		}
+	}
+	return filtered, nil
+}
+
+func (r *accountRepository) ListSchedulableUngroupedByPlatforms(ctx context.Context, platforms []string) ([]service.Account, error) {
+	accounts, err := r.ListSchedulableByPlatforms(ctx, platforms)
+	if err != nil {
+		return nil, err
+	}
+	filtered := make([]service.Account, 0, len(accounts))
+	for i := range accounts {
+		if len(accounts[i].GroupIDs) == 0 {
+			filtered = append(filtered, accounts[i])
+		}
+	}
+	return filtered, nil
+}
+
 func (r *accountRepository) ListSchedulableByGroupIDAndPlatforms(ctx context.Context, groupID int64, platforms []string) ([]service.Account, error) {
 	if len(platforms) == 0 {
 		return nil, nil
@@ -1628,4 +1656,56 @@ func (r *accountRepository) FindByExtraField(ctx context.Context, key string, va
 	}
 
 	return r.accountsToService(ctx, accounts)
+}
+
+// IncrementQuotaUsed atomically increments account quota usage counters stored in extra JSON.
+func (r *accountRepository) IncrementQuotaUsed(ctx context.Context, id int64, amount float64) error {
+	res, err := r.sql.ExecContext(ctx, `
+		UPDATE accounts
+		SET extra = (
+			COALESCE(extra, '{}'::jsonb)
+			|| jsonb_build_object('quota_used', COALESCE((extra->>'quota_used')::numeric, 0) + $1)
+			|| jsonb_build_object('quota_daily_used', COALESCE((extra->>'quota_daily_used')::numeric, 0) + $1)
+			|| jsonb_build_object('quota_weekly_used', COALESCE((extra->>'quota_weekly_used')::numeric, 0) + $1)
+		),
+		updated_at = NOW()
+		WHERE id = $2 AND deleted_at IS NULL
+	`, amount, id)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+	return nil
+}
+
+// ResetQuotaUsed resets account quota usage counters stored in extra JSON.
+func (r *accountRepository) ResetQuotaUsed(ctx context.Context, id int64) error {
+	res, err := r.sql.ExecContext(ctx, `
+		UPDATE accounts
+		SET extra = (
+			COALESCE(extra, '{}'::jsonb)
+			|| jsonb_build_object('quota_used', 0)
+			|| jsonb_build_object('quota_daily_used', 0)
+			|| jsonb_build_object('quota_weekly_used', 0)
+		),
+		updated_at = NOW()
+		WHERE id = $1 AND deleted_at IS NULL
+	`, id)
+	if err != nil {
+		return err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return service.ErrAccountNotFound
+	}
+	return nil
 }

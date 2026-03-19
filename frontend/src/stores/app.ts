@@ -12,7 +12,6 @@ import {
   type ReleaseInfo
 } from '@/api/admin/system'
 import { getPublicSettings as fetchPublicSettingsAPI } from '@/api/auth'
-import { injectBaiduScripts } from '@/utils/baiduTracking'
 
 export const useAppStore = defineStore('app', () => {
   // ==================== State ====================
@@ -21,8 +20,6 @@ export const useAppStore = defineStore('app', () => {
   const mobileOpen = ref<boolean>(false)
   const loading = ref<boolean>(false)
   const toasts = ref<Toast[]>([])
-
-  // Background export state — survives page navigation
   const isExporting = ref<boolean>(false)
 
   // Public settings cache state
@@ -51,6 +48,7 @@ export const useAppStore = defineStore('app', () => {
   // ==================== Computed ====================
 
   const hasActiveToasts = computed(() => toasts.value.length > 0)
+  const backendModeEnabled = computed(() => cachedPublicSettings.value?.backend_mode_enabled ?? false)
 
   const loadingCount = ref<number>(0)
 
@@ -221,12 +219,8 @@ export const useAppStore = defineStore('app', () => {
   }
 
   /**
-   * Run a background export: fetch a Blob via `fetcher`, then trigger a browser download.
-   * The export survives page navigation because the async operation is owned by the store,
-   * not the calling component. A floating indicator in App.vue shows progress globally.
-   * @param fetcher - Async function that resolves to the file Blob
-   * @param filename - Download filename
-   * @param messages - Translated success/error strings from the caller
+   * Run a background export and trigger browser download.
+   * The caller passes translated success/error messages.
    */
   async function startExport(
     fetcher: () => Promise<Blob>,
@@ -260,6 +254,7 @@ export const useAppStore = defineStore('app', () => {
     loading.value = false
     loadingCount.value = 0
     toasts.value = []
+    isExporting.value = false
   }
 
   // ==================== Version Management ====================
@@ -326,7 +321,6 @@ export const useAppStore = defineStore('app', () => {
     apiBaseUrl.value = config.api_base_url || ''
     docUrl.value = config.doc_url || ''
     publicSettingsLoaded.value = true
-    injectBaiduScripts(config.baidu_tongji_id || '')
   }
 
   /**
@@ -348,6 +342,7 @@ export const useAppStore = defineStore('app', () => {
       return {
         registration_enabled: false,
         email_verify_enabled: false,
+        registration_email_suffix_whitelist: [],
         promo_code_enabled: true,
         password_reset_enabled: false,
         invitation_code_enabled: false,
@@ -363,10 +358,10 @@ export const useAppStore = defineStore('app', () => {
         hide_ccs_import_button: false,
         purchase_subscription_enabled: false,
         purchase_subscription_url: '',
-        claude_official_url: '',
-        codex_official_url: '',
-        gemini_official_url: '',
+        custom_menu_items: [],
         linuxdo_oauth_enabled: false,
+        sora_client_enabled: false,
+        backend_mode_enabled: false,
         version: siteVersion.value
       }
     }
@@ -441,6 +436,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Computed
     hasActiveToasts,
+    backendModeEnabled,
 
     // Actions
     toggleSidebar,

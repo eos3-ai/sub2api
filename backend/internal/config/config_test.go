@@ -224,7 +224,7 @@ func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 }
 
 func TestLoadDashboardAggregationRetentionFromEnv(t *testing.T) {
-	viper.Reset()
+	resetViperWithJWTSecret(t)
 	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_USAGE_LOGS_DAYS", "123")
 	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_HOURLY_DAYS", "456")
 	t.Setenv("DASHBOARD_AGGREGATION_RETENTION_DAILY_DAYS", "789")
@@ -246,7 +246,7 @@ func TestLoadDashboardAggregationRetentionFromEnv(t *testing.T) {
 }
 
 func TestLoadUsageCleanupEnabledFromEnv(t *testing.T) {
-	viper.Reset()
+	resetViperWithJWTSecret(t)
 	t.Setenv("USAGE_CLEANUP_ENABLED", "false")
 
 	cfg, err := Load()
@@ -260,7 +260,7 @@ func TestLoadUsageCleanupEnabledFromEnv(t *testing.T) {
 }
 
 func TestLoadAdminAPIKeyReadOnlyAllowlistFromEnv(t *testing.T) {
-	viper.Reset()
+	resetViperWithJWTSecret(t)
 	t.Setenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS", "/api/v1/admin/users/export,/api/v1/admin/usage")
 	t.Setenv("SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATH_PREFIXES", `["/api/v1/admin/users"]`)
 

@@ -73,6 +73,7 @@ func provideCleanup(
 	tokenRefresh *service.TokenRefreshService,
 	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
 	openaiAPIKeyMonitor *service.OpenAIAPIKeyMonitorService,
+	scheduledTestRunner *service.ScheduledTestRunnerService,
 	accountExpiry *service.AccountExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
@@ -98,7 +99,9 @@ func provideCleanup(
 			fn   func() error
 		}{
 			{"PaymentMaintenanceService", func() error {
-				paymentMaintenance.Stop()
+				if paymentMaintenance != nil {
+					paymentMaintenance.Stop()
+				}
 				return nil
 			}},
 			{"OpsScheduledReportService", func() error {
@@ -177,6 +180,12 @@ func provideCleanup(
 				}
 				return nil
 			}},
+			{"ScheduledTestRunnerService", func() error {
+				if scheduledTestRunner != nil {
+					scheduledTestRunner.Stop()
+				}
+				return nil
+			}},
 			{"AccountExpiryService", func() error {
 				accountExpiry.Stop()
 				return nil
@@ -226,9 +235,15 @@ func provideCleanup(
 				return nil
 			}},
 			{"Redis", func() error {
+				if rdb == nil {
+					return nil
+				}
 				return rdb.Close()
 			}},
 			{"Ent", func() error {
+				if entClient == nil {
+					return nil
+				}
 				return entClient.Close()
 			}},
 		}

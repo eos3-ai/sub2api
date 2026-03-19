@@ -319,8 +319,18 @@ import DataTable from '@/components/common/DataTable.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import Icon from '@/components/icons/Icon.vue'
 import type { AdminUsageLog } from '@/types'
+import type { Column } from '@/components/common/types'
 
-defineProps(['data', 'loading', 'columns'])
+interface Props {
+  data: AdminUsageLog[]
+  loading?: boolean
+  columns?: Column[]
+}
+
+withDefaults(defineProps<Props>(), {
+  loading: false,
+  columns: () => []
+})
 defineEmits(['userClick'])
 const { t } = useI18n()
 
