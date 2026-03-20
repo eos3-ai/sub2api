@@ -65,6 +65,8 @@ type AccountTestService struct {
 	soraTestGuardMu           sync.Mutex
 	soraTestLastRun           map[int64]time.Time
 	soraTestCooldown          time.Duration
+	backgroundCtxOnce         sync.Once
+	backgroundCtxEngine       *gin.Engine
 }
 
 const defaultSoraTestCooldown = 10 * time.Second
@@ -1505,7 +1507,7 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 	startedAt := time.Now()
 
 	w := httptest.NewRecorder()
-	ginCtx, _ := gin.CreateTestContext(w)
+	ginCtx := gin.CreateTestContextOnly(w, s.backgroundTestEngine())
 	ginCtx.Request = (&http.Request{}).WithContext(ctx)
 
 	testErr := s.TestAccountConnection(ginCtx, accountID, modelID, "")
@@ -1530,6 +1532,15 @@ func (s *AccountTestService) RunTestBackground(ctx context.Context, accountID in
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
 	}, nil
+}
+
+func (s *AccountTestService) backgroundTestEngine() *gin.Engine {
+	s.backgroundCtxOnce.Do(func() {
+		// Reuse a single engine for background test contexts so periodic jobs
+		// don't repeatedly trigger Gin's debug-mode engine creation warning.
+		s.backgroundCtxEngine = gin.New()
+	})
+	return s.backgroundCtxEngine
 }
 
 func parseTestSSEOutput(body string) (responseText, errMsg string) {
