@@ -60,8 +60,6 @@ func TestProvideCleanup_WithMinimalDependencies_NoPanic(t *testing.T) {
 		&service.SoraMediaCleanupService{},
 		schedulerSnapshotSvc,
 		tokenRefreshSvc,
-		nil, // anthropicAPIKeyMonitor
-		nil, // openaiAPIKeyMonitor
 		nil, // scheduledTestRunner
 		accountExpirySvc,
 		subscriptionExpirySvc,

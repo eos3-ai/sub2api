@@ -71,8 +71,6 @@ func provideCleanup(
 	soraMediaCleanup *service.SoraMediaCleanupService,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
-	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
-	openaiAPIKeyMonitor *service.OpenAIAPIKeyMonitorService,
 	scheduledTestRunner *service.ScheduledTestRunnerService,
 	accountExpiry *service.AccountExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
@@ -166,18 +164,6 @@ func provideCleanup(
 			}},
 			{"TokenRefreshService", func() error {
 				tokenRefresh.Stop()
-				return nil
-			}},
-			{"AnthropicAPIKeyMonitorService", func() error {
-				if anthropicAPIKeyMonitor != nil {
-					anthropicAPIKeyMonitor.Stop()
-				}
-				return nil
-			}},
-			{"OpenAIAPIKeyMonitorService", func() error {
-				if openaiAPIKeyMonitor != nil {
-					openaiAPIKeyMonitor.Stop()
-				}
 				return nil
 			}},
 			{"ScheduledTestRunnerService", func() error {

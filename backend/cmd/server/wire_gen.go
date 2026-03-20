@@ -255,13 +255,11 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 	opsScheduledReportService := service.ProvideOpsScheduledReportService(opsService, userService, emailService, redisClient, configConfig)
 	soraMediaCleanupService := service.ProvideSoraMediaCleanupService(soraMediaStorage, configConfig)
 	tokenRefreshService := service.ProvideTokenRefreshService(accountRepository, soraAccountRepository, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, compositeTokenCacheInvalidator, schedulerCache, configConfig)
-	anthropicAPIKeyMonitorService := service.ProvideAnthropicAPIKeyMonitorService(accountRepository, httpUpstream, redisClient, configConfig)
-	openAIAPIKeyMonitorService := service.ProvideOpenAIAPIKeyMonitorService(accountRepository, httpUpstream, redisClient, configConfig)
 	scheduledTestRunnerService := service.ProvideScheduledTestRunnerService(scheduledTestPlanRepository, scheduledTestService, accountTestService, rateLimitService, configConfig)
 	accountExpiryService := service.ProvideAccountExpiryService(accountRepository)
 	subscriptionExpiryService := service.ProvideSubscriptionExpiryService(userSubscriptionRepository)
 	paymentMaintenanceService := service.ProvidePaymentMaintenanceService(configConfig, paymentService)
-	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, soraMediaCleanupService, schedulerSnapshotService, tokenRefreshService, anthropicAPIKeyMonitorService, openAIAPIKeyMonitorService, scheduledTestRunnerService, accountExpiryService, subscriptionExpiryService, usageCleanupService, idempotencyCleanupService, pricingService, emailQueueService, billingCacheService, usageRecordWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
+	v := provideCleanup(client, redisClient, opsMetricsCollector, opsAggregationService, opsAlertEvaluatorService, opsCleanupService, opsScheduledReportService, opsSystemLogSink, soraMediaCleanupService, schedulerSnapshotService, tokenRefreshService, scheduledTestRunnerService, accountExpiryService, subscriptionExpiryService, usageCleanupService, idempotencyCleanupService, pricingService, emailQueueService, billingCacheService, usageRecordWorkerPool, subscriptionService, oAuthService, openAIOAuthService, geminiOAuthService, antigravityOAuthService, paymentMaintenanceService)
 	application := &Application{
 		Server:  httpServer,
 		Cleanup: v,
@@ -295,8 +293,6 @@ func provideCleanup(
 	soraMediaCleanup *service.SoraMediaCleanupService,
 	schedulerSnapshot *service.SchedulerSnapshotService,
 	tokenRefresh *service.TokenRefreshService,
-	anthropicAPIKeyMonitor *service.AnthropicAPIKeyMonitorService,
-	openaiAPIKeyMonitor *service.OpenAIAPIKeyMonitorService,
 	scheduledTestRunner *service.ScheduledTestRunnerService,
 	accountExpiry *service.AccountExpiryService,
 	subscriptionExpiry *service.SubscriptionExpiryService,
@@ -389,18 +385,6 @@ func provideCleanup(
 			}},
 			{"TokenRefreshService", func() error {
 				tokenRefresh.Stop()
-				return nil
-			}},
-			{"AnthropicAPIKeyMonitorService", func() error {
-				if anthropicAPIKeyMonitor != nil {
-					anthropicAPIKeyMonitor.Stop()
-				}
-				return nil
-			}},
-			{"OpenAIAPIKeyMonitorService", func() error {
-				if openaiAPIKeyMonitor != nil {
-					openaiAPIKeyMonitor.Stop()
-				}
 				return nil
 			}},
 			{"ScheduledTestRunnerService", func() error {

@@ -56,36 +56,6 @@ func ProvideTokenRefreshService(
 	return svc
 }
 
-// ProvideAnthropicAPIKeyMonitorService creates and starts AnthropicAPIKeyMonitorService.
-func ProvideAnthropicAPIKeyMonitorService(
-	accountRepo AccountRepository,
-	httpUpstream HTTPUpstream,
-	redisClient *redis.Client,
-	cfg *config.Config,
-) *AnthropicAPIKeyMonitorService {
-	// Temporarily disabled: use scheduled-test based account detection/recovery chain from v0.1.103.
-	_ = accountRepo
-	_ = httpUpstream
-	_ = redisClient
-	_ = cfg
-	return nil
-}
-
-// ProvideOpenAIAPIKeyMonitorService creates and starts OpenAIAPIKeyMonitorService.
-func ProvideOpenAIAPIKeyMonitorService(
-	accountRepo AccountRepository,
-	httpUpstream HTTPUpstream,
-	redisClient *redis.Client,
-	cfg *config.Config,
-) *OpenAIAPIKeyMonitorService {
-	// Temporarily disabled: use scheduled-test based account detection/recovery chain from v0.1.103.
-	_ = accountRepo
-	_ = httpUpstream
-	_ = redisClient
-	_ = cfg
-	return nil
-}
-
 // ProvideDashboardAggregationService 创建并启动仪表盘聚合服务
 func ProvideDashboardAggregationService(repo DashboardAggregationRepository, timingWheel *TimingWheelService, cfg *config.Config) *DashboardAggregationService {
 	svc := NewDashboardAggregationService(repo, timingWheel, cfg)
@@ -476,8 +446,6 @@ var ProviderSet = wire.NewSet(
 	NewUserAttributeService,
 	NewUsageCache,
 	ProvidePaymentMaintenanceService,
-	ProvideAnthropicAPIKeyMonitorService,
-	ProvideOpenAIAPIKeyMonitorService,
 	NewTotpService,
 	NewErrorPassthroughService,
 	NewDigestSessionStore,

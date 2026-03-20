@@ -441,3 +441,15 @@ func (s *ScheduledTestRunnerService) sendLowAvailableAccountAlert(platform strin
 		}
 	}(title, sb.String())
 }
+
+func getExtraBool(extra map[string]any, key string) bool {
+	if extra == nil {
+		return false
+	}
+	v, ok := extra[key]
+	if !ok || v == nil {
+		return false
+	}
+	b, ok := v.(bool)
+	return ok && b
+}
