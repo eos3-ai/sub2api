@@ -281,6 +281,7 @@ export default {
     proxies: 'IP管理',
     redeemCodes: '兑换码',
     ops: '运维监控',
+    groupMonitor: '分组监控',
     promoCodes: '优惠码',
     settings: '系统设置',
     myAccount: '我的账户',
@@ -294,6 +295,51 @@ export default {
     buySubscription: '购买订阅',
     docs: '文档',
     modelPricing: '模型价格'
+  },
+
+  groupMonitor: {
+    title: '分组监控',
+    description: '基于公开分组的聚合健康视图：任意账号成功即分组成功。',
+    refresh: '刷新',
+    loading: '加载中...',
+    loadFailed: '加载分组监控失败',
+    empty: '暂无公开分组监控数据',
+    impactedKeys: '受影响 API Key（当前分组异常）',
+    noImpactedKeys: '当前没有需要切换分组的 API Key',
+    keyName: 'API Key',
+    currentGroup: '当前分组',
+    currentStatus: '当前状态',
+    switchTo: '切换到分组',
+    action: '操作',
+    selectTargetGroup: '请选择目标分组',
+    switchNow: '立即切换',
+    switchSuccess: '分组切换成功',
+    switchFailed: '分组切换失败',
+    groupDetails: '分组详情',
+    totalRequests1h: '1h 总请求',
+    successRequests1h: '1h 成功',
+    failureRequests1h: '1h 失败',
+    samples: '最近 30 条样本',
+    summary: {
+      publicGroups: '公开分组数',
+      healthyGroups: '健康分组',
+      riskyGroups: '风险分组'
+    },
+    status: {
+      normal: '正常',
+      abnormal: '异常',
+      unknown: '未知'
+    },
+    sampleStatus: {
+      success: '成功',
+      failed: '失败'
+    },
+    sample: {
+      requestTime: '请求时间',
+      status: '请求状态',
+      model: '请求模型',
+      latency: '请求时长'
+    }
   },
 
   // Promotion

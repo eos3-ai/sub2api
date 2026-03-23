@@ -24,6 +24,7 @@ type ScheduledTestPlan struct {
 type ScheduledTestResult struct {
 	ID           int64     `json:"id"`
 	PlanID       int64     `json:"plan_id"`
+	RoundID      string    `json:"round_id"`
 	Status       string    `json:"status"`
 	ResponseText string    `json:"response_text"`
 	ErrorMessage string    `json:"error_message"`

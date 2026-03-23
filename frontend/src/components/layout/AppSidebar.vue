@@ -458,6 +458,7 @@ const userNavItems = computed(() => {
     { path: '/model-pricing', label: t('nav.modelPricing'), icon: PriceTagIcon },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/group-monitor', label: t('nav.groupMonitor'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
     { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
     { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
@@ -485,6 +486,7 @@ const personalNavItems = computed(() => {
     { path: '/model-pricing', label: t('nav.modelPricing'), icon: PriceTagIcon },
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/group-monitor', label: t('nav.groupMonitor'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
     { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
     { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
@@ -511,7 +513,9 @@ const adminNavItems = computed(() => {
   const baseItems = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     ...(adminSettingsStore.opsMonitoringEnabled
-      ? [{ path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon }]
+      ? [
+          { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon }
+        ]
       : []),
     { path: '/admin/users', label: t('nav.users'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/admin/groups', label: t('nav.groups'), icon: FolderIcon, hideInSimpleMode: true },

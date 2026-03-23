@@ -153,6 +153,18 @@ const routes: RouteRecordRaw[] = [
       descriptionKey: 'usage.description'
     }
   },
+  {
+    path: '/group-monitor',
+    name: 'GroupMonitor',
+    component: () => import('@/views/user/GroupMonitorView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Group Monitor',
+      titleKey: 'groupMonitor.title',
+      descriptionKey: 'groupMonitor.description'
+    }
+  },
   // Redeem code feature is not used in this deployment:
   /*
   {

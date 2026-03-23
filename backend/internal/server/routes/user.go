@@ -87,6 +87,7 @@ func RegisterUserRoutes(
 		{
 			groups.GET("/available", h.APIKey.GetAvailableGroups)
 			groups.GET("/rates", h.APIKey.GetUserGroupRates)
+			groups.GET("/monitor", h.APIKey.GetPublicGroupMonitor)
 		}
 
 		// 使用记录

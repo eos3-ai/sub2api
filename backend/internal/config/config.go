@@ -726,6 +726,9 @@ type GatewaySchedulingConfig struct {
 
 	// OpenAIAPIKeyMonitor: OpenAI API-key 账号连通性监控（自动启停调度）
 	OpenAIAPIKeyMonitor OpenAIAPIKeyMonitorConfig `mapstructure:"openai_apikey_monitor"`
+
+	// GeminiAPIKeyMonitor: Gemini API-key 账号连通性监控（自动启停调度）
+	GeminiAPIKeyMonitor GeminiAPIKeyMonitorConfig `mapstructure:"gemini_apikey_monitor"`
 }
 
 // AnthropicAPIKeyMonitorConfig controls the background connectivity monitor for Anthropic API-key accounts.
@@ -803,6 +806,45 @@ type OpenAIAPIKeyMonitorConfig struct {
 	// AvailableAccountAlertThreshold: when the number of schedulable OpenAI API-key accounts
 	// drops to or below this value, a DingTalk alert is fired. 0 disables the alert.
 	// Env: GATEWAY_SCHEDULING_OPENAI_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD
+	AvailableAccountAlertThreshold int `mapstructure:"available_account_alert_threshold"`
+}
+
+// GeminiAPIKeyMonitorConfig controls the background connectivity monitor for Gemini API-key accounts.
+//
+// When enabled, the service periodically performs a lightweight "test account connection" call against
+// the configured Gemini upstream (account.credentials.base_url), and:
+// - disables scheduling after N consecutive failures
+// - re-enables scheduling after N consecutive successes
+type GeminiAPIKeyMonitorConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+
+	// Interval between checks. Recommended: 10s.
+	Interval time.Duration `mapstructure:"interval"`
+
+	// FailureThreshold: consecutive failures required to stop scheduling. Recommended: 6.
+	FailureThreshold int `mapstructure:"failure_threshold"`
+	// SuccessThreshold: consecutive successes required to resume scheduling. Recommended: 6.
+	SuccessThreshold int `mapstructure:"success_threshold"`
+
+	// RequestTimeout bounds a single upstream test request. Recommended: 8s.
+	RequestTimeout time.Duration `mapstructure:"request_timeout"`
+
+	// MaxConcurrency limits concurrent upstream tests per cycle. 0 uses a safe default.
+	MaxConcurrency int `mapstructure:"max_concurrency"`
+
+	// ModelID optionally overrides the model used for the test request.
+	// Empty uses the backend default (geminicli.DefaultTestModel), then applies account model_mapping.
+	ModelID string `mapstructure:"model_id"`
+
+	// IncludeAccountIDs optionally restricts the monitor to specific account IDs.
+	// When non-empty, only matching Gemini API-key active accounts will be tested.
+	IncludeAccountIDs []int64 `mapstructure:"include_account_ids"`
+	// ExcludeAccountIDs optionally skips specific account IDs from monitoring.
+	ExcludeAccountIDs []int64 `mapstructure:"exclude_account_ids"`
+
+	// AvailableAccountAlertThreshold: when the number of schedulable Gemini API-key accounts
+	// drops to or below this value, a DingTalk alert is fired. 0 disables the alert.
+	// Env: GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD
 	AvailableAccountAlertThreshold int `mapstructure:"available_account_alert_threshold"`
 }
 
@@ -1290,6 +1332,20 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 		}
 		viper.Set("gateway.scheduling.openai_apikey_monitor.exclude_account_ids", ids)
 	}
+	if raw := strings.TrimSpace(os.Getenv("GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")); raw != "" {
+		ids, err := parseInt64ListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS: %w", err)
+		}
+		viper.Set("gateway.scheduling.gemini_apikey_monitor.include_account_ids", ids)
+	}
+	if raw := strings.TrimSpace(os.Getenv("GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")); raw != "" {
+		ids, err := parseInt64ListEnv(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS: %w", err)
+		}
+		viper.Set("gateway.scheduling.gemini_apikey_monitor.exclude_account_ids", ids)
+	}
 
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -1324,6 +1380,8 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.AnthropicAPIKeyMonitor.ExcludeAccountIDs)
 	cfg.Gateway.Scheduling.OpenAIAPIKeyMonitor.IncludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.OpenAIAPIKeyMonitor.IncludeAccountIDs)
 	cfg.Gateway.Scheduling.OpenAIAPIKeyMonitor.ExcludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.OpenAIAPIKeyMonitor.ExcludeAccountIDs)
+	cfg.Gateway.Scheduling.GeminiAPIKeyMonitor.IncludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.GeminiAPIKeyMonitor.IncludeAccountIDs)
+	cfg.Gateway.Scheduling.GeminiAPIKeyMonitor.ExcludeAccountIDs = normalizeInt64Slice(cfg.Gateway.Scheduling.GeminiAPIKeyMonitor.ExcludeAccountIDs)
 	cfg.Log.Level = strings.ToLower(strings.TrimSpace(cfg.Log.Level))
 	cfg.Log.Format = strings.ToLower(strings.TrimSpace(cfg.Log.Format))
 	cfg.Log.ServiceName = strings.TrimSpace(cfg.Log.ServiceName)
@@ -1529,6 +1587,18 @@ func bindCoreEnvAliases(v *viper.Viper) {
 	_ = v.BindEnv("gateway.scheduling.openai_apikey_monitor.include_account_ids", "GATEWAY_SCHEDULING_OPENAI_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")
 	_ = v.BindEnv("gateway.scheduling.openai_apikey_monitor.exclude_account_ids", "GATEWAY_SCHEDULING_OPENAI_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")
 	_ = v.BindEnv("gateway.scheduling.openai_apikey_monitor.available_account_alert_threshold", "GATEWAY_SCHEDULING_OPENAI_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD", "GATEWAY_SCHEDULING_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD")
+
+	// Gateway scheduling monitor (Gemini API-key health)
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.enabled", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_ENABLED", "GATEWAY_SCHEDULING_APIKEY_MONITOR_ENABLED")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.interval", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_INTERVAL", "GATEWAY_SCHEDULING_APIKEY_MONITOR_INTERVAL")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.failure_threshold", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_FAILURE_THRESHOLD", "GATEWAY_SCHEDULING_APIKEY_MONITOR_FAILURE_THRESHOLD")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.success_threshold", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_SUCCESS_THRESHOLD", "GATEWAY_SCHEDULING_APIKEY_MONITOR_SUCCESS_THRESHOLD")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.request_timeout", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_REQUEST_TIMEOUT", "GATEWAY_SCHEDULING_APIKEY_MONITOR_REQUEST_TIMEOUT")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.max_concurrency", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_MAX_CONCURRENCY", "GATEWAY_SCHEDULING_APIKEY_MONITOR_MAX_CONCURRENCY")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.model_id", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_MODEL_ID", "GATEWAY_SCHEDULING_APIKEY_MONITOR_MODEL_ID")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.include_account_ids", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_INCLUDE_ACCOUNT_IDS")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.exclude_account_ids", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_EXCLUDE_ACCOUNT_IDS")
+	_ = v.BindEnv("gateway.scheduling.gemini_apikey_monitor.available_account_alert_threshold", "GATEWAY_SCHEDULING_GEMINI_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD", "GATEWAY_SCHEDULING_APIKEY_MONITOR_AVAILABLE_ACCOUNT_ALERT_THRESHOLD")
 
 	// Gateway TLS fingerprint simulation
 	_ = v.BindEnv("gateway.tls_fingerprint.enabled", "GATEWAY_TLS_FINGERPRINT_ENABLED")
@@ -2081,6 +2151,17 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.openai_apikey_monitor.include_account_ids", []int64{})
 	viper.SetDefault("gateway.scheduling.openai_apikey_monitor.exclude_account_ids", []int64{})
 	viper.SetDefault("gateway.scheduling.openai_apikey_monitor.available_account_alert_threshold", 0)
+	// Gemini API-key connectivity monitor (disabled by default)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.enabled", false)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.interval", 10*time.Second)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.failure_threshold", 6)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.success_threshold", 6)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.request_timeout", 8*time.Second)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.max_concurrency", 4)
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.model_id", "")
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.include_account_ids", []int64{})
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.exclude_account_ids", []int64{})
+	viper.SetDefault("gateway.scheduling.gemini_apikey_monitor.available_account_alert_threshold", 0)
 	viper.SetDefault("gateway.usage_record.worker_count", 128)
 	viper.SetDefault("gateway.usage_record.queue_size", 16384)
 	viper.SetDefault("gateway.usage_record.task_timeout_seconds", 5)

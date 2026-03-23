@@ -281,6 +281,7 @@ export default {
     proxies: 'Proxies',
     redeemCodes: 'Redeem Codes',
     ops: 'Ops',
+    groupMonitor: 'Group Monitor',
     promoCodes: 'Promo Codes',
     settings: 'Settings',
     myAccount: 'My Account',
@@ -294,6 +295,51 @@ export default {
     buySubscription: 'Purchase Subscription',
     docs: 'Docs',
     modelPricing: 'Model Pricing'
+  },
+
+  groupMonitor: {
+    title: 'Group Monitor',
+    description: 'Public-group aggregated health view: any account success means group success.',
+    refresh: 'Refresh',
+    loading: 'Loading...',
+    loadFailed: 'Failed to load group monitor',
+    empty: 'No public group monitor data',
+    impactedKeys: 'Impacted API Keys (current group abnormal)',
+    noImpactedKeys: 'No API keys need switching right now',
+    keyName: 'API Key',
+    currentGroup: 'Current Group',
+    currentStatus: 'Current Status',
+    switchTo: 'Switch To',
+    action: 'Action',
+    selectTargetGroup: 'Select target group',
+    switchNow: 'Switch Now',
+    switchSuccess: 'Group switched successfully',
+    switchFailed: 'Failed to switch group',
+    groupDetails: 'Group Details',
+    totalRequests1h: '1h Total Requests',
+    successRequests1h: '1h Success',
+    failureRequests1h: '1h Failure',
+    samples: 'Recent 30 Samples',
+    summary: {
+      publicGroups: 'Public Groups',
+      healthyGroups: 'Healthy Groups',
+      riskyGroups: 'Risky Groups'
+    },
+    status: {
+      normal: 'Normal',
+      abnormal: 'Abnormal',
+      unknown: 'Unknown'
+    },
+    sampleStatus: {
+      success: 'Success',
+      failed: 'Failed'
+    },
+    sample: {
+      requestTime: 'Request Time',
+      status: 'Request Status',
+      model: 'Request Model',
+      latency: 'Request Duration'
+    }
   },
 
   // Promotion

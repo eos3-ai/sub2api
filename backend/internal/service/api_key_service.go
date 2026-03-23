@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -197,6 +198,19 @@ type APIKeyService struct {
 	authGroup             singleflight.Group
 	lastUsedTouchL1       sync.Map // keyID -> nextAllowedAt(time.Time)
 	lastUsedTouchSF       singleflight.Group
+}
+
+// PublicGroupMonitorReader is an optional repository capability implemented by group repository.
+// It aggregates scheduled-test results into user-facing group monitor payload.
+type PublicGroupMonitorReader interface {
+	GetPublicGroupMonitorOverview(
+		ctx context.Context,
+		groupIDs []int64,
+		bucketSeconds int,
+		sampleSize int,
+		now time.Time,
+		window time.Duration,
+	) (map[int64]*PublicGroupMonitorAggregate, error)
 }
 
 // NewAPIKeyService 创建API Key服务实例
@@ -768,6 +782,124 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	}
 
 	return availableGroups, nil
+}
+
+// GetPublicGroupMonitor returns user-facing public-group monitor data.
+// Public groups are defined as active non-exclusive standard groups.
+func (s *APIKeyService) GetPublicGroupMonitor(
+	ctx context.Context,
+	_ int64,
+	query PublicGroupMonitorQuery,
+) (*PublicGroupMonitorResponse, error) {
+	window := query.Window
+	if window <= 0 {
+		window = time.Hour
+	}
+	// Guardrail: keep window bounded for predictable query cost.
+	if window > 24*time.Hour {
+		window = 24 * time.Hour
+	}
+
+	sampleSize := query.SampleSize
+	if sampleSize <= 0 {
+		sampleSize = 30
+	}
+	if sampleSize > 30 {
+		sampleSize = 30
+	}
+
+	bucketSeconds := query.BucketSeconds
+	if bucketSeconds <= 0 {
+		bucketSeconds = 15
+	}
+	if bucketSeconds > 300 {
+		bucketSeconds = 300
+	}
+
+	allGroups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list active groups: %w", err)
+	}
+
+	publicGroups := make([]Group, 0, len(allGroups))
+	groupIDs := make([]int64, 0, len(allGroups))
+	for i := range allGroups {
+		g := allGroups[i]
+		if g.IsExclusive {
+			continue
+		}
+		if g.SubscriptionType != SubscriptionTypeStandard {
+			continue
+		}
+		publicGroups = append(publicGroups, g)
+		groupIDs = append(groupIDs, g.ID)
+	}
+
+	sort.Slice(publicGroups, func(i, j int) bool {
+		if publicGroups[i].SortOrder != publicGroups[j].SortOrder {
+			return publicGroups[i].SortOrder < publicGroups[j].SortOrder
+		}
+		if publicGroups[i].Name != publicGroups[j].Name {
+			return publicGroups[i].Name < publicGroups[j].Name
+		}
+		return publicGroups[i].ID < publicGroups[j].ID
+	})
+
+	resp := &PublicGroupMonitorResponse{
+		GeneratedAt:    time.Now().UTC(),
+		WindowSeconds:  int64(window / time.Second),
+		SampleSize:     sampleSize,
+		BucketSeconds:  bucketSeconds,
+		PublicGroupNum: len(publicGroups),
+		Items:          make([]*PublicGroupMonitorItem, 0, len(publicGroups)),
+	}
+
+	if len(publicGroups) == 0 {
+		return resp, nil
+	}
+
+	reader, ok := s.groupRepo.(PublicGroupMonitorReader)
+	if !ok || reader == nil {
+		return nil, infraerrors.ServiceUnavailable("GROUP_MONITOR_NOT_AVAILABLE", "group monitor data source not available")
+	}
+
+	aggByGroupID, err := reader.GetPublicGroupMonitorOverview(
+		ctx,
+		groupIDs,
+		bucketSeconds,
+		sampleSize,
+		resp.GeneratedAt,
+		window,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query public group monitor overview: %w", err)
+	}
+
+	for i := range publicGroups {
+		g := publicGroups[i]
+		agg := aggByGroupID[g.ID]
+		item := &PublicGroupMonitorItem{
+			GroupID:       g.ID,
+			GroupName:     g.Name,
+			Platform:      g.Platform,
+			CurrentStatus: "unknown",
+			Samples:       []*PublicGroupMonitorSample{},
+		}
+		if agg != nil {
+			if agg.CurrentStatus != "" {
+				item.CurrentStatus = agg.CurrentStatus
+			}
+			item.TotalRequests1h = agg.TotalRequests1h
+			item.SuccessRequests1h = agg.SuccessRequests1h
+			item.FailureRequests1h = agg.FailureRequests1h
+			if len(agg.Samples) > 0 {
+				item.Samples = agg.Samples
+			}
+		}
+		resp.Items = append(resp.Items, item)
+	}
+
+	return resp, nil
 }
 
 // canUserBindGroupInternal 内部方法，检查用户是否可以绑定分组（使用预加载的订阅数据）

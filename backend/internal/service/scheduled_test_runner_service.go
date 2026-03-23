@@ -38,6 +38,7 @@ type ScheduledTestRunnerService struct {
 
 	lastAnthropicLowAvailableAlertAt time.Time
 	lastOpenAILowAvailableAlertAt    time.Time
+	lastGeminiLowAvailableAlertAt    time.Time
 }
 
 // NewScheduledTestRunnerService creates a new runner.
@@ -108,6 +109,7 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	defer cancel()
 
 	now := time.Now()
+	roundID := newScheduledTestRoundID(now)
 	plans, err := s.planRepo.ListDue(ctx, now)
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] ListDue error: %v", err)
@@ -130,7 +132,7 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 			go func(p *ScheduledTestPlan) {
 				defer wg.Done()
 				defer func() { <-sem }()
-				abnormal, reason := s.runOnePlan(ctx, p)
+				abnormal, reason := s.runOnePlan(ctx, p, roundID)
 				failedMu.Lock()
 				defer failedMu.Unlock()
 				if abnormal {
@@ -151,7 +153,7 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 	s.evaluateLowAvailableAlerts(ctx, failedAccountIDs, time.Now())
 }
 
-func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan) (bool, string) {
+func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan, roundID string) (bool, string) {
 	result, err := s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground error: %v", plan.ID, err)
@@ -161,6 +163,8 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground returned nil result", plan.ID)
 		return true, "scheduled test returned nil result"
 	}
+
+	result.RoundID = roundID
 
 	if err := s.scheduledSvc.SaveResult(ctx, plan.ID, plan.MaxResults, result); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d SaveResult error: %v", plan.ID, err)
@@ -188,6 +192,10 @@ func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *Sched
 		return true, scheduledTestFailureReason(result)
 	}
 	return false, ""
+}
+
+func newScheduledTestRoundID(now time.Time) string {
+	return fmt.Sprintf("st-%d", now.UTC().UnixNano())
 }
 
 // tryRecoverAccount attempts to recover an account from recoverable runtime state.
@@ -327,6 +335,13 @@ func (s *ScheduledTestRunnerService) evaluateLowAvailableAlerts(ctx context.Cont
 		failedAccountIDs,
 		now,
 	)
+	s.checkPlatformLowAvailableAlert(
+		ctx,
+		PlatformGemini,
+		s.cfg.Gateway.Scheduling.GeminiAPIKeyMonitor.AvailableAccountAlertThreshold,
+		failedAccountIDs,
+		now,
+	)
 }
 
 func (s *ScheduledTestRunnerService) checkPlatformLowAvailableAlert(
@@ -390,6 +405,8 @@ func (s *ScheduledTestRunnerService) shouldSendLowAvailableAlert(platform string
 		last = &s.lastAnthropicLowAvailableAlertAt
 	case PlatformOpenAI:
 		last = &s.lastOpenAILowAvailableAlertAt
+	case PlatformGemini:
+		last = &s.lastGeminiLowAvailableAlertAt
 	default:
 		return false
 	}
@@ -412,6 +429,8 @@ func (s *ScheduledTestRunnerService) sendLowAvailableAccountAlert(platform strin
 		platformLabel = "Anthropic"
 	case PlatformOpenAI:
 		platformLabel = "OpenAI"
+	case PlatformGemini:
+		platformLabel = "Gemini"
 	}
 
 	title := fmt.Sprintf("账号告警: 可用 %s API-key 账号不足 (剩余 %d)", platformLabel, available)
