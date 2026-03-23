@@ -300,6 +300,8 @@ export default {
   groupMonitor: {
     title: '分组监控',
     description: '基于公开分组的聚合健康视图：任意账号成功即分组成功。',
+    platformFilter: '平台',
+    allPlatforms: '全部平台',
     refresh: '刷新',
     loading: '加载中...',
     loadFailed: '加载分组监控失败',

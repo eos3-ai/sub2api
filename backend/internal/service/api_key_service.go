@@ -206,10 +206,7 @@ type PublicGroupMonitorReader interface {
 	GetPublicGroupMonitorOverview(
 		ctx context.Context,
 		groupIDs []int64,
-		bucketSeconds int,
-		sampleSize int,
 		now time.Time,
-		window time.Duration,
 	) (map[int64]*PublicGroupMonitorAggregate, error)
 }
 
@@ -789,33 +786,7 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 func (s *APIKeyService) GetPublicGroupMonitor(
 	ctx context.Context,
 	_ int64,
-	query PublicGroupMonitorQuery,
 ) (*PublicGroupMonitorResponse, error) {
-	window := query.Window
-	if window <= 0 {
-		window = time.Hour
-	}
-	// Guardrail: keep window bounded for predictable query cost.
-	if window > 24*time.Hour {
-		window = 24 * time.Hour
-	}
-
-	sampleSize := query.SampleSize
-	if sampleSize <= 0 {
-		sampleSize = 30
-	}
-	if sampleSize > 30 {
-		sampleSize = 30
-	}
-
-	bucketSeconds := query.BucketSeconds
-	if bucketSeconds <= 0 {
-		bucketSeconds = 15
-	}
-	if bucketSeconds > 300 {
-		bucketSeconds = 300
-	}
-
 	allGroups, err := s.groupRepo.ListActive(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list active groups: %w", err)
@@ -847,9 +818,6 @@ func (s *APIKeyService) GetPublicGroupMonitor(
 
 	resp := &PublicGroupMonitorResponse{
 		GeneratedAt:    time.Now().UTC(),
-		WindowSeconds:  int64(window / time.Second),
-		SampleSize:     sampleSize,
-		BucketSeconds:  bucketSeconds,
 		PublicGroupNum: len(publicGroups),
 		Items:          make([]*PublicGroupMonitorItem, 0, len(publicGroups)),
 	}
@@ -866,10 +834,7 @@ func (s *APIKeyService) GetPublicGroupMonitor(
 	aggByGroupID, err := reader.GetPublicGroupMonitorOverview(
 		ctx,
 		groupIDs,
-		bucketSeconds,
-		sampleSize,
 		resp.GeneratedAt,
-		window,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("query public group monitor overview: %w", err)
@@ -883,17 +848,10 @@ func (s *APIKeyService) GetPublicGroupMonitor(
 			GroupName:     g.Name,
 			Platform:      g.Platform,
 			CurrentStatus: "unknown",
-			Samples:       []*PublicGroupMonitorSample{},
 		}
 		if agg != nil {
 			if agg.CurrentStatus != "" {
 				item.CurrentStatus = agg.CurrentStatus
-			}
-			item.TotalRequests1h = agg.TotalRequests1h
-			item.SuccessRequests1h = agg.SuccessRequests1h
-			item.FailureRequests1h = agg.FailureRequests1h
-			if len(agg.Samples) > 0 {
-				item.Samples = agg.Samples
 			}
 		}
 		resp.Items = append(resp.Items, item)

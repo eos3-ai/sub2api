@@ -27,42 +27,22 @@ export async function getUserGroupRates(): Promise<Record<number, number>> {
   return data || {}
 }
 
-export interface PublicGroupMonitorSample {
-  started_at: string
-  status: 'success' | 'failed'
-  model: string
-  latency_ms: number
-}
-
 export interface PublicGroupMonitorItem {
   group_id: number
   group_name: string
   platform: string
   current_status: 'normal' | 'abnormal' | 'unknown'
-  total_requests_1h: number
-  success_requests_1h: number
-  failure_requests_1h: number
-  samples: PublicGroupMonitorSample[]
 }
 
 export interface PublicGroupMonitorResponse {
   generated_at: string
-  window_seconds: number
-  sample_size: number
-  bucket_seconds: number
   public_group_num: number
   items: PublicGroupMonitorItem[]
 }
 
-export interface PublicGroupMonitorParams {
-  sample_size?: number
-  bucket_seconds?: number
-}
-
 export async function getPublicGroupMonitor(
-  params: PublicGroupMonitorParams = {}
 ): Promise<PublicGroupMonitorResponse> {
-  const { data } = await apiClient.get<PublicGroupMonitorResponse>('/groups/monitor', { params })
+  const { data } = await apiClient.get<PublicGroupMonitorResponse>('/groups/monitor')
   return data
 }
 

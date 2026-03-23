@@ -300,6 +300,8 @@ export default {
   groupMonitor: {
     title: 'Group Monitor',
     description: 'Public-group aggregated health view: any account success means group success.',
+    platformFilter: 'Platform',
+    allPlatforms: 'All Platforms',
     refresh: 'Refresh',
     loading: 'Loading...',
     loadFailed: 'Failed to load group monitor',

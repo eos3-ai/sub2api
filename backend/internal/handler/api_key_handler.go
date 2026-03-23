@@ -307,10 +307,6 @@ func (h *APIKeyHandler) GetUserGroupRates(c *gin.Context) {
 
 // GetPublicGroupMonitor returns monitor aggregation for all active public groups.
 // GET /api/v1/groups/monitor
-//
-// Query params:
-// - sample_size: optional, default 30, max 30
-// - bucket_seconds: optional, default 15, max 300
 func (h *APIKeyHandler) GetPublicGroupMonitor(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -318,34 +314,9 @@ func (h *APIKeyHandler) GetPublicGroupMonitor(c *gin.Context) {
 		return
 	}
 
-	sampleSize := 30
-	if v := strings.TrimSpace(c.Query("sample_size")); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			response.BadRequest(c, "Invalid sample_size")
-			return
-		}
-		sampleSize = n
-	}
-
-	bucketSeconds := 15
-	if v := strings.TrimSpace(c.Query("bucket_seconds")); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			response.BadRequest(c, "Invalid bucket_seconds")
-			return
-		}
-		bucketSeconds = n
-	}
-
 	data, err := h.apiKeyService.GetPublicGroupMonitor(
 		c.Request.Context(),
 		subject.UserID,
-		service.PublicGroupMonitorQuery{
-			Window:        time.Hour,
-			SampleSize:    sampleSize,
-			BucketSeconds: bucketSeconds,
-		},
 	)
 	if err != nil {
 		response.ErrorFrom(c, err)
