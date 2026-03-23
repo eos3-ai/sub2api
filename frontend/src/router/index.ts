@@ -160,7 +160,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Group Monitor',
+      title: 'Service Status Monitor',
       titleKey: 'groupMonitor.title',
       descriptionKey: 'groupMonitor.description'
     }
