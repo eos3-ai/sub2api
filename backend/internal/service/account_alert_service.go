@@ -16,6 +16,12 @@ const (
 	// when multiple requests concurrently mark the same account as error.
 	accountAlertCooldown = 5 * time.Minute
 
+	// accountAlertMaxCooldown is the upper bound for progressive cooldown.
+	accountAlertMaxCooldown = 60 * time.Minute
+
+	// accountAlertBackoffResetAfter resets cooldown to base after a long quiet period.
+	accountAlertBackoffResetAfter = 6 * time.Hour
+
 	// accountAlertSendTimeout bounds the DingTalk webhook call.
 	accountAlertSendTimeout = 5 * time.Second
 )
@@ -25,18 +31,23 @@ const (
 // It is intentionally best-effort:
 // - never blocks the critical path (async send)
 // - skips when DingTalk isn't enabled/configured
-// - applies a small in-process cooldown per account ID to reduce duplicate alerts
+// - applies a progressive in-process cooldown per account ID when errors keep repeating
 type AccountAlertService struct {
 	dingtalk *DingtalkService
 
 	mu       sync.Mutex
-	lastSent map[int64]time.Time
+	throttle map[int64]accountAlertThrottleState
+}
+
+type accountAlertThrottleState struct {
+	lastSent time.Time
+	cooldown time.Duration
 }
 
 func NewAccountAlertService(cfg *config.Config) *AccountAlertService {
 	return &AccountAlertService{
 		dingtalk: NewDingtalkService(cfg),
-		lastSent: map[int64]time.Time{},
+		throttle: map[int64]accountAlertThrottleState{},
 	}
 }
 
@@ -76,16 +87,39 @@ func (s *AccountAlertService) allow(accountID int64, now time.Time) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.lastSent == nil {
-		s.lastSent = map[int64]time.Time{}
+	if s.throttle == nil {
+		s.throttle = map[int64]accountAlertThrottleState{}
 	}
 
-	if last, ok := s.lastSent[accountID]; ok && !last.IsZero() {
-		if now.Sub(last) < accountAlertCooldown {
-			return false
+	st, ok := s.throttle[accountID]
+	if !ok || st.lastSent.IsZero() || now.Sub(st.lastSent) >= accountAlertBackoffResetAfter {
+		s.throttle[accountID] = accountAlertThrottleState{
+			lastSent: now,
+			cooldown: accountAlertCooldown,
 		}
+		return true
 	}
-	s.lastSent[accountID] = now
+
+	if st.cooldown <= 0 {
+		st.cooldown = accountAlertCooldown
+	}
+
+	if now.Sub(st.lastSent) < st.cooldown {
+		return false
+	}
+
+	nextCooldown := st.cooldown * 2
+	if nextCooldown > accountAlertMaxCooldown {
+		nextCooldown = accountAlertMaxCooldown
+	}
+	if nextCooldown < accountAlertCooldown {
+		nextCooldown = accountAlertCooldown
+	}
+
+	s.throttle[accountID] = accountAlertThrottleState{
+		lastSent: now,
+		cooldown: nextCooldown,
+	}
 	return true
 }
 
@@ -106,7 +140,7 @@ func buildAccountErrorDingtalkMessage(account *Account, source string, reason st
 
 	// Avoid breaking markdown code block formatting.
 	reason = strings.ReplaceAll(reason, "```", "'''")
-	reason = truncateString(reason, 1500)
+	reason = truncateAccountAlertReason(reason, 1500)
 
 	name := strings.TrimSpace(account.Name)
 	if name == "" {
@@ -163,4 +197,14 @@ func escapeInlineCode(s string) string {
 		"`", "'",
 	)
 	return replacer.Replace(s)
+}
+
+func truncateAccountAlertReason(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	if len(s) <= max {
+		return s
+	}
+	return s[:max]
 }

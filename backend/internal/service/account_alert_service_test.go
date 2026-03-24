@@ -49,12 +49,63 @@ func TestAccountAlertServiceAllowCooldown(t *testing.T) {
 	t.Parallel()
 
 	svc := &AccountAlertService{
-		lastSent: map[int64]time.Time{},
+		throttle: map[int64]accountAlertThrottleState{},
 	}
 	now := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
 
 	require.False(t, svc.allow(0, now))
 	require.True(t, svc.allow(1, now))
 	require.False(t, svc.allow(1, now.Add(1*time.Minute)))
-	require.True(t, svc.allow(1, now.Add(accountAlertCooldown+time.Second)))
+	second := now.Add(accountAlertCooldown + time.Second)
+	require.True(t, svc.allow(1, second))
+
+	// progressive cooldown: 5m -> 10m
+	require.False(t, svc.allow(1, second.Add(9*time.Minute)))
+	require.True(t, svc.allow(1, second.Add(10*time.Minute+time.Second)))
+}
+
+func TestAccountAlertServiceAllowCooldownCapsAtMax(t *testing.T) {
+	t.Parallel()
+
+	svc := &AccountAlertService{
+		throttle: map[int64]accountAlertThrottleState{},
+	}
+	now := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	// first alert starts with base cooldown
+	require.True(t, svc.allow(42, now))
+	st := svc.throttle[42]
+	require.Equal(t, accountAlertCooldown, st.cooldown)
+
+	// keep triggering at each allowed moment until reaching max cooldown
+	current := now
+	for i := 0; i < 8; i++ {
+		current = current.Add(st.cooldown + time.Second)
+		require.True(t, svc.allow(42, current))
+		st = svc.throttle[42]
+	}
+	require.Equal(t, accountAlertMaxCooldown, st.cooldown)
+
+	// once capped, still enforces max cooldown and no longer increases.
+	require.False(t, svc.allow(42, current.Add(accountAlertMaxCooldown-time.Second)))
+	require.True(t, svc.allow(42, current.Add(accountAlertMaxCooldown+time.Second)))
+	require.Equal(t, accountAlertMaxCooldown, svc.throttle[42].cooldown)
+}
+
+func TestAccountAlertServiceAllowCooldownResetsAfterQuietPeriod(t *testing.T) {
+	t.Parallel()
+
+	svc := &AccountAlertService{
+		throttle: map[int64]accountAlertThrottleState{},
+	}
+	now := time.Date(2026, 1, 31, 0, 0, 0, 0, time.UTC)
+
+	require.True(t, svc.allow(7, now))
+	second := now.Add(accountAlertCooldown + time.Second)
+	require.True(t, svc.allow(7, second))
+	require.Equal(t, 2*accountAlertCooldown, svc.throttle[7].cooldown)
+
+	afterQuiet := second.Add(accountAlertBackoffResetAfter + time.Second)
+	require.True(t, svc.allow(7, afterQuiet))
+	require.Equal(t, accountAlertCooldown, svc.throttle[7].cooldown)
 }
