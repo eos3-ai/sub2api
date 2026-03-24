@@ -22,6 +22,13 @@ const (
 	scheduledTestExtraRecoveredReasonKey = "scheduled_test_recovered_reason"
 )
 
+const (
+	// low-available account alert backoff for scheduled tests.
+	scheduledTestLowAvailableAlertBaseCooldown = 5 * time.Minute
+	scheduledTestLowAvailableAlertMaxCooldown  = 60 * time.Minute
+	scheduledTestLowAvailableAlertResetAfter   = 6 * time.Hour
+)
+
 // ScheduledTestRunnerService periodically scans due test plans and executes them.
 type ScheduledTestRunnerService struct {
 	planRepo       ScheduledTestPlanRepository
@@ -36,9 +43,12 @@ type ScheduledTestRunnerService struct {
 	stopOnce  sync.Once
 	alertMu   sync.Mutex
 
-	lastAnthropicLowAvailableAlertAt time.Time
-	lastOpenAILowAvailableAlertAt    time.Time
-	lastGeminiLowAvailableAlertAt    time.Time
+	lowAvailableAlertThrottle map[string]scheduledTestAlertThrottleState
+}
+
+type scheduledTestAlertThrottleState struct {
+	lastSent time.Time
+	cooldown time.Duration
 }
 
 // NewScheduledTestRunnerService creates a new runner.
@@ -56,6 +66,11 @@ func NewScheduledTestRunnerService(
 		rateLimitSvc:   rateLimitSvc,
 		cfg:            cfg,
 		dingtalk:       NewDingtalkService(cfg),
+		lowAvailableAlertThrottle: map[string]scheduledTestAlertThrottleState{
+			PlatformAnthropic: {},
+			PlatformOpenAI:    {},
+			PlatformGemini:    {},
+		},
 	}
 }
 
@@ -395,27 +410,60 @@ func computeAvailableSchedulableAPIKeyCount(accounts []Account, abnormalAccountI
 }
 
 func (s *ScheduledTestRunnerService) shouldSendLowAvailableAlert(platform string, now time.Time) bool {
-	const availableAlertCooldown = 5 * time.Minute
+	if now.IsZero() {
+		now = time.Now()
+	}
+
 	s.alertMu.Lock()
 	defer s.alertMu.Unlock()
 
-	var last *time.Time
-	switch platform {
-	case PlatformAnthropic:
-		last = &s.lastAnthropicLowAvailableAlertAt
-	case PlatformOpenAI:
-		last = &s.lastOpenAILowAvailableAlertAt
-	case PlatformGemini:
-		last = &s.lastGeminiLowAvailableAlertAt
-	default:
+	if !isLowAvailableAlertPlatform(platform) {
 		return false
 	}
 
-	if !last.IsZero() && now.Sub(*last) < availableAlertCooldown {
+	if s.lowAvailableAlertThrottle == nil {
+		s.lowAvailableAlertThrottle = map[string]scheduledTestAlertThrottleState{}
+	}
+
+	st, ok := s.lowAvailableAlertThrottle[platform]
+	if !ok || st.lastSent.IsZero() || now.Sub(st.lastSent) >= scheduledTestLowAvailableAlertResetAfter {
+		s.lowAvailableAlertThrottle[platform] = scheduledTestAlertThrottleState{
+			lastSent: now,
+			cooldown: scheduledTestLowAvailableAlertBaseCooldown,
+		}
+		return true
+	}
+
+	if st.cooldown <= 0 {
+		st.cooldown = scheduledTestLowAvailableAlertBaseCooldown
+	}
+
+	if now.Sub(st.lastSent) < st.cooldown {
 		return false
 	}
-	*last = now
+
+	nextCooldown := st.cooldown * 2
+	if nextCooldown > scheduledTestLowAvailableAlertMaxCooldown {
+		nextCooldown = scheduledTestLowAvailableAlertMaxCooldown
+	}
+	if nextCooldown < scheduledTestLowAvailableAlertBaseCooldown {
+		nextCooldown = scheduledTestLowAvailableAlertBaseCooldown
+	}
+
+	s.lowAvailableAlertThrottle[platform] = scheduledTestAlertThrottleState{
+		lastSent: now,
+		cooldown: nextCooldown,
+	}
 	return true
+}
+
+func isLowAvailableAlertPlatform(platform string) bool {
+	switch platform {
+	case PlatformAnthropic, PlatformOpenAI, PlatformGemini:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *ScheduledTestRunnerService) sendLowAvailableAccountAlert(platform string, available, threshold, abnormalDeduction int, now time.Time) {

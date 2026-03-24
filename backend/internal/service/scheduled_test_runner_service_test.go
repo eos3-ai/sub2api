@@ -62,3 +62,70 @@ func TestScheduledTestFailureReason(t *testing.T) {
 		Status: "partial_success",
 	}))
 }
+
+func TestShouldSendLowAvailableAlertProgressiveBackoff(t *testing.T) {
+	svc := &ScheduledTestRunnerService{
+		lowAvailableAlertThrottle: map[string]scheduledTestAlertThrottleState{},
+	}
+	now := time.Date(2026, 3, 24, 4, 0, 0, 0, time.UTC)
+
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformAnthropic, now))
+	require.False(t, svc.shouldSendLowAvailableAlert(PlatformAnthropic, now.Add(1*time.Minute)))
+
+	second := now.Add(scheduledTestLowAvailableAlertBaseCooldown + time.Second)
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformAnthropic, second))
+
+	// next required window should be 10 minutes.
+	require.False(t, svc.shouldSendLowAvailableAlert(PlatformAnthropic, second.Add(9*time.Minute)))
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformAnthropic, second.Add(10*time.Minute+time.Second)))
+
+	// different platform should not be throttled by anthropic state.
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformOpenAI, second.Add(10*time.Minute+time.Second)))
+}
+
+func TestShouldSendLowAvailableAlertCapsAtMax(t *testing.T) {
+	svc := &ScheduledTestRunnerService{
+		lowAvailableAlertThrottle: map[string]scheduledTestAlertThrottleState{},
+	}
+	now := time.Date(2026, 3, 24, 4, 0, 0, 0, time.UTC)
+
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformGemini, now))
+	st := svc.lowAvailableAlertThrottle[PlatformGemini]
+	require.Equal(t, scheduledTestLowAvailableAlertBaseCooldown, st.cooldown)
+
+	current := now
+	for i := 0; i < 8; i++ {
+		current = current.Add(st.cooldown + time.Second)
+		require.True(t, svc.shouldSendLowAvailableAlert(PlatformGemini, current))
+		st = svc.lowAvailableAlertThrottle[PlatformGemini]
+	}
+	require.Equal(t, scheduledTestLowAvailableAlertMaxCooldown, st.cooldown)
+
+	require.False(t, svc.shouldSendLowAvailableAlert(PlatformGemini, current.Add(scheduledTestLowAvailableAlertMaxCooldown-time.Second)))
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformGemini, current.Add(scheduledTestLowAvailableAlertMaxCooldown+time.Second)))
+	require.Equal(t, scheduledTestLowAvailableAlertMaxCooldown, svc.lowAvailableAlertThrottle[PlatformGemini].cooldown)
+}
+
+func TestShouldSendLowAvailableAlertResetsAfterQuietPeriod(t *testing.T) {
+	svc := &ScheduledTestRunnerService{
+		lowAvailableAlertThrottle: map[string]scheduledTestAlertThrottleState{},
+	}
+	now := time.Date(2026, 3, 24, 4, 0, 0, 0, time.UTC)
+
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformOpenAI, now))
+	second := now.Add(scheduledTestLowAvailableAlertBaseCooldown + time.Second)
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformOpenAI, second))
+	require.Equal(t, 2*scheduledTestLowAvailableAlertBaseCooldown, svc.lowAvailableAlertThrottle[PlatformOpenAI].cooldown)
+
+	afterQuiet := second.Add(scheduledTestLowAvailableAlertResetAfter + time.Second)
+	require.True(t, svc.shouldSendLowAvailableAlert(PlatformOpenAI, afterQuiet))
+	require.Equal(t, scheduledTestLowAvailableAlertBaseCooldown, svc.lowAvailableAlertThrottle[PlatformOpenAI].cooldown)
+}
+
+func TestShouldSendLowAvailableAlertRejectsUnknownPlatform(t *testing.T) {
+	svc := &ScheduledTestRunnerService{
+		lowAvailableAlertThrottle: map[string]scheduledTestAlertThrottleState{},
+	}
+	now := time.Date(2026, 3, 24, 4, 0, 0, 0, time.UTC)
+	require.False(t, svc.shouldSendLowAvailableAlert("unknown", now))
+}
