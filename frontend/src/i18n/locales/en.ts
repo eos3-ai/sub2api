@@ -959,6 +959,11 @@ export default {
     duration: 'Duration',
     time: 'Time',
     endpoint: 'Endpoint',
+    inboundEndpoint: 'Inbound Endpoint',
+    upstreamEndpoint: 'Upstream Endpoint',
+    upstreamModel: 'Upstream Model',
+    inbound: 'Inbound',
+    upstream: 'Upstream',
     userAgent: 'User Agent',
     stream: 'Stream',
     sync: 'Sync',
@@ -2458,7 +2463,7 @@ export default {
               channel: 'AI Studio API Key / OAuth',
               free: 'No billing (free tier)',
               paid: 'Billing enabled (pay-as-you-go)',
-              limitsFree: 'RPD 50; RPM 2 (Pro) / 15 (Flash)',
+              limitsFree: 'Unlimited',
               limitsPaid: 'RPD unlimited; RPM 1000 (Pro) / 2000 (Flash) (per model)'
             },
             customOAuth: {

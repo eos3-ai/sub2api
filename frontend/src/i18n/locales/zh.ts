@@ -985,6 +985,11 @@ export default {
     subscription: '订阅',
     imageUnit: '张',
     endpoint: '端点',
+    inboundEndpoint: '入站端点',
+    upstreamEndpoint: '上游端点',
+    upstreamModel: '上游模型',
+    inbound: '入站',
+    upstream: '上游',
     userAgent: '用户代理'
   },
 
@@ -2594,7 +2599,7 @@ export default {
               channel: 'AI Studio API Key / OAuth',
               free: '未绑卡（免费层）',
               paid: '已绑卡（按量付费）',
-              limitsFree: 'RPD 50；RPM 2（Pro）/ 15（Flash）',
+              limitsFree: '无限流',
               limitsPaid: 'RPD 不限；RPM 1000（Pro）/ 2000（Flash）（按模型配额）'
             },
             customOAuth: {

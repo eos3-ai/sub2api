@@ -184,7 +184,10 @@
             </button>
           </template>
           <template #cell-today_stats="{ row }">
-            <AccountTodayStatsCell :account="row" />
+            <AccountTodayStatsCell
+              :stats="todayStatsByAccount[row.id] ?? null"
+              :loading="todayStatsLoading"
+            />
           </template>
           <template #cell-groups="{ row }">
             <AccountGroupsCell :groups="row.groups" :max-display="4" />
@@ -274,7 +277,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted, toRaw } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, toRaw, watch } from 'vue'
 import { useIntervalFn } from '@vueuse/core'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
@@ -306,7 +309,7 @@ import PlatformTypeBadge from '@/components/common/PlatformTypeBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
 import ErrorPassthroughRulesModal from '@/components/admin/ErrorPassthroughRulesModal.vue'
 import { formatRelativeTime } from '@/utils/format'
-import type { Account, Proxy, AdminGroup, ClaudeModel } from '@/types'
+import type { Account, Proxy, AdminGroup, ClaudeModel, WindowStats } from '@/types'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -340,6 +343,9 @@ const scheduleModelOptions = ref<SelectOption[]>([])
 const togglingSchedulable = ref<number | null>(null)
 const menu = reactive<{show:boolean, acc:Account|null, pos:{top:number, left:number}|null}>({ show: false, acc: null, pos: null })
 const exportingData = ref(false)
+const todayStatsByAccount = ref<Record<number, WindowStats | null>>({})
+const todayStatsLoading = ref(false)
+let todayStatsRequestToken = 0
 
 // Column settings
 const showColumnDropdown = ref(false)
@@ -510,6 +516,65 @@ const handlePageSizeChange = (size: number) => {
   baseHandlePageSizeChange(size)
 }
 
+const clearTodayStatsState = () => {
+  todayStatsRequestToken += 1
+  todayStatsByAccount.value = {}
+  todayStatsLoading.value = false
+}
+
+const loadTodayStatsIndividually = async (accountIDs: number[], token: number) => {
+  const requests = accountIDs.map((id) => adminAPI.accounts.getTodayStats(id))
+  const settled = await Promise.allSettled(requests)
+  if (token !== todayStatsRequestToken) return
+
+  const next: Record<number, WindowStats | null> = {}
+  for (let i = 0; i < accountIDs.length; i += 1) {
+    const accountID = accountIDs[i]
+    const result = settled[i]
+    next[accountID] = result.status === 'fulfilled' ? result.value : null
+  }
+  todayStatsByAccount.value = next
+}
+
+const loadTodayStatsBatch = async (rows: Account[]) => {
+  const accountIDs = rows.map((account) => account.id).filter((id) => id > 0)
+  if (accountIDs.length === 0) {
+    clearTodayStatsState()
+    return
+  }
+
+  const token = ++todayStatsRequestToken
+  todayStatsLoading.value = true
+  try {
+    const result = await adminAPI.accounts.getBatchTodayStats(accountIDs)
+    if (token !== todayStatsRequestToken) return
+
+    const stats = result?.stats || {}
+    const next: Record<number, WindowStats | null> = {}
+    for (const id of accountIDs) {
+      next[id] = stats[String(id)] || null
+    }
+    todayStatsByAccount.value = next
+  } catch (error) {
+    console.error('Failed to load batch account today stats, fallback to per-account:', error)
+    try {
+      await loadTodayStatsIndividually(accountIDs, token)
+    } catch (fallbackError) {
+      console.error('Failed to load per-account today stats fallback:', fallbackError)
+      if (token !== todayStatsRequestToken) return
+      const fallback: Record<number, WindowStats | null> = {}
+      for (const id of accountIDs) {
+        fallback[id] = null
+      }
+      todayStatsByAccount.value = fallback
+    }
+  } finally {
+    if (token === todayStatsRequestToken) {
+      todayStatsLoading.value = false
+    }
+  }
+}
+
 const isAnyModalOpen = computed(() => {
   return (
     showCreate.value ||
@@ -592,6 +657,7 @@ const mergeAccountsIncrementally = (nextRows: Account[]) => {
 const refreshAccountsIncrementally = async () => {
   if (autoRefreshFetching.value) return
   autoRefreshFetching.value = true
+  let shouldRefreshTodayStats = false
   try {
     const result = await adminAPI.accounts.listWithEtag(
       pagination.page,
@@ -604,6 +670,7 @@ const refreshAccountsIncrementally = async () => {
       },
       { etag: autoRefreshETag.value }
     )
+    shouldRefreshTodayStats = true
 
     if (result.etag) {
       autoRefreshETag.value = result.etag
@@ -620,6 +687,9 @@ const refreshAccountsIncrementally = async () => {
     console.error('Auto refresh failed:', error)
   } finally {
     autoRefreshFetching.value = false
+    if (shouldRefreshTodayStats) {
+      void loadTodayStatsBatch(accounts.value)
+    }
   }
 }
 
@@ -1105,6 +1175,14 @@ onMounted(async () => {
     pauseAutoRefresh()
   }
 })
+
+watch(
+  () => accounts.value.map((account) => account.id).join(','),
+  () => {
+    void loadTodayStatsBatch(accounts.value)
+  },
+  { immediate: true }
+)
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll, true)
