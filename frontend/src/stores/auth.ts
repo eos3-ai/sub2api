@@ -38,7 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   const isOperator = computed(() => {
-    return user.value?.role === 'operator'
+    return user.value?.role === 'sales'
   })
 
   const isBackoffice = computed(() => {

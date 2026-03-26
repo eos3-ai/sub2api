@@ -248,15 +248,15 @@ func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
 	})
 }
 
-func TestAdminAuthJWTOperatorAllowed(t *testing.T) {
+func TestAdminAuthJWTSalesAllowed(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret", ExpireHour: 1}}
 	authService := service.NewAuthService(nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil)
 
-	operator := &service.User{
+	sales := &service.User{
 		ID:           7,
-		Email:        "operator@example.com",
+		Email:        "sales@example.com",
 		Role:         service.RoleOperator,
 		Status:       service.StatusActive,
 		TokenVersion: 1,
@@ -265,10 +265,10 @@ func TestAdminAuthJWTOperatorAllowed(t *testing.T) {
 
 	userRepo := &stubUserRepo{
 		getByID: func(ctx context.Context, id int64) (*service.User, error) {
-			if id != operator.ID {
+			if id != sales.ID {
 				return nil, service.ErrUserNotFound
 			}
-			clone := *operator
+			clone := *sales
 			return &clone, nil
 		},
 	}
@@ -281,10 +281,10 @@ func TestAdminAuthJWTOperatorAllowed(t *testing.T) {
 	})
 
 	token, err := authService.GenerateToken(&service.User{
-		ID:           operator.ID,
-		Email:        operator.Email,
-		Role:         operator.Role,
-		TokenVersion: operator.TokenVersion,
+		ID:           sales.ID,
+		Email:        sales.Email,
+		Role:         sales.Role,
+		TokenVersion: sales.TokenVersion,
 	})
 	require.NoError(t, err)
 

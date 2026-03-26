@@ -28,7 +28,7 @@ func NewAdminAuthMiddleware(
 // 支持三种认证方式：
 // 1. Admin API Key（读写）：x-api-key: <admin-api-key>
 // 2. Admin API Key（只读）：x-api-key: <admin-api-key-read-only>（仅允许 GET）
-// 3. JWT Token：Authorization: Bearer <jwt-token>（需要后台角色：admin/operator）
+// 3. JWT Token：Authorization: Bearer <jwt-token>（需要后台角色：admin/sales）
 func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -281,7 +281,7 @@ func setAdminAPIKeyContext(c *gin.Context, userService *service.UserService) boo
 	return true
 }
 
-// validateJWTForAdmin 验证 JWT 并检查后台角色权限（admin/operator）
+// validateJWTForAdmin 验证 JWT 并检查后台角色权限（admin/sales）
 func validateJWTForAdmin(
 	c *gin.Context,
 	token string,

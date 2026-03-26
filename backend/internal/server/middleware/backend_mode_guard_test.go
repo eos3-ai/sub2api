@@ -105,7 +105,7 @@ func TestBackendModeUserGuard(t *testing.T) {
 		{
 			name:       "enabled_operator_allowed",
 			enabled:    "true",
-			role:       stringPtr("operator"),
+			role:       stringPtr("sales"),
 			wantStatus: http.StatusOK,
 		},
 		{

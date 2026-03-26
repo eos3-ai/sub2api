@@ -59,7 +59,7 @@ type UpdateUserRequest struct {
 	Password      string   `json:"password" binding:"omitempty,min=6"`
 	Username      *string  `json:"username"`
 	Notes         *string  `json:"notes"`
-	Role          string   `json:"role" binding:"omitempty,oneof=admin operator user"`
+	Role          string   `json:"role" binding:"omitempty,oneof=admin sales user"`
 	Balance       *float64 `json:"balance"`
 	Concurrency   *int     `json:"concurrency"`
 	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
@@ -350,15 +350,15 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 	role, _ := middleware.GetUserRoleFromContext(c)
 	if role == service.RoleOperator {
 		if req.Operation != "add" {
-			response.Forbidden(c, "Operator can only add small compensation.")
+			response.Forbidden(c, "Sales can only add small compensation.")
 			return
 		}
 		if req.Balance > operatorMaxCompensationUSD {
-			response.Forbidden(c, "Operator compensation cannot exceed $8.")
+			response.Forbidden(c, "Sales compensation cannot exceed $8.")
 			return
 		}
 		if req.Notes == "" {
-			response.BadRequest(c, "Notes are required for operator compensation.")
+			response.BadRequest(c, "Notes are required for sales compensation.")
 			return
 		}
 	}

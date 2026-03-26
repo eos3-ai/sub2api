@@ -33,7 +33,7 @@
         <label class="input-label">{{ t('admin.users.form.roleLabel') }}</label>
         <select v-model="form.role" class="input">
           <option value="admin">{{ t('admin.users.admin') }}</option>
-          <option value="operator">{{ t('admin.users.operator') }}</option>
+          <option value="sales">{{ t('admin.users.operator') }}</option>
           <option value="user">{{ t('admin.users.user') }}</option>
         </select>
       </div>
@@ -87,7 +87,7 @@ const form = reactive({
   password: '',
   username: '',
   notes: '',
-  role: 'user' as 'admin' | 'operator' | 'user',
+  role: 'user' as 'admin' | 'sales' | 'user',
   concurrency: 1,
   sora_storage_quota_gb: 0,
   customAttributes: {} as UserAttributeValuesMap
@@ -100,7 +100,7 @@ watch(() => props.user, (u) => {
       password: '',
       username: u.username || '',
       notes: u.notes || '',
-      role: (u.role || 'user') as 'admin' | 'operator' | 'user',
+      role: (u.role || 'user') as 'admin' | 'sales' | 'user',
       concurrency: u.concurrency,
       sora_storage_quota_gb: Number(((u.sora_storage_quota_bytes || 0) / (1024 * 1024 * 1024)).toFixed(2)),
       customAttributes: {}

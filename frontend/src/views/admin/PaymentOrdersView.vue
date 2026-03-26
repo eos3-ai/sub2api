@@ -82,7 +82,14 @@
                 {{ t('admin.paymentOrders.timeRange') }}
               </label>
               <div class="[&_.date-picker-trigger]:w-full">
+                <Select
+                  v-if="isOperator"
+                  v-model="operatorDatePreset"
+                  :options="operatorDateOptions"
+                  @update:modelValue="handleOperatorDatePresetChange"
+                />
                 <DateRangePicker
+                  v-else
                   :start-date="filters.startDate"
                   :end-date="filters.endDate"
                   @update:startDate="updateStartDate"
@@ -149,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { saveAs } from 'file-saver'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -160,10 +167,13 @@ import EmptyState from '@/components/common/EmptyState.vue'
 import Select from '@/components/common/Select.vue'
 import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import { adminAPI } from '@/api/admin'
+import { useAuthStore } from '@/stores/auth'
 import type { Column } from '@/components/common/types'
 import type { AdminPaymentOrder, AdminPaymentOrdersSummary, AdminPaymentOrderType } from '@/api/admin/paymentOrders'
 
 const { t } = useI18n()
+const authStore = useAuthStore()
+const isOperator = computed(() => authStore.isOperator)
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -177,14 +187,26 @@ const formatYMD = (d: Date): string => {
   return `${year}-${month}-${day}`
 }
 
-const getDefaultRange = () => {
+const getDefaultRange = (operatorOnlyToday = false) => {
   const now = new Date()
+  if (operatorOnlyToday) {
+    const today = formatYMD(now)
+    return { startDate: today, endDate: today }
+  }
   const weekAgo = new Date(now)
   weekAgo.setDate(weekAgo.getDate() - 6)
   return { startDate: formatYMD(weekAgo), endDate: formatYMD(now) }
 }
 
-const defaultRange = getDefaultRange()
+type OperatorDatePreset = 'today' | 'yesterday'
+
+const operatorDatePreset = ref<OperatorDatePreset>('today')
+const operatorDateOptions = computed(() => [
+  { label: t('dates.today'), value: 'today' },
+  { label: t('dates.yesterday'), value: 'yesterday' }
+])
+
+const defaultRange = getDefaultRange(isOperator.value)
 
 const filters = reactive<{ orderType: AdminPaymentOrderType | ''; user: string; status: string; startDate: string; endDate: string }>({
   orderType: '',
@@ -217,6 +239,22 @@ const statusOptions = computed(() => [
   { label: t('payment.statusExpired'), value: 'expired' },
   { label: t('payment.statusCancelled'), value: 'cancelled' }
 ])
+
+function setOperatorDateRange(preset: OperatorDatePreset) {
+  operatorDatePreset.value = preset
+  const date = new Date()
+  if (preset === 'yesterday') {
+    date.setDate(date.getDate() - 1)
+  }
+  const ymd = formatYMD(date)
+  filters.startDate = ymd
+  filters.endDate = ymd
+}
+
+function handleOperatorDatePresetChange(value: string | number | boolean | null) {
+  const preset: OperatorDatePreset = value === 'yesterday' ? 'yesterday' : 'today'
+  setOperatorDateRange(preset)
+}
 
 const columns = computed<Column[]>(() => [
   { key: 'order_no', label: t('payment.orderNo') },
@@ -358,9 +396,13 @@ function resetFilters() {
   filters.orderType = ''
   filters.user = ''
   filters.status = 'paid'
-  const { startDate, endDate } = getDefaultRange()
-  filters.startDate = startDate
-  filters.endDate = endDate
+  if (isOperator.value) {
+    setOperatorDateRange('today')
+  } else {
+    const { startDate, endDate } = getDefaultRange()
+    filters.startDate = startDate
+    filters.endDate = endDate
+  }
   applyFilters()
 }
 
@@ -392,6 +434,18 @@ async function exportRecords() {
 }
 
 onMounted(() => {
+  if (isOperator.value) {
+    setOperatorDateRange(operatorDatePreset.value)
+  }
   loadAll()
 })
+
+watch(
+  () => isOperator.value,
+  (value) => {
+    if (value) {
+      setOperatorDateRange(operatorDatePreset.value)
+    }
+  }
+)
 </script>

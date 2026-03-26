@@ -29,8 +29,8 @@ func setupUserHandlerRouterWithRole(role string) *gin.Engine {
 	return router
 }
 
-func TestOperatorUpdateBalanceConstraints(t *testing.T) {
-	router := setupUserHandlerRouterWithRole("operator")
+func TestSalesUpdateBalanceConstraints(t *testing.T) {
+	router := setupUserHandlerRouterWithRole("sales")
 
 	cases := []struct {
 		name       string
@@ -81,8 +81,8 @@ func TestAdminUpdateBalanceUnaffected(t *testing.T) {
 	require.Equal(t, http.StatusOK, rec.Code)
 }
 
-func TestGetUserAPIKeysMasksForOperator(t *testing.T) {
-	router := setupUserHandlerRouterWithRole("operator")
+func TestGetUserAPIKeysMasksForSales(t *testing.T) {
+	router := setupUserHandlerRouterWithRole("sales")
 
 	rec := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users/1/api-keys", nil)

@@ -13,7 +13,7 @@ import (
 
 func TestIsBackofficeRole(t *testing.T) {
 	require.True(t, IsBackofficeRole("admin"))
-	require.True(t, IsBackofficeRole("operator"))
+	require.True(t, IsBackofficeRole("sales"))
 	require.False(t, IsBackofficeRole("user"))
 	require.False(t, IsBackofficeRole(""))
 }
@@ -145,7 +145,7 @@ func TestRequireAdminPermission_OperatorAllowDenyMatrix(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := gin.New()
 			r.Use(func(c *gin.Context) {
-				c.Set(string(ContextKeyUserRole), "operator")
+				c.Set(string(ContextKeyUserRole), "sales")
 				c.Next()
 			})
 			r.Use(RequireAdminPermission())

@@ -19,7 +19,7 @@ export async function list(
   pageSize: number = 20,
   filters?: {
     status?: 'active' | 'disabled'
-    role?: 'admin' | 'operator' | 'user'
+    role?: 'admin' | 'sales' | 'user'
     search?: string
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
@@ -55,7 +55,7 @@ export async function list(
 
 export async function exportRecords(filters?: {
   status?: 'active' | 'disabled'
-  role?: 'admin' | 'operator' | 'user'
+  role?: 'admin' | 'sales' | 'user'
   search?: string
   attributes?: Record<number, string>
 }): Promise<Blob> {

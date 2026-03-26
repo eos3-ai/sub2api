@@ -45,7 +45,7 @@ func IsBackofficeRole(role string) bool {
 }
 
 // RequireAdminPermission enforces fine-grained admin-route permission checks.
-// Admin has full access; operator is restricted by static allowlist.
+// Admin has full access; sales is restricted by static allowlist.
 func RequireAdminPermission() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, ok := GetUserRoleFromContext(c)
@@ -66,11 +66,11 @@ func RequireAdminPermission() gin.HandlerFunc {
 
 		perm, matched := resolveAdminPermission(c.Request.Method, c.FullPath())
 		if !matched {
-			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Operator permission denied")
+			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Sales permission denied")
 			return
 		}
 		if _, allowed := operatorAllowedPermissions[perm]; !allowed {
-			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Operator permission denied")
+			AbortWithError(c, http.StatusForbidden, "FORBIDDEN", "Sales permission denied")
 			return
 		}
 		c.Next()

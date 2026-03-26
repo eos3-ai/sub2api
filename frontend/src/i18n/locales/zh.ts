@@ -1043,7 +1043,7 @@ export default {
     concurrencyLimit: '并发限制',
     memberSince: '注册时间',
     administrator: '管理员',
-    operator: '运营',
+    operator: '销售',
     user: '用户',
     username: '用户名',
     enterUsername: '输入用户名',
@@ -1291,7 +1291,7 @@ export default {
       statusFilter: '状态筛选',
       allStatuses: '全部状态',
       admin: '管理员',
-      operator: '运营',
+      operator: '销售',
       user: '用户',
       disabled: '禁用',
       email: '邮箱',
@@ -1355,7 +1355,7 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
-        operator: '运营',
+        sales: '销售',
         user: '用户'
       },
       form: {
