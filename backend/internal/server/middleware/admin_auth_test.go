@@ -248,6 +248,54 @@ func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
 	})
 }
 
+func TestAdminAuthJWTOperatorAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret", ExpireHour: 1}}
+	authService := service.NewAuthService(nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil)
+
+	operator := &service.User{
+		ID:           7,
+		Email:        "operator@example.com",
+		Role:         service.RoleOperator,
+		Status:       service.StatusActive,
+		TokenVersion: 1,
+		Concurrency:  1,
+	}
+
+	userRepo := &stubUserRepo{
+		getByID: func(ctx context.Context, id int64) (*service.User, error) {
+			if id != operator.ID {
+				return nil, service.ErrUserNotFound
+			}
+			clone := *operator
+			return &clone, nil
+		},
+	}
+	userService := service.NewUserService(userRepo, nil, nil)
+
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAdminAuthMiddleware(authService, userService, nil, cfg)))
+	router.GET("/t", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	token, err := authService.GenerateToken(&service.User{
+		ID:           operator.ID,
+		Email:        operator.Email,
+		Role:         operator.Role,
+		TokenVersion: operator.TokenVersion,
+	})
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/t", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+}
+
 // ---------------------------------------------------------------------------
 // Stub repositories
 // ---------------------------------------------------------------------------
@@ -365,6 +413,10 @@ func (r *stubUserRepo) ExistsByEmail(ctx context.Context, email string) (bool, e
 
 func (r *stubUserRepo) RemoveGroupFromAllowedGroups(ctx context.Context, groupID int64) (int64, error) {
 	return 0, errors.New("not implemented")
+}
+
+func (r *stubUserRepo) AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
+	return errors.New("not implemented")
 }
 
 func (r *stubUserRepo) UpdateTotpSecret(ctx context.Context, userID int64, encryptedSecret *string) error {

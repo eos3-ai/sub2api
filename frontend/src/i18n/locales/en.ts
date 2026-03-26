@@ -1039,6 +1039,7 @@ export default {
     concurrencyLimit: 'Concurrency Limit',
     memberSince: 'Member Since',
     administrator: 'Administrator',
+    operator: 'Operator',
     user: 'User',
     username: 'Username',
     enterUsername: 'Enter username',
@@ -1264,6 +1265,7 @@ export default {
       allRoles: 'All Roles',
       allStatus: 'All Status',
       admin: 'Admin',
+      operator: 'Operator',
       user: 'User',
       disabled: 'Disabled',
       email: 'Email',
@@ -1386,6 +1388,7 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        operator: 'Operator',
         user: 'User'
       },
       // Settings Dropdowns

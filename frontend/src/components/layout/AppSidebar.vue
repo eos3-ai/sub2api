@@ -25,8 +25,8 @@
 
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
-      <!-- Admin View: Admin menu first, then personal menu -->
-      <template v-if="isAdmin">
+      <!-- Backoffice View: Admin/Operator menu first, then personal menu -->
+      <template v-if="isBackoffice">
         <!-- Admin Section -->
         <div class="sidebar-section">
           <router-link
@@ -54,7 +54,7 @@
           </router-link>
         </div>
 
-        <!-- Personal Section for Admin (hidden in simple mode) -->
+        <!-- Personal Section for Backoffice (hidden in simple mode) -->
         <div v-if="!authStore.isSimpleMode" class="sidebar-section">
           <div v-if="!sidebarCollapsed" class="sidebar-section-title">
             {{ t('nav.myAccount') }}
@@ -160,7 +160,9 @@ const adminSettingsStore = useAdminSettingsStore()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
+const isBackoffice = computed(() => authStore.isBackoffice)
 const isAdmin = computed(() => authStore.isAdmin)
+const isOperator = computed(() => authStore.isOperator)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 // Site settings from appStore (cached, no flicker)
@@ -510,6 +512,18 @@ const personalNavItems = computed(() => {
 
 // Admin navigation items
 const adminNavItems = computed(() => {
+  if (isOperator.value) {
+    return [
+      { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
+      { path: '/admin/ops', label: t('nav.ops'), icon: ChartIcon },
+      { path: '/admin/users', label: t('nav.users'), icon: UsersIcon },
+      { path: '/admin/payment-orders', label: t('nav.rechargeRecords'), icon: CreditCardIcon },
+      { path: '/admin/invoices', label: t('nav.invoiceManagement'), icon: CreditCardIcon },
+      { path: '/admin/announcements', label: t('nav.announcements'), icon: BellIcon },
+      { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon },
+    ]
+  }
+
   const baseItems = [
     { path: '/admin/dashboard', label: t('nav.dashboard'), icon: DashboardIcon },
     ...(adminSettingsStore.opsMonitoringEnabled

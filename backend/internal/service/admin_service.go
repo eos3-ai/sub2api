@@ -105,6 +105,7 @@ type UpdateUserInput struct {
 	Password              string
 	Username              *string
 	Notes                 *string
+	Role                  string
 	Balance               *float64 // 使用指针区分"未提供"和"设置为0"
 	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
 	SoraStorageQuotaBytes *int64
@@ -539,6 +540,10 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if user.Role == "admin" && input.Status == "disabled" {
 		return nil, errors.New("cannot disable admin user")
 	}
+	// Protect admin users: cannot change admin role
+	if user.Role == RoleAdmin && input.Role != "" && input.Role != RoleAdmin {
+		return nil, errors.New("cannot change admin user role")
+	}
 
 	oldConcurrency := user.Concurrency
 	oldStatus := user.Status
@@ -562,6 +567,14 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	if input.Status != "" {
 		user.Status = input.Status
+	}
+	if input.Role != "" {
+		switch input.Role {
+		case RoleAdmin, RoleOperator, RoleUser:
+			user.Role = input.Role
+		default:
+			return nil, fmt.Errorf("invalid role")
+		}
 	}
 
 	if input.Concurrency != nil {

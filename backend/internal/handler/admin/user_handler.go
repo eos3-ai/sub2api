@@ -12,10 +12,13 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
 )
+
+const operatorMaxCompensationUSD = 8.0
 
 // UserWithConcurrency wraps AdminUser with current concurrency info
 type UserWithConcurrency struct {
@@ -56,6 +59,7 @@ type UpdateUserRequest struct {
 	Password      string   `json:"password" binding:"omitempty,min=6"`
 	Username      *string  `json:"username"`
 	Notes         *string  `json:"notes"`
+	Role          string   `json:"role" binding:"omitempty,oneof=admin operator user"`
 	Balance       *float64 `json:"balance"`
 	Concurrency   *int     `json:"concurrency"`
 	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
@@ -293,6 +297,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		Password:              req.Password,
 		Username:              req.Username,
 		Notes:                 req.Notes,
+		Role:                  req.Role,
 		Balance:               req.Balance,
 		Concurrency:           req.Concurrency,
 		Status:                req.Status,
@@ -340,6 +345,23 @@ func (h *UserHandler) UpdateBalance(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	req.Notes = strings.TrimSpace(req.Notes)
+
+	role, _ := middleware.GetUserRoleFromContext(c)
+	if role == service.RoleOperator {
+		if req.Operation != "add" {
+			response.Forbidden(c, "Operator can only add small compensation.")
+			return
+		}
+		if req.Balance > operatorMaxCompensationUSD {
+			response.Forbidden(c, "Operator compensation cannot exceed $8.")
+			return
+		}
+		if req.Notes == "" {
+			response.BadRequest(c, "Notes are required for operator compensation.")
+			return
+		}
+	}
 
 	idempotencyPayload := struct {
 		UserID int64                `json:"user_id"`
@@ -374,11 +396,37 @@ func (h *UserHandler) GetUserAPIKeys(c *gin.Context) {
 		return
 	}
 
+	role, _ := middleware.GetUserRoleFromContext(c)
+	maskForOperator := role == service.RoleOperator
+
 	out := make([]dto.APIKey, 0, len(keys))
 	for i := range keys {
-		out = append(out, *dto.APIKeyFromService(&keys[i]))
+		item := dto.APIKeyFromService(&keys[i])
+		if item == nil {
+			continue
+		}
+		if maskForOperator {
+			item.Key = maskAPIKeyForOperator(item.Key)
+		}
+		out = append(out, *item)
 	}
 	response.Paginated(c, out, total, page, pageSize)
+}
+
+func maskAPIKeyForOperator(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if len(raw) <= 8 {
+		return "****"
+	}
+	prefix := raw[:4]
+	suffix := raw[len(raw)-4:]
+	maskLen := len(raw) - 8
+	if maskLen < 4 {
+		maskLen = 4
+	}
+	return prefix + strings.Repeat("*", maskLen) + suffix
 }
 
 // GetUserUsage handles getting user's usage statistics

@@ -94,7 +94,7 @@ const menuItem = computed(() => {
   const found = publicItems.find((item) => item.id === id) ?? null
   if (found) return found
   // For admin users, also check admin settings (contains admin-only items)
-  if (authStore.isAdmin) {
+  if (authStore.isBackoffice) {
     return adminSettingsStore.customMenuItems.find((item) => item.id === id) ?? null
   }
   return null

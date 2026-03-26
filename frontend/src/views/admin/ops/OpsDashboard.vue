@@ -100,7 +100,7 @@
 
       <!-- System Logs -->
       <OpsSystemLogTable
-        v-if="opsEnabled && !(loading && !hasLoadedOnce)"
+        v-if="opsEnabled && !isOperator && !(loading && !hasLoadedOnce)"
         :platform-filter="platform"
         :refresh-token="dashboardRefreshToken"
       />
@@ -154,7 +154,7 @@ import {
   type OpsThroughputTrendResponse,
   type OpsMetricThresholds
 } from '@/api/admin/ops'
-import { useAdminSettingsStore, useAppStore } from '@/stores'
+import { useAdminSettingsStore, useAppStore, useAuthStore } from '@/stores'
 import OpsDashboardHeader from './components/OpsDashboardHeader.vue'
 import OpsDashboardSkeleton from './components/OpsDashboardSkeleton.vue'
 import OpsConcurrencyCard from './components/OpsConcurrencyCard.vue'
@@ -176,9 +176,11 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const adminSettingsStore = useAdminSettingsStore()
+const authStore = useAuthStore()
 const { t } = useI18n()
 
 const opsEnabled = computed(() => adminSettingsStore.opsMonitoringEnabled)
+const isOperator = computed(() => authStore.isOperator)
 
 type TimeRange = '1h' | '1d' | '7d' | '30d' | 'custom'
 const allowedTimeRanges = new Set<TimeRange>(['1h', '1d', '7d', '30d', 'custom'])

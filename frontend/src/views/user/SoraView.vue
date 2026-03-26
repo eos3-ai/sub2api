@@ -77,7 +77,7 @@ const activeTab = ref<'generate' | 'library'>('generate')
 const quota = ref<QuotaInfo | null>(null)
 const activeTaskCount = ref(0)
 const hasGeneratingTask = ref(false)
-const dashboardPath = computed(() => (authStore.isAdmin ? '/admin/dashboard' : '/dashboard'))
+const dashboardPath = computed(() => (authStore.isBackoffice ? '/admin/dashboard' : '/dashboard'))
 
 const tabs = computed(() => [
   { key: 'generate' as const, label: t('sora.tabGenerate') },

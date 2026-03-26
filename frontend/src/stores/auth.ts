@@ -37,6 +37,14 @@ export const useAuthStore = defineStore('auth', () => {
     return user.value?.role === 'admin'
   })
 
+  const isOperator = computed(() => {
+    return user.value?.role === 'operator'
+  })
+
+  const isBackoffice = computed(() => {
+    return isAdmin.value || isOperator.value
+  })
+
   const isSimpleMode = computed(() => runMode.value === 'simple')
 
   // ==================== Actions ====================
@@ -403,6 +411,8 @@ export const useAuthStore = defineStore('auth', () => {
     // Computed
     isAuthenticated,
     isAdmin,
+    isOperator,
+    isBackoffice,
     isSimpleMode,
 
     // Actions

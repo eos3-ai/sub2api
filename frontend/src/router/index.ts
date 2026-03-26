@@ -535,7 +535,7 @@ router.beforeEach((to, _from, next) => {
     const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
     const adminSettingsStore = useAdminSettingsStore()
     const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
+      ?? (authStore.isBackoffice ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
       const siteName = appStore.siteName || 'Sub2API'
       document.title = `${menuItem.label} - ${siteName}`
@@ -556,12 +556,12 @@ router.beforeEach((to, _from, next) => {
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
       // In backend mode, non-admin users should NOT be redirected away from login
       // (they are blocked from all protected routes, so redirecting would cause a loop)
-      if (appStore.backendModeEnabled && !authStore.isAdmin) {
+      if (appStore.backendModeEnabled && !authStore.isBackoffice) {
         next()
         return
       }
       // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
       return
     }
     // Backend mode: block public pages for unauthenticated users (except login, key-usage, setup)
@@ -587,7 +587,7 @@ router.beforeEach((to, _from, next) => {
   }
 
   // Check admin requirement
-  if (requiresAdmin && !authStore.isAdmin) {
+  if (requiresAdmin && !authStore.isBackoffice) {
     // User is authenticated but not admin, redirect to user dashboard
     next('/dashboard')
     return
@@ -605,14 +605,14 @@ router.beforeEach((to, _from, next) => {
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
       // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
 
   // Backend mode: admin gets full access, non-admin blocked
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && authStore.isBackoffice) {
       next()
       return
     }
