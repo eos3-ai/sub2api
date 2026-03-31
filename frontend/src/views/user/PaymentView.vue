@@ -100,6 +100,7 @@
               </div>
               <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <button
+                  v-if="availablePayMethods.includes('alipay')"
                   type="button"
                   class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
                   :class="
@@ -121,6 +122,7 @@
                 </button>
 
                 <button
+                  v-if="availablePayMethods.includes('wechat')"
                   type="button"
                   class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
                   :class="
@@ -141,6 +143,9 @@
                   <span>{{ t('payment.wechat') }}</span>
                 </button>
               </div>
+              <p v-if="availablePayMethods.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
+                {{ t('payment.noPayMethodEnabled') }}
+              </p>
 
               <div class="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
                 <div class="text-sm text-gray-700 dark:text-dark-200">
@@ -449,7 +454,7 @@ const orders = ref<PaymentOrder[]>([])
 const selectedKind = ref<'plan' | 'custom' | null>(null)
 const selectedPlan = ref<PaymentPlan | null>(null)
 const customAmountUSDInput = ref('')
-const payMethod = ref<PaymentPayMethod>('alipay')
+const payMethod = ref<PaymentPayMethod | ''>('alipay')
 const creatingOrder = ref(false)
 const checkoutOpen = ref(false)
 
@@ -476,6 +481,24 @@ const discountRate = computed(() => {
 const customAmountUSD = computed(() => {
   const parsed = Number.parseFloat(customAmountUSDInput.value)
   return Number.isFinite(parsed) ? parsed : 0
+})
+
+const availablePayMethods = computed<PaymentPayMethod[]>(() => {
+  const legacyDefaults: PaymentPayMethod[] = ['alipay', 'wechat']
+  if (plans.value.length === 0) return legacyDefaults
+
+  const hasExplicitChannels = plans.value.some((plan) => Array.isArray(plan.available_channels))
+  if (!hasExplicitChannels) return legacyDefaults
+
+  const enabled = new Set<PaymentPayMethod>()
+  for (const plan of plans.value) {
+    for (const channel of plan.available_channels || []) {
+      if (channel === 'alipay' || channel === 'wechat') {
+        enabled.add(channel)
+      }
+    }
+  }
+  return legacyDefaults.filter((method) => enabled.has(method))
 })
 
 const selectedAmountUSD = computed(() => {
@@ -513,6 +536,7 @@ const canPayNow = computed(() => {
   if (!selectedKind.value) return false
   if (selectedKind.value === 'plan' && !selectedPlan.value) return false
   if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) return false
+  if (!payMethod.value) return false
   return true
 })
 
@@ -686,6 +710,10 @@ async function payNow() {
     appStore.showWarning(t('payment.selectAmount'))
     return
   }
+  if (!payMethod.value) {
+    appStore.showWarning(t('payment.noPayMethodEnabled'))
+    return
+  }
   if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) {
     appStore.showWarning(t('payment.invalidAmount'))
     return
@@ -702,11 +730,11 @@ async function payNow() {
       selectedKind.value === 'custom'
         ? await paymentAPI.createPaymentOrder({
             amount_usd: customAmountUSD.value,
-            channel: payMethod.value
+            channel: payMethod.value as PaymentPayMethod
           })
         : await paymentAPI.createPaymentOrder({
             plan_id: selectedPlan.value!.id,
-            channel: payMethod.value
+            channel: payMethod.value as PaymentPayMethod
           })
     appStore.showSuccess(t('payment.orderCreated') + ` (${resp.order.order_no})`)
     await loadOrders()
@@ -745,6 +773,20 @@ watch(
   async () => {
     if (payOpen.value) await refreshPayQR()
   }
+)
+
+watch(
+  () => availablePayMethods.value,
+  (methods) => {
+    if (methods.length === 0) {
+      payMethod.value = ''
+      return
+    }
+    if (!payMethod.value || !methods.includes(payMethod.value as PaymentPayMethod)) {
+      payMethod.value = methods[0]
+    }
+  },
+  { immediate: true }
 )
 
 function channelLabel(channel: string): string {

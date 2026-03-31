@@ -1029,6 +1029,8 @@ payment:
     return_url: "/payment/result"
     submit_url: "https://zpayz.cn/submit.php"
     query_url: "https://zpayz.cn/api.php"
+    # 用户侧渠道开关：按此列表展示并允许下单（支持：alipay, wxpay）
+    # 例如仅保留微信：payment_methods: "wxpay"
     payment_methods: "alipay,wxpay"
     # order_prefix: "ORD_"
     notify_user: false

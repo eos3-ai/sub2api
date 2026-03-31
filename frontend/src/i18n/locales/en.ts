@@ -439,6 +439,7 @@ export default {
     onlineRecharge: 'Online Recharge',
     quickSelectAmount: 'Quick select amount',
     choosePayMethod: 'Choose payment method',
+    noPayMethodEnabled: 'No payment channel is enabled for users. Please contact the administrator.',
     payAmountLabel: 'Pay amount',
     estimatedPay: 'Estimated',
     other: 'Other',

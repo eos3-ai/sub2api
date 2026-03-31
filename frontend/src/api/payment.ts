@@ -20,6 +20,7 @@ export interface PaymentPlan {
   credits_usd: number
   exchange_rate: number
   discount_rate: number
+  available_channels?: PaymentPayMethod[]
   description?: string
   enabled?: boolean
 }

@@ -55,6 +55,7 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 
 	paymentCfg := h.cfg.Payment
+	availableChannels := h.availableUserPaymentChannels()
 	discount := normalizedDiscountRate(paymentCfg.DiscountRate)
 	plans := make([]dto.PaymentPlan, 0, len(paymentCfg.Packages))
 	for i, pkg := range paymentCfg.Packages {
@@ -66,14 +67,15 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 		creditsUSD := amountUSD
 		payUSD := creditsUSD * discount
 		plans = append(plans, dto.PaymentPlan{
-			ID:           planID,
-			Name:         pkg.Label,
-			AmountUSD:    amountUSD,
-			PayUSD:       payUSD,
-			CreditsUSD:   creditsUSD,
-			ExchangeRate: paymentCfg.ExchangeRate,
-			DiscountRate: discount,
-			Enabled:      paymentCfg.Enabled,
+			ID:                planID,
+			Name:              pkg.Label,
+			AmountUSD:         amountUSD,
+			PayUSD:            payUSD,
+			CreditsUSD:        creditsUSD,
+			ExchangeRate:      paymentCfg.ExchangeRate,
+			DiscountRate:      discount,
+			Enabled:           paymentCfg.Enabled,
+			AvailableChannels: append([]string(nil), availableChannels...),
 		})
 	}
 	response.Success(c, plans)
@@ -98,6 +100,12 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "payment config is missing")
 		return
 	}
+	if !h.isCreateChannelEnabled(req.Channel) {
+		response.BadRequest(c, "payment channel is disabled")
+		return
+	}
+
+	channel := h.resolveCreateChannel(req.Channel)
 
 	var amountCNY float64
 	if req.PlanID != "" {
@@ -116,14 +124,14 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	provider := normalizePaymentProvider(req.Channel)
+	provider := normalizePaymentProvider(channel)
 
 	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
 		UserID:        subject.UserID,
 		Username:      "",
 		AmountCNY:     amountCNY,
 		Provider:      provider,
-		Channel:       req.Channel,
+		Channel:       channel,
 		PaymentMethod: "web",
 		ClientIP:      c.ClientIP(),
 		UserAgent:     c.GetHeader("User-Agent"),
@@ -137,9 +145,9 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	var qrURL string
 	switch strings.ToLower(strings.TrimSpace(order.Provider)) {
 	case "zpay":
-		payURL, qrURL, err = h.zpayService.CreatePayment(c.Request.Context(), order, req.Channel)
+		payURL, qrURL, err = h.zpayService.CreatePayment(c.Request.Context(), order, channel)
 	case "stripe":
-		payURL, qrURL, err = h.stripeService.CreatePayment(c.Request.Context(), order, req.Channel)
+		payURL, qrURL, err = h.stripeService.CreatePayment(c.Request.Context(), order, channel)
 	default:
 		// Provider integration is still WIP.
 	}
@@ -262,6 +270,98 @@ func normalizePaymentProvider(channel string) string {
 	default:
 		return strings.ToLower(strings.TrimSpace(channel))
 	}
+}
+
+func (h *PaymentHandler) availableUserPaymentChannels() []string {
+	enabled := h.enabledUserPaymentChannelSet()
+	out := make([]string, 0, 2)
+	for _, channel := range []string{"alipay", "wechat"} {
+		if _, ok := enabled[channel]; ok {
+			out = append(out, channel)
+		}
+	}
+	return out
+}
+
+func (h *PaymentHandler) enabledUserPaymentChannelSet() map[string]struct{} {
+	out := make(map[string]struct{})
+	if h == nil || h.cfg == nil {
+		return out
+	}
+	paymentCfg := h.cfg.Payment
+	if !paymentCfg.Enabled || !paymentCfg.Zpay.Enabled {
+		return out
+	}
+
+	methods := parseCommaListLower(paymentCfg.Zpay.PaymentMethods)
+	if len(methods) == 0 {
+		// Keep historical behavior when payment_methods is not explicitly set.
+		out["alipay"] = struct{}{}
+		out["wechat"] = struct{}{}
+		return out
+	}
+
+	for _, method := range methods {
+		switch method {
+		case "alipay", "zpay":
+			out["alipay"] = struct{}{}
+		case "wechat", "wxpay", "wechat_pay":
+			out["wechat"] = struct{}{}
+		}
+	}
+	return out
+}
+
+func (h *PaymentHandler) isCreateChannelEnabled(channel string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(channel))
+	if h == nil || h.cfg == nil {
+		return false
+	}
+
+	switch normalized {
+	case "alipay", "wechat":
+		_, ok := h.enabledUserPaymentChannelSet()[normalized]
+		return ok
+	case "zpay":
+		return h.cfg.Payment.Zpay.Enabled && len(h.availableUserPaymentChannels()) > 0
+	case "stripe":
+		return h.cfg.Payment.Enabled && h.cfg.Payment.Stripe.Enabled
+	default:
+		return false
+	}
+}
+
+func (h *PaymentHandler) resolveCreateChannel(channel string) string {
+	normalized := strings.ToLower(strings.TrimSpace(channel))
+	if normalized != "zpay" {
+		return normalized
+	}
+
+	enabled := h.enabledUserPaymentChannelSet()
+	if _, ok := enabled["alipay"]; ok {
+		return "alipay"
+	}
+	if _, ok := enabled["wechat"]; ok {
+		return "wechat"
+	}
+	return normalized
+}
+
+func parseCommaListLower(raw string) []string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" {
+			continue
+		}
+		out = append(out, part)
+	}
+	return out
 }
 
 // ZpayNotify handles ZPay notify callback.

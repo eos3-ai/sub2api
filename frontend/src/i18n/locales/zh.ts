@@ -438,6 +438,7 @@ export default {
     onlineRecharge: '在线充值',
     quickSelectAmount: '快速选择充值金额',
     choosePayMethod: '选择支付方式',
+    noPayMethodEnabled: '当前未开放可用支付渠道，请联系管理员。',
     payAmountLabel: '支付金额',
     estimatedPay: '实付约',
     other: '其他',

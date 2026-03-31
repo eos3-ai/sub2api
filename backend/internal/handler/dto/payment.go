@@ -9,22 +9,23 @@ import (
 
 // PaymentPlan represents a frontend-friendly payment package definition.
 type PaymentPlan struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	AmountUSD    float64 `json:"amount_usd"`
-	PayUSD       float64 `json:"pay_usd"`
-	CreditsUSD   float64 `json:"credits_usd"`
-	ExchangeRate float64 `json:"exchange_rate"`
-	DiscountRate float64 `json:"discount_rate"`
-	Enabled      bool    `json:"enabled"`
+	ID                string   `json:"id"`
+	Name              string   `json:"name"`
+	AmountUSD         float64  `json:"amount_usd"`
+	PayUSD            float64  `json:"pay_usd"`
+	CreditsUSD        float64  `json:"credits_usd"`
+	ExchangeRate      float64  `json:"exchange_rate"`
+	DiscountRate      float64  `json:"discount_rate"`
+	Enabled           bool     `json:"enabled"`
+	AvailableChannels []string `json:"available_channels,omitempty"`
 }
 
 // PaymentOrder represents a payment order for API responses.
 type PaymentOrder struct {
-	ID      int64  `json:"id"`
-	OrderNo string `json:"order_no"`
-	OrderType string `json:"order_type"`
-	TradeNo *string `json:"trade_no,omitempty"`
+	ID        int64   `json:"id"`
+	OrderNo   string  `json:"order_no"`
+	OrderType string  `json:"order_type"`
+	TradeNo   *string `json:"trade_no,omitempty"`
 
 	UserID    int64  `json:"user_id"`
 	Username  string `json:"username"`
@@ -71,33 +72,33 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 		orderType = "activity_recharge"
 	}
 	return &PaymentOrder{
-		ID:           o.ID,
-		OrderNo:      o.OrderNo,
-		OrderType:    orderType,
-		TradeNo:      o.TradeNo,
-		UserID:       o.UserID,
-		Username:     o.Username,
-		Remark:       o.Remark,
-		AmountCNY:    o.AmountCNY,
-		AmountUSD:    o.AmountUSD,
-		BonusUSD:     o.BonusUSD,
-		TotalUSD:     o.TotalUSD,
-		ExchangeRate: o.ExchangeRate,
-		DiscountRate: o.DiscountRate,
-		Provider:     o.Provider,
-		Channel:      o.Channel,
+		ID:            o.ID,
+		OrderNo:       o.OrderNo,
+		OrderType:     orderType,
+		TradeNo:       o.TradeNo,
+		UserID:        o.UserID,
+		Username:      o.Username,
+		Remark:        o.Remark,
+		AmountCNY:     o.AmountCNY,
+		AmountUSD:     o.AmountUSD,
+		BonusUSD:      o.BonusUSD,
+		TotalUSD:      o.TotalUSD,
+		ExchangeRate:  o.ExchangeRate,
+		DiscountRate:  o.DiscountRate,
+		Provider:      o.Provider,
+		Channel:       o.Channel,
 		PaymentMethod: o.PaymentMethod,
-		PaymentURL:   o.PaymentURL,
-		Status:       o.Status,
-		PaidAt:       o.PaidAt,
-		ExpireAt:     o.ExpireAt,
+		PaymentURL:    o.PaymentURL,
+		Status:        o.Status,
+		PaidAt:        o.PaidAt,
+		ExpireAt:      o.ExpireAt,
 		PromotionTier: o.PromotionTier,
 		PromotionUsed: o.PromotionUsed,
-		CallbackData: o.CallbackData,
-		CallbackAt:   o.CallbackAt,
-		ClientIP:     o.ClientIP,
-		UserAgent:    o.UserAgent,
-		CreatedAt:    o.CreatedAt,
-		UpdatedAt:    o.UpdatedAt,
+		CallbackData:  o.CallbackData,
+		CallbackAt:    o.CallbackAt,
+		ClientIP:      o.ClientIP,
+		UserAgent:     o.UserAgent,
+		CreatedAt:     o.CreatedAt,
+		UpdatedAt:     o.UpdatedAt,
 	}
 }
