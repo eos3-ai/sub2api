@@ -411,26 +411,34 @@ const (
 	proxyQualityResponseHeaderTimeout = 10 * time.Second
 	proxyQualityMaxBodyBytes          = int64(8 * 1024)
 	proxyQualityClientUserAgent       = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+
+	defaultScheduledTestCronExpression = "* * * * *"
+	defaultScheduledTestMaxResults     = 50
+
+	defaultScheduledTestModelAnthropic = "haiku4.5"
+	defaultScheduledTestModelOpenAI    = "gpt5.3-codex"
+	defaultScheduledTestModelGemini    = "gemini-3-pro-preview"
 )
 
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
-	userRepo             UserRepository
-	groupRepo            GroupRepository
-	accountRepo          AccountRepository
-	accountAlert         *AccountAlertService
-	soraAccountRepo      SoraAccountRepository // Sora 账号扩展表仓储
-	proxyRepo            ProxyRepository
-	apiKeyRepo           APIKeyRepository
-	redeemCodeRepo       RedeemCodeRepository
-	balanceService       *BalanceService
-	userGroupRateRepo    UserGroupRateRepository
-	billingCacheService  *BillingCacheService
-	proxyLatencyCache    ProxyLatencyCache
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	proxyProber          ProxyExitInfoProber
-	paymentOrderRepo     PaymentOrderRepository
-	cfg                  *config.Config
+	userRepo              UserRepository
+	groupRepo             GroupRepository
+	accountRepo           AccountRepository
+	accountAlert          *AccountAlertService
+	soraAccountRepo       SoraAccountRepository // Sora 账号扩展表仓储
+	proxyRepo             ProxyRepository
+	apiKeyRepo            APIKeyRepository
+	redeemCodeRepo        RedeemCodeRepository
+	balanceService        *BalanceService
+	userGroupRateRepo     UserGroupRateRepository
+	billingCacheService   *BillingCacheService
+	proxyLatencyCache     ProxyLatencyCache
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	proxyProber           ProxyExitInfoProber
+	paymentOrderRepo      PaymentOrderRepository
+	scheduledTestPlanRepo ScheduledTestPlanRepository
+	cfg                   *config.Config
 }
 
 // NewAdminService creates a new AdminService
@@ -449,25 +457,27 @@ func NewAdminService(
 	proxyProber ProxyExitInfoProber,
 	proxyLatencyCache ProxyLatencyCache,
 	paymentOrderRepo PaymentOrderRepository,
+	scheduledTestPlanRepo ScheduledTestPlanRepository,
 	cfg *config.Config,
 ) AdminService {
 	return &adminServiceImpl{
-		userRepo:             userRepo,
-		groupRepo:            groupRepo,
-		accountRepo:          accountRepo,
-		accountAlert:         NewAccountAlertService(cfg),
-		soraAccountRepo:      soraAccountRepo,
-		proxyRepo:            proxyRepo,
-		apiKeyRepo:           apiKeyRepo,
-		redeemCodeRepo:       redeemCodeRepo,
-		balanceService:       balanceService,
-		userGroupRateRepo:    userGroupRateRepo,
-		billingCacheService:  billingCacheService,
-		proxyLatencyCache:    proxyLatencyCache,
-		authCacheInvalidator: authCacheInvalidator,
-		proxyProber:          proxyProber,
-		paymentOrderRepo:     paymentOrderRepo,
-		cfg:                  cfg,
+		userRepo:              userRepo,
+		groupRepo:             groupRepo,
+		accountRepo:           accountRepo,
+		accountAlert:          NewAccountAlertService(cfg),
+		soraAccountRepo:       soraAccountRepo,
+		proxyRepo:             proxyRepo,
+		apiKeyRepo:            apiKeyRepo,
+		redeemCodeRepo:        redeemCodeRepo,
+		balanceService:        balanceService,
+		userGroupRateRepo:     userGroupRateRepo,
+		billingCacheService:   billingCacheService,
+		proxyLatencyCache:     proxyLatencyCache,
+		authCacheInvalidator:  authCacheInvalidator,
+		proxyProber:           proxyProber,
+		paymentOrderRepo:      paymentOrderRepo,
+		scheduledTestPlanRepo: scheduledTestPlanRepo,
+		cfg:                   cfg,
 	}
 }
 
@@ -1395,7 +1405,65 @@ func (s *adminServiceImpl) CreateAccount(ctx context.Context, input *CreateAccou
 		}
 	}
 
+	if err := s.createDefaultScheduledTestPlan(ctx, account); err != nil {
+		// 非阻断：账号已创建成功，默认定时检测创建失败只记录日志
+		logger.LegacyPrintf("service.admin", "[AdminService] auto create default scheduled test plan failed: account_id=%d platform=%s err=%v", account.ID, account.Platform, err)
+	}
+
 	return account, nil
+}
+
+func (s *adminServiceImpl) createDefaultScheduledTestPlan(ctx context.Context, account *Account) error {
+	if s == nil || s.scheduledTestPlanRepo == nil || account == nil {
+		return nil
+	}
+
+	plan, err := buildDefaultScheduledTestPlan(account.ID, account.Platform, time.Now())
+	if err != nil || plan == nil {
+		return err
+	}
+
+	_, err = s.scheduledTestPlanRepo.Create(ctx, plan)
+	return err
+}
+
+func buildDefaultScheduledTestPlan(accountID int64, platform string, now time.Time) (*ScheduledTestPlan, error) {
+	if accountID <= 0 {
+		return nil, nil
+	}
+
+	modelID, ok := defaultScheduledTestModelByPlatform(platform)
+	if !ok {
+		return nil, nil
+	}
+
+	nextRun, err := computeNextRun(defaultScheduledTestCronExpression, now)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ScheduledTestPlan{
+		AccountID:      accountID,
+		ModelID:        modelID,
+		CronExpression: defaultScheduledTestCronExpression,
+		Enabled:        true,
+		MaxResults:     defaultScheduledTestMaxResults,
+		AutoRecover:    true,
+		NextRunAt:      &nextRun,
+	}, nil
+}
+
+func defaultScheduledTestModelByPlatform(platform string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(platform)) {
+	case PlatformAnthropic:
+		return defaultScheduledTestModelAnthropic, true
+	case PlatformOpenAI:
+		return defaultScheduledTestModelOpenAI, true
+	case PlatformGemini:
+		return defaultScheduledTestModelGemini, true
+	default:
+		return "", false
+	}
 }
 
 func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *UpdateAccountInput) (*Account, error) {
