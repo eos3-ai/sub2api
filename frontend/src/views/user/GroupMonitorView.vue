@@ -36,31 +36,41 @@
           {{ t('groupMonitor.empty') }}
         </div>
 
-        <div v-else class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <article
-            v-for="group in filteredMonitorItems"
-            :key="group.group_id"
-            class="relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-            :class="statusCardClass(group.current_status)"
+        <div v-else class="space-y-6">
+          <section
+            v-for="section in monitorSections"
+            :key="section.type"
           >
-            <div class="absolute inset-x-0 top-0 h-1" :class="statusAccentClass(group.current_status)" />
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                  {{ group.group_name }}
-                </div>
-                <div class="mt-2">
-                  <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium" :class="platformBadgeClass(group.platform)">
-                    {{ group.platform }}
+            <h3 class="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {{ section.title }}
+            </h3>
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <article
+                v-for="group in section.items"
+                :key="group.group_id"
+                class="relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                :class="statusCardClass(group.current_status)"
+              >
+                <div class="absolute inset-x-0 top-0 h-1" :class="statusAccentClass(group.current_status)" />
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {{ group.group_name }}
+                    </div>
+                    <div class="mt-2">
+                      <span class="inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium" :class="platformBadgeClass(group.platform)">
+                        {{ group.platform }}
+                      </span>
+                    </div>
+                  </div>
+                  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" :class="statusBadgeClass(group.current_status)">
+                    <span class="h-2 w-2 rounded-full" :class="statusDotClass(group.current_status)" />
+                    {{ statusLabel(group.current_status) }}
                   </span>
                 </div>
-              </div>
-              <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold" :class="statusBadgeClass(group.current_status)">
-                <span class="h-2 w-2 rounded-full" :class="statusDotClass(group.current_status)" />
-                {{ statusLabel(group.current_status) }}
-              </span>
+              </article>
             </div>
-          </article>
+          </section>
         </div>
       </section>
     </div>
@@ -104,9 +114,37 @@ const filteredMonitorItems = computed<PublicGroupMonitorItem[]>(() => {
   if (!platform) return monitorItems.value
   return monitorItems.value.filter((item) => item.platform === platform)
 })
+const publicMonitorItems = computed<PublicGroupMonitorItem[]>(() =>
+  filteredMonitorItems.value.filter((item) => resolveGroupType(item) === 'public')
+)
+const subscriptionMonitorItems = computed<PublicGroupMonitorItem[]>(() =>
+  filteredMonitorItems.value.filter((item) => resolveGroupType(item) === 'subscription')
+)
+const monitorSections = computed(() => {
+  const sections: Array<{ type: 'public' | 'subscription'; title: string; items: PublicGroupMonitorItem[] }> = []
+  if (publicMonitorItems.value.length > 0) {
+    sections.push({
+      type: 'public',
+      title: t('groupMonitor.publicType'),
+      items: publicMonitorItems.value
+    })
+  }
+  if (subscriptionMonitorItems.value.length > 0) {
+    sections.push({
+      type: 'subscription',
+      title: t('groupMonitor.subscriptionType'),
+      items: subscriptionMonitorItems.value
+    })
+  }
+  return sections
+})
 
 function onPlatformFilterChange(value: string | number | boolean | null) {
   selectedPlatform.value = String(value ?? '')
+}
+
+function resolveGroupType(item: PublicGroupMonitorItem): 'public' | 'subscription' {
+  return item.group_type === 'subscription' ? 'subscription' : 'public'
 }
 
 function statusLabel(status: string): string {

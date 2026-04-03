@@ -781,8 +781,11 @@ func (s *APIKeyService) GetAvailableGroups(ctx context.Context, userID int64) ([
 	return availableGroups, nil
 }
 
-// GetPublicGroupMonitor returns user-facing public-group monitor data.
-// Public groups are defined as active non-exclusive standard groups.
+// GetPublicGroupMonitor returns user-facing group monitor data.
+// It includes:
+//   - active non-exclusive standard groups (usage-based billing)
+//   - active subscription groups that are purchasable on user payment page
+//     (subscription + user_purchase_visible + user_purchase_price_usd > 0)
 func (s *APIKeyService) GetPublicGroupMonitor(
 	ctx context.Context,
 	_ int64,
@@ -792,37 +795,45 @@ func (s *APIKeyService) GetPublicGroupMonitor(
 		return nil, fmt.Errorf("list active groups: %w", err)
 	}
 
-	publicGroups := make([]Group, 0, len(allGroups))
+	monitorGroups := make([]Group, 0, len(allGroups))
+	groupTypes := make(map[int64]string, len(allGroups))
 	groupIDs := make([]int64, 0, len(allGroups))
 	for i := range allGroups {
 		g := allGroups[i]
-		if g.IsExclusive {
+		includeUsageBased := !g.IsExclusive && g.SubscriptionType == SubscriptionTypeStandard
+		includeSubscriptionPackage := g.SubscriptionType == SubscriptionTypeSubscription &&
+			g.UserPurchaseVisible &&
+			g.UserPurchasePriceUSD != nil &&
+			*g.UserPurchasePriceUSD > 0
+		if !includeUsageBased && !includeSubscriptionPackage {
 			continue
 		}
-		if g.SubscriptionType != SubscriptionTypeStandard {
-			continue
+		if includeSubscriptionPackage {
+			groupTypes[g.ID] = PublicGroupMonitorTypeSubscription
+		} else {
+			groupTypes[g.ID] = PublicGroupMonitorTypePublic
 		}
-		publicGroups = append(publicGroups, g)
+		monitorGroups = append(monitorGroups, g)
 		groupIDs = append(groupIDs, g.ID)
 	}
 
-	sort.Slice(publicGroups, func(i, j int) bool {
-		if publicGroups[i].SortOrder != publicGroups[j].SortOrder {
-			return publicGroups[i].SortOrder < publicGroups[j].SortOrder
+	sort.Slice(monitorGroups, func(i, j int) bool {
+		if monitorGroups[i].SortOrder != monitorGroups[j].SortOrder {
+			return monitorGroups[i].SortOrder < monitorGroups[j].SortOrder
 		}
-		if publicGroups[i].Name != publicGroups[j].Name {
-			return publicGroups[i].Name < publicGroups[j].Name
+		if monitorGroups[i].Name != monitorGroups[j].Name {
+			return monitorGroups[i].Name < monitorGroups[j].Name
 		}
-		return publicGroups[i].ID < publicGroups[j].ID
+		return monitorGroups[i].ID < monitorGroups[j].ID
 	})
 
 	resp := &PublicGroupMonitorResponse{
 		GeneratedAt:    time.Now().UTC(),
-		PublicGroupNum: len(publicGroups),
-		Items:          make([]*PublicGroupMonitorItem, 0, len(publicGroups)),
+		PublicGroupNum: len(monitorGroups),
+		Items:          make([]*PublicGroupMonitorItem, 0, len(monitorGroups)),
 	}
 
-	if len(publicGroups) == 0 {
+	if len(monitorGroups) == 0 {
 		return resp, nil
 	}
 
@@ -840,13 +851,14 @@ func (s *APIKeyService) GetPublicGroupMonitor(
 		return nil, fmt.Errorf("query public group monitor overview: %w", err)
 	}
 
-	for i := range publicGroups {
-		g := publicGroups[i]
+	for i := range monitorGroups {
+		g := monitorGroups[i]
 		agg := aggByGroupID[g.ID]
 		item := &PublicGroupMonitorItem{
 			GroupID:       g.ID,
 			GroupName:     g.Name,
 			Platform:      g.Platform,
+			GroupType:     groupTypes[g.ID],
 			CurrentStatus: "unknown",
 		}
 		if agg != nil {

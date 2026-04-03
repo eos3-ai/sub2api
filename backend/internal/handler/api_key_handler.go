@@ -305,7 +305,8 @@ func (h *APIKeyHandler) GetUserGroupRates(c *gin.Context) {
 	response.Success(c, rates)
 }
 
-// GetPublicGroupMonitor returns monitor aggregation for all active public groups.
+// GetPublicGroupMonitor returns monitor aggregation for user-facing groups:
+// usage-based public groups and user-purchasable subscription package groups.
 // GET /api/v1/groups/monitor
 func (h *APIKeyHandler) GetPublicGroupMonitor(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)

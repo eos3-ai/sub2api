@@ -31,6 +31,7 @@ export interface PublicGroupMonitorItem {
   group_id: number
   group_name: string
   platform: string
+  group_type: 'public' | 'subscription'
   current_status: 'normal' | 'abnormal' | 'unknown'
 }
 

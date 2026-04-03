@@ -2,11 +2,19 @@ package service
 
 import "time"
 
+const (
+	// PublicGroupMonitorTypePublic marks usage-based public groups.
+	PublicGroupMonitorTypePublic = "public"
+	// PublicGroupMonitorTypeSubscription marks purchasable subscription groups.
+	PublicGroupMonitorTypeSubscription = "subscription"
+)
+
 // PublicGroupMonitorItem is user-facing group monitor summary.
 type PublicGroupMonitorItem struct {
 	GroupID   int64  `json:"group_id"`
 	GroupName string `json:"group_name"`
 	Platform  string `json:"platform"`
+	GroupType string `json:"group_type"` // public | subscription
 
 	CurrentStatus string `json:"current_status"` // normal | abnormal | unknown
 }
