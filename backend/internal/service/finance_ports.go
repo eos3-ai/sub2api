@@ -78,7 +78,8 @@ type PaymentOrderFilter struct {
 	UserID   *int64
 	Status   string
 	Provider string
-	// OrderType is a derived field for admin filtering (online_recharge/admin_recharge/activity_recharge).
+	// OrderType is a derived field for admin filtering
+	// (online_recharge/admin_recharge/activity_recharge/subscription_purchase).
 	// Backend maps it to provider constraints.
 	OrderType string
 	From      *time.Time

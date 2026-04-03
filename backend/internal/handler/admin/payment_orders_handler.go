@@ -133,6 +133,8 @@ func (h *PaymentOrdersHandler) Export(c *gin.Context) {
 			orderType = "admin_recharge"
 		} else if strings.EqualFold(o.Provider, "activity") {
 			orderType = "activity_recharge"
+		} else if o.IsSubscriptionPurchase() {
+			orderType = "subscription_purchase"
 		}
 		_ = w.Write([]string{
 			o.OrderNo,
@@ -187,7 +189,7 @@ func parsePaymentOrderFilter(c *gin.Context) (service.PaymentOrderFilter, error)
 	if orderType != "" {
 		normalized := strings.ToLower(orderType)
 		switch normalized {
-		case "online_recharge", "admin_recharge", "activity_recharge":
+		case "online_recharge", "admin_recharge", "activity_recharge", "subscription_purchase":
 			filter.OrderType = normalized
 		default:
 			return filter, fmt.Errorf("invalid order_type")

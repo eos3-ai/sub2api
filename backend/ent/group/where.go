@@ -125,6 +125,16 @@ func DefaultValidityDays(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDefaultValidityDays, v))
 }
 
+// UserPurchaseVisible applies equality check predicate on the "user_purchase_visible" field. It's identical to UserPurchaseVisibleEQ.
+func UserPurchaseVisible(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUserPurchaseVisible, v))
+}
+
+// UserPurchasePriceUsd applies equality check predicate on the "user_purchase_price_usd" field. It's identical to UserPurchasePriceUsdEQ.
+func UserPurchasePriceUsd(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUserPurchasePriceUsd, v))
+}
+
 // ImagePrice1k applies equality check predicate on the "image_price_1k" field. It's identical to ImagePrice1kEQ.
 func ImagePrice1k(v float64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldImagePrice1k, v))
@@ -908,6 +918,66 @@ func DefaultValidityDaysLT(v int) predicate.Group {
 // DefaultValidityDaysLTE applies the LTE predicate on the "default_validity_days" field.
 func DefaultValidityDaysLTE(v int) predicate.Group {
 	return predicate.Group(sql.FieldLTE(FieldDefaultValidityDays, v))
+}
+
+// UserPurchaseVisibleEQ applies the EQ predicate on the "user_purchase_visible" field.
+func UserPurchaseVisibleEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUserPurchaseVisible, v))
+}
+
+// UserPurchaseVisibleNEQ applies the NEQ predicate on the "user_purchase_visible" field.
+func UserPurchaseVisibleNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldUserPurchaseVisible, v))
+}
+
+// UserPurchasePriceUsdEQ applies the EQ predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdNEQ applies the NEQ predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdNEQ(v float64) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdIn applies the In predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldUserPurchasePriceUsd, vs...))
+}
+
+// UserPurchasePriceUsdNotIn applies the NotIn predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdNotIn(vs ...float64) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldUserPurchasePriceUsd, vs...))
+}
+
+// UserPurchasePriceUsdGT applies the GT predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdGT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdGTE applies the GTE predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdGTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdLT applies the LT predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdLT(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdLTE applies the LTE predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdLTE(v float64) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldUserPurchasePriceUsd, v))
+}
+
+// UserPurchasePriceUsdIsNil applies the IsNil predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdIsNil() predicate.Group {
+	return predicate.Group(sql.FieldIsNull(FieldUserPurchasePriceUsd))
+}
+
+// UserPurchasePriceUsdNotNil applies the NotNil predicate on the "user_purchase_price_usd" field.
+func UserPurchasePriceUsdNotNil() predicate.Group {
+	return predicate.Group(sql.FieldNotNull(FieldUserPurchasePriceUsd))
 }
 
 // ImagePrice1kEQ applies the EQ predicate on the "image_price_1k" field.

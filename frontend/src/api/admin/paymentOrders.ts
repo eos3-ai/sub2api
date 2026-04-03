@@ -6,7 +6,11 @@ import { apiClient } from '../client'
 import type { PaginatedResponse } from '@/types'
 
 export type AdminPaymentProvider = 'zpay' | 'stripe' | 'admin' | 'activity'
-export type AdminPaymentOrderType = 'online_recharge' | 'admin_recharge' | 'activity_recharge'
+export type AdminPaymentOrderType =
+  | 'online_recharge'
+  | 'admin_recharge'
+  | 'activity_recharge'
+  | 'subscription_purchase'
 
 export interface AdminPaymentOrder {
   id: number

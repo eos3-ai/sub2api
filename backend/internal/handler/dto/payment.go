@@ -20,6 +20,21 @@ type PaymentPlan struct {
 	AvailableChannels []string `json:"available_channels,omitempty"`
 }
 
+type PaymentSubscriptionPlan struct {
+	GroupID               int64    `json:"group_id"`
+	GroupName             string   `json:"group_name"`
+	Description           string   `json:"description,omitempty"`
+	Platform              string   `json:"platform"`
+	PriceUSD              float64  `json:"price_usd"`
+	ValidityDays          int      `json:"validity_days"`
+	DailyLimitUSD         *float64 `json:"daily_limit_usd,omitempty"`
+	WeeklyLimitUSD        *float64 `json:"weekly_limit_usd,omitempty"`
+	MonthlyLimitUSD       *float64 `json:"monthly_limit_usd,omitempty"`
+	ExchangeRate          float64  `json:"exchange_rate"`
+	AvailableChannels     []string `json:"available_channels,omitempty"`
+	HasActiveSubscription bool     `json:"has_active_subscription"`
+}
+
 // PaymentOrder represents a payment order for API responses.
 type PaymentOrder struct {
 	ID        int64   `json:"id"`
@@ -39,10 +54,12 @@ type PaymentOrder struct {
 	ExchangeRate float64 `json:"exchange_rate"`
 	DiscountRate float64 `json:"discount_rate"`
 
-	Provider      string `json:"provider"`
-	Channel       string `json:"channel"`
-	PaymentMethod string `json:"payment_method"`
-	PaymentURL    string `json:"payment_url,omitempty"`
+	Provider        string `json:"provider"`
+	Channel         string `json:"channel"`
+	PaymentMethod   string `json:"payment_method"`
+	PaymentURL      string `json:"payment_url,omitempty"`
+	BizGroupID      *int64 `json:"biz_group_id,omitempty"`
+	BizValidityDays *int   `json:"biz_validity_days,omitempty"`
 
 	Status   string     `json:"status"`
 	PaidAt   *time.Time `json:"paid_at,omitempty"`
@@ -70,35 +87,39 @@ func PaymentOrderFromService(o *service.PaymentOrder) *PaymentOrder {
 		orderType = "admin_recharge"
 	} else if strings.EqualFold(o.Provider, "activity") {
 		orderType = "activity_recharge"
+	} else if o.IsSubscriptionPurchase() {
+		orderType = "subscription_purchase"
 	}
 	return &PaymentOrder{
-		ID:            o.ID,
-		OrderNo:       o.OrderNo,
-		OrderType:     orderType,
-		TradeNo:       o.TradeNo,
-		UserID:        o.UserID,
-		Username:      o.Username,
-		Remark:        o.Remark,
-		AmountCNY:     o.AmountCNY,
-		AmountUSD:     o.AmountUSD,
-		BonusUSD:      o.BonusUSD,
-		TotalUSD:      o.TotalUSD,
-		ExchangeRate:  o.ExchangeRate,
-		DiscountRate:  o.DiscountRate,
-		Provider:      o.Provider,
-		Channel:       o.Channel,
-		PaymentMethod: o.PaymentMethod,
-		PaymentURL:    o.PaymentURL,
-		Status:        o.Status,
-		PaidAt:        o.PaidAt,
-		ExpireAt:      o.ExpireAt,
-		PromotionTier: o.PromotionTier,
-		PromotionUsed: o.PromotionUsed,
-		CallbackData:  o.CallbackData,
-		CallbackAt:    o.CallbackAt,
-		ClientIP:      o.ClientIP,
-		UserAgent:     o.UserAgent,
-		CreatedAt:     o.CreatedAt,
-		UpdatedAt:     o.UpdatedAt,
+		ID:              o.ID,
+		OrderNo:         o.OrderNo,
+		OrderType:       orderType,
+		TradeNo:         o.TradeNo,
+		UserID:          o.UserID,
+		Username:        o.Username,
+		Remark:          o.Remark,
+		AmountCNY:       o.AmountCNY,
+		AmountUSD:       o.AmountUSD,
+		BonusUSD:        o.BonusUSD,
+		TotalUSD:        o.TotalUSD,
+		ExchangeRate:    o.ExchangeRate,
+		DiscountRate:    o.DiscountRate,
+		Provider:        o.Provider,
+		Channel:         o.Channel,
+		PaymentMethod:   o.PaymentMethod,
+		PaymentURL:      o.PaymentURL,
+		BizGroupID:      o.BizGroupID,
+		BizValidityDays: o.BizValidityDays,
+		Status:          o.Status,
+		PaidAt:          o.PaidAt,
+		ExpireAt:        o.ExpireAt,
+		PromotionTier:   o.PromotionTier,
+		PromotionUsed:   o.PromotionUsed,
+		CallbackData:    o.CallbackData,
+		CallbackAt:      o.CallbackAt,
+		ClientIP:        o.ClientIP,
+		UserAgent:       o.UserAgent,
+		CreatedAt:       o.CreatedAt,
+		UpdatedAt:       o.UpdatedAt,
 	}
 }

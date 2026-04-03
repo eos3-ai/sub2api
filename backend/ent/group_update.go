@@ -274,6 +274,47 @@ func (_u *GroupUpdate) AddDefaultValidityDays(v int) *GroupUpdate {
 	return _u
 }
 
+// SetUserPurchaseVisible sets the "user_purchase_visible" field.
+func (_u *GroupUpdate) SetUserPurchaseVisible(v bool) *GroupUpdate {
+	_u.mutation.SetUserPurchaseVisible(v)
+	return _u
+}
+
+// SetNillableUserPurchaseVisible sets the "user_purchase_visible" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableUserPurchaseVisible(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetUserPurchaseVisible(*v)
+	}
+	return _u
+}
+
+// SetUserPurchasePriceUsd sets the "user_purchase_price_usd" field.
+func (_u *GroupUpdate) SetUserPurchasePriceUsd(v float64) *GroupUpdate {
+	_u.mutation.ResetUserPurchasePriceUsd()
+	_u.mutation.SetUserPurchasePriceUsd(v)
+	return _u
+}
+
+// SetNillableUserPurchasePriceUsd sets the "user_purchase_price_usd" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableUserPurchasePriceUsd(v *float64) *GroupUpdate {
+	if v != nil {
+		_u.SetUserPurchasePriceUsd(*v)
+	}
+	return _u
+}
+
+// AddUserPurchasePriceUsd adds value to the "user_purchase_price_usd" field.
+func (_u *GroupUpdate) AddUserPurchasePriceUsd(v float64) *GroupUpdate {
+	_u.mutation.AddUserPurchasePriceUsd(v)
+	return _u
+}
+
+// ClearUserPurchasePriceUsd clears the value of the "user_purchase_price_usd" field.
+func (_u *GroupUpdate) ClearUserPurchasePriceUsd() *GroupUpdate {
+	_u.mutation.ClearUserPurchasePriceUsd()
+	return _u
+}
+
 // SetImagePrice1k sets the "image_price_1k" field.
 func (_u *GroupUpdate) SetImagePrice1k(v float64) *GroupUpdate {
 	_u.mutation.ResetImagePrice1k()
@@ -1027,6 +1068,18 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AddedDefaultValidityDays(); ok {
 		_spec.AddField(group.FieldDefaultValidityDays, field.TypeInt, value)
 	}
+	if value, ok := _u.mutation.UserPurchaseVisible(); ok {
+		_spec.SetField(group.FieldUserPurchaseVisible, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.UserPurchasePriceUsd(); ok {
+		_spec.SetField(group.FieldUserPurchasePriceUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedUserPurchasePriceUsd(); ok {
+		_spec.AddField(group.FieldUserPurchasePriceUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.UserPurchasePriceUsdCleared() {
+		_spec.ClearField(group.FieldUserPurchasePriceUsd, field.TypeFloat64)
+	}
 	if value, ok := _u.mutation.ImagePrice1k(); ok {
 		_spec.SetField(group.FieldImagePrice1k, field.TypeFloat64, value)
 	}
@@ -1699,6 +1752,47 @@ func (_u *GroupUpdateOne) SetNillableDefaultValidityDays(v *int) *GroupUpdateOne
 // AddDefaultValidityDays adds value to the "default_validity_days" field.
 func (_u *GroupUpdateOne) AddDefaultValidityDays(v int) *GroupUpdateOne {
 	_u.mutation.AddDefaultValidityDays(v)
+	return _u
+}
+
+// SetUserPurchaseVisible sets the "user_purchase_visible" field.
+func (_u *GroupUpdateOne) SetUserPurchaseVisible(v bool) *GroupUpdateOne {
+	_u.mutation.SetUserPurchaseVisible(v)
+	return _u
+}
+
+// SetNillableUserPurchaseVisible sets the "user_purchase_visible" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableUserPurchaseVisible(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetUserPurchaseVisible(*v)
+	}
+	return _u
+}
+
+// SetUserPurchasePriceUsd sets the "user_purchase_price_usd" field.
+func (_u *GroupUpdateOne) SetUserPurchasePriceUsd(v float64) *GroupUpdateOne {
+	_u.mutation.ResetUserPurchasePriceUsd()
+	_u.mutation.SetUserPurchasePriceUsd(v)
+	return _u
+}
+
+// SetNillableUserPurchasePriceUsd sets the "user_purchase_price_usd" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableUserPurchasePriceUsd(v *float64) *GroupUpdateOne {
+	if v != nil {
+		_u.SetUserPurchasePriceUsd(*v)
+	}
+	return _u
+}
+
+// AddUserPurchasePriceUsd adds value to the "user_purchase_price_usd" field.
+func (_u *GroupUpdateOne) AddUserPurchasePriceUsd(v float64) *GroupUpdateOne {
+	_u.mutation.AddUserPurchasePriceUsd(v)
+	return _u
+}
+
+// ClearUserPurchasePriceUsd clears the value of the "user_purchase_price_usd" field.
+func (_u *GroupUpdateOne) ClearUserPurchasePriceUsd() *GroupUpdateOne {
+	_u.mutation.ClearUserPurchasePriceUsd()
 	return _u
 }
 
@@ -2484,6 +2578,18 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.AddedDefaultValidityDays(); ok {
 		_spec.AddField(group.FieldDefaultValidityDays, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.UserPurchaseVisible(); ok {
+		_spec.SetField(group.FieldUserPurchaseVisible, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.UserPurchasePriceUsd(); ok {
+		_spec.SetField(group.FieldUserPurchasePriceUsd, field.TypeFloat64, value)
+	}
+	if value, ok := _u.mutation.AddedUserPurchasePriceUsd(); ok {
+		_spec.AddField(group.FieldUserPurchasePriceUsd, field.TypeFloat64, value)
+	}
+	if _u.mutation.UserPurchasePriceUsdCleared() {
+		_spec.ClearField(group.FieldUserPurchasePriceUsd, field.TypeFloat64)
 	}
 	if value, ok := _u.mutation.ImagePrice1k(); ok {
 		_spec.SetField(group.FieldImagePrice1k, field.TypeFloat64, value)

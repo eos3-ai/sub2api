@@ -25,6 +25,21 @@ export interface PaymentPlan {
   enabled?: boolean
 }
 
+export interface PaymentSubscriptionPlan {
+  group_id: number
+  group_name: string
+  description?: string
+  platform: string
+  price_usd: number
+  validity_days: number
+  daily_limit_usd?: number | null
+  weekly_limit_usd?: number | null
+  monthly_limit_usd?: number | null
+  exchange_rate: number
+  available_channels?: PaymentPayMethod[]
+  has_active_subscription?: boolean
+}
+
 export type PaymentOrderStatus = 'pending' | 'paid' | 'expired' | 'cancelled' | 'failed' | 'refunded'
 
 export interface PaymentOrder {
@@ -32,7 +47,9 @@ export interface PaymentOrder {
   order_no: string
   order_type: string
   provider: PaymentChannel
-  channel?: string  // 实际支付渠道（alipay/wechat）
+  channel?: string // 实际支付渠道（alipay/wechat）
+  biz_group_id?: number
+  biz_validity_days?: number
   remark?: string
   amount_cny: number
   amount_usd: number
@@ -52,6 +69,7 @@ export async function getPaymentPlans(): Promise<PaymentPlan[]> {
 export async function createPaymentOrder(payload: {
   plan_id?: string
   amount_usd?: number
+  subscription_group_id?: number
   channel: PaymentCreateChannel
 }): Promise<{
   order: PaymentOrder
@@ -63,6 +81,11 @@ export async function createPaymentOrder(payload: {
     pay_url?: string
     qr_url?: string
   }>('/payment/orders', payload)
+  return data
+}
+
+export async function getSubscriptionPlans(): Promise<PaymentSubscriptionPlan[]> {
+  const { data } = await apiClient.get<PaymentSubscriptionPlan[]>('/payment/subscription-plans')
   return data
 }
 
@@ -89,6 +112,7 @@ export async function cancelPaymentOrder(orderNo: string): Promise<{ message: st
 
 export const paymentAPI = {
   getPaymentPlans,
+  getSubscriptionPlans,
   createPaymentOrder,
   getMyPaymentOrders,
   getPaymentOrder,

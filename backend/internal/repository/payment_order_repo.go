@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent"
@@ -39,9 +40,21 @@ func (r *paymentOrderRepository) Create(ctx context.Context, order *service.Paym
 	if order.PromotionTier != nil {
 		promotionTier = sql.NullInt64{Int64: int64(*order.PromotionTier), Valid: true}
 	}
+	var bizGroupID sql.NullInt64
+	if order.BizGroupID != nil {
+		bizGroupID = sql.NullInt64{Int64: *order.BizGroupID, Valid: true}
+	}
+	var bizValidityDays sql.NullInt64
+	if order.BizValidityDays != nil {
+		bizValidityDays = sql.NullInt64{Int64: int64(*order.BizValidityDays), Valid: true}
+	}
 	var callbackAt sql.NullTime
 	if order.CallbackAt != nil {
 		callbackAt = sql.NullTime{Time: *order.CallbackAt, Valid: true}
+	}
+	bizType := strings.ToLower(strings.TrimSpace(order.BizType))
+	if bizType == "" {
+		bizType = service.PaymentBizTypeOnlineRecharge
 	}
 
 	err := scanSingleRow(
@@ -50,14 +63,14 @@ func (r *paymentOrderRepository) Create(ctx context.Context, order *service.Paym
 		`
 INSERT INTO payment_orders (
   order_no, trade_no, user_id, username, remark,
-  amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
+  amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate, biz_type, biz_group_id, biz_validity_days,
   provider, channel, payment_method, payment_url,
   status, paid_at, expire_at,
   promotion_tier, promotion_used,
   callback_data, callback_at,
   client_ip, user_agent
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
 RETURNING id, created_at, updated_at
 `,
 		[]any{
@@ -71,6 +84,9 @@ RETURNING id, created_at, updated_at
 			order.BonusUSD,
 			order.TotalUSD,
 			order.ExchangeRate,
+			bizType,
+			bizGroupID,
+			bizValidityDays,
 			order.Provider,
 			nullIfEmpty(order.Channel),
 			nullIfEmpty(order.PaymentMethod),
@@ -125,9 +141,21 @@ func (r *paymentOrderRepository) Update(ctx context.Context, order *service.Paym
 	if order.PromotionTier != nil {
 		promotionTier = sql.NullInt64{Int64: int64(*order.PromotionTier), Valid: true}
 	}
+	var bizGroupID sql.NullInt64
+	if order.BizGroupID != nil {
+		bizGroupID = sql.NullInt64{Int64: *order.BizGroupID, Valid: true}
+	}
+	var bizValidityDays sql.NullInt64
+	if order.BizValidityDays != nil {
+		bizValidityDays = sql.NullInt64{Int64: int64(*order.BizValidityDays), Valid: true}
+	}
 	var callbackAt sql.NullTime
 	if order.CallbackAt != nil {
 		callbackAt = sql.NullTime{Time: *order.CallbackAt, Valid: true}
+	}
+	bizType := strings.ToLower(strings.TrimSpace(order.BizType))
+	if bizType == "" {
+		bizType = service.PaymentBizTypeOnlineRecharge
 	}
 
 	err := scanSingleRow(
@@ -143,19 +171,22 @@ SET trade_no=$2,
     bonus_usd=$7,
     total_usd=$8,
     exchange_rate=$9,
-    provider=$10,
-    channel=$11,
-    payment_method=$12,
-    payment_url=$13,
-    status=$14,
-    paid_at=$15,
-    expire_at=$16,
-    promotion_tier=$17,
-    promotion_used=$18,
-    callback_data=$19,
-    callback_at=$20,
-    client_ip=$21,
-    user_agent=$22,
+    biz_type=$10,
+    biz_group_id=$11,
+    biz_validity_days=$12,
+    provider=$13,
+    channel=$14,
+    payment_method=$15,
+    payment_url=$16,
+    status=$17,
+    paid_at=$18,
+    expire_at=$19,
+    promotion_tier=$20,
+    promotion_used=$21,
+    callback_data=$22,
+    callback_at=$23,
+    client_ip=$24,
+    user_agent=$25,
     updated_at=NOW()
 WHERE order_no=$1
 RETURNING updated_at
@@ -170,6 +201,9 @@ RETURNING updated_at
 			order.BonusUSD,
 			order.TotalUSD,
 			order.ExchangeRate,
+			bizType,
+			bizGroupID,
+			bizValidityDays,
 			order.Provider,
 			nullIfEmpty(order.Channel),
 			nullIfEmpty(order.PaymentMethod),
@@ -219,8 +253,10 @@ func (r *paymentOrderRepository) List(ctx context.Context, params pagination.Pag
 			add("provider", "admin")
 		case "activity_recharge":
 			add("provider", "activity")
+		case "subscription_purchase":
+			where += " AND provider NOT IN ('admin','activity') AND COALESCE(biz_type, 'online_recharge') = 'subscription_purchase'"
 		case "online_recharge":
-			where += " AND provider NOT IN ('admin','activity')"
+			where += " AND provider NOT IN ('admin','activity') AND COALESCE(biz_type, 'online_recharge') <> 'subscription_purchase'"
 		default:
 			return nil, nil, fmt.Errorf("unsupported order_type: %s", filter.OrderType)
 		}
@@ -248,6 +284,7 @@ func (r *paymentOrderRepository) List(ctx context.Context, params pagination.Pag
 		`
 SELECT id, order_no, trade_no, user_id, username, remark,
        amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
+       biz_type, biz_group_id, biz_validity_days,
        provider, channel, payment_method, payment_url,
        status, paid_at, expire_at,
        promotion_tier, promotion_used,
@@ -307,8 +344,10 @@ func (r *paymentOrderRepository) Summary(ctx context.Context, filter service.Pay
 			add("provider", "admin")
 		case "activity_recharge":
 			add("provider", "activity")
+		case "subscription_purchase":
+			where += " AND provider NOT IN ('admin','activity') AND COALESCE(biz_type, 'online_recharge') = 'subscription_purchase'"
 		case "online_recharge":
-			where += " AND provider NOT IN ('admin','activity')"
+			where += " AND provider NOT IN ('admin','activity') AND COALESCE(biz_type, 'online_recharge') <> 'subscription_purchase'"
 		default:
 			return 0, 0, fmt.Errorf("unsupported order_type: %s", filter.OrderType)
 		}
@@ -355,6 +394,7 @@ func (r *paymentOrderRepository) getOne(ctx context.Context, exec sqlExecutor, w
 	query := `
 SELECT id, order_no, trade_no, user_id, username, remark,
        amount_cny, amount_usd, bonus_usd, total_usd, exchange_rate,
+       biz_type, biz_group_id, biz_validity_days,
        provider, channel, payment_method, payment_url,
        status, paid_at, expire_at,
        promotion_tier, promotion_used,
@@ -390,6 +430,9 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 	var o service.PaymentOrder
 	var tradeNo sql.NullString
 	var username sql.NullString
+	var bizType sql.NullString
+	var bizGroupID sql.NullInt64
+	var bizValidityDays sql.NullInt64
 	var channel sql.NullString
 	var paymentMethod sql.NullString
 	var paymentURL sql.NullString
@@ -412,6 +455,9 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 		&o.BonusUSD,
 		&o.TotalUSD,
 		&o.ExchangeRate,
+		&bizType,
+		&bizGroupID,
+		&bizValidityDays,
 		&o.Provider,
 		&channel,
 		&paymentMethod,
@@ -436,6 +482,18 @@ func scanPaymentOrder(s sqlRowScanner) (*service.PaymentOrder, error) {
 		o.TradeNo = &v
 	}
 	o.Username = username.String
+	o.BizType = bizType.String
+	if o.BizType == "" {
+		o.BizType = service.PaymentBizTypeOnlineRecharge
+	}
+	if bizGroupID.Valid {
+		v := bizGroupID.Int64
+		o.BizGroupID = &v
+	}
+	if bizValidityDays.Valid {
+		v := int(bizValidityDays.Int64)
+		o.BizValidityDays = &v
+	}
 	o.Channel = channel.String
 	o.PaymentMethod = paymentMethod.String
 	o.PaymentURL = paymentURL.String

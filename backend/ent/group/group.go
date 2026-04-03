@@ -43,6 +43,10 @@ const (
 	FieldMonthlyLimitUsd = "monthly_limit_usd"
 	// FieldDefaultValidityDays holds the string denoting the default_validity_days field in the database.
 	FieldDefaultValidityDays = "default_validity_days"
+	// FieldUserPurchaseVisible holds the string denoting the user_purchase_visible field in the database.
+	FieldUserPurchaseVisible = "user_purchase_visible"
+	// FieldUserPurchasePriceUsd holds the string denoting the user_purchase_price_usd field in the database.
+	FieldUserPurchasePriceUsd = "user_purchase_price_usd"
 	// FieldImagePrice1k holds the string denoting the image_price_1k field in the database.
 	FieldImagePrice1k = "image_price_1k"
 	// FieldImagePrice2k holds the string denoting the image_price_2k field in the database.
@@ -168,6 +172,8 @@ var Columns = []string{
 	FieldWeeklyLimitUsd,
 	FieldMonthlyLimitUsd,
 	FieldDefaultValidityDays,
+	FieldUserPurchaseVisible,
+	FieldUserPurchasePriceUsd,
 	FieldImagePrice1k,
 	FieldImagePrice2k,
 	FieldImagePrice4k,
@@ -241,6 +247,8 @@ var (
 	SubscriptionTypeValidator func(string) error
 	// DefaultDefaultValidityDays holds the default value on creation for the "default_validity_days" field.
 	DefaultDefaultValidityDays int
+	// DefaultUserPurchaseVisible holds the default value on creation for the "user_purchase_visible" field.
+	DefaultUserPurchaseVisible bool
 	// DefaultSoraStorageQuotaBytes holds the default value on creation for the "sora_storage_quota_bytes" field.
 	DefaultSoraStorageQuotaBytes int64
 	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
@@ -337,6 +345,16 @@ func ByMonthlyLimitUsd(opts ...sql.OrderTermOption) OrderOption {
 // ByDefaultValidityDays orders the results by the default_validity_days field.
 func ByDefaultValidityDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultValidityDays, opts...).ToFunc()
+}
+
+// ByUserPurchaseVisible orders the results by the user_purchase_visible field.
+func ByUserPurchaseVisible(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserPurchaseVisible, opts...).ToFunc()
+}
+
+// ByUserPurchasePriceUsd orders the results by the user_purchase_price_usd field.
+func ByUserPurchasePriceUsd(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUserPurchasePriceUsd, opts...).ToFunc()
 }
 
 // ByImagePrice1k orders the results by the image_price_1k field.

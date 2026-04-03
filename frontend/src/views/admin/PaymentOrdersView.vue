@@ -227,6 +227,7 @@ const items = ref<AdminPaymentOrder[]>([])
 const orderTypeOptions = computed(() => [
   { label: t('common.all'), value: '' },
   { label: t('payment.orderTypeOnline'), value: 'online_recharge' },
+  { label: t('payment.orderTypeSubscriptionPurchase'), value: 'subscription_purchase' },
   { label: t('payment.orderTypeAdmin'), value: 'admin_recharge' },
   { label: t('payment.orderTypeActivity'), value: 'activity_recharge' }
 ])
@@ -278,7 +279,7 @@ function channelLabel(channel: string): string {
 
 function shouldShowChannel(orderType?: string): boolean {
   const value = String(orderType || '').toLowerCase()
-  return value === '' || value === 'online_recharge'
+  return value === '' || value === 'online_recharge' || value === 'subscription_purchase'
 }
 
 function shouldShowPayAmount(orderType?: string): boolean {
@@ -287,6 +288,7 @@ function shouldShowPayAmount(orderType?: string): boolean {
 
 function orderTypeLabel(orderType?: string): string {
   const value = String(orderType || '').toLowerCase()
+  if (value === 'subscription_purchase') return t('payment.orderTypeSubscriptionPurchase')
   if (value === 'admin_recharge') return t('payment.orderTypeAdmin')
   if (value === 'activity_recharge') return t('payment.orderTypeActivity')
   return t('payment.orderTypeOnline')

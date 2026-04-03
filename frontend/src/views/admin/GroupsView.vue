@@ -144,6 +144,19 @@
                   t('admin.groups.subscription.noLimit')
                 }}</span>
               </div>
+              <div
+                v-if="row.subscription_type === 'subscription'"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
+                <template v-if="row.user_purchase_visible && row.user_purchase_price_usd">
+                  {{ t('admin.groups.subscription.userPurchaseVisible') }} ·
+                  ${{ Number(row.user_purchase_price_usd).toFixed(2) }} ·
+                  {{ t('admin.groups.subscription.validityDaysShort', { days: row.default_validity_days || 30 }) }}
+                </template>
+                <span v-else class="text-gray-400 dark:text-gray-500">
+                  {{ t('admin.groups.subscription.notVisibleToUsers') }}
+                </span>
+              </div>
             </div>
           </template>
 
@@ -394,6 +407,63 @@
             v-if="createForm.subscription_type === 'subscription'"
             class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
           >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label class="input-label">{{ t('admin.groups.subscription.defaultValidityDays') }}</label>
+                <input
+                  v-model.number="createForm.default_validity_days"
+                  type="number"
+                  min="1"
+                  max="36500"
+                  step="1"
+                  class="input"
+                />
+                <p class="input-hint">{{ t('admin.groups.subscription.validityHint') }}</p>
+              </div>
+              <div>
+                <div class="mb-1.5 flex items-center gap-1">
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.groups.subscription.userPurchaseVisible') }}
+                  </label>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    @click="createForm.user_purchase_visible = !createForm.user_purchase_visible"
+                    :class="[
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                      createForm.user_purchase_visible ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600'
+                    ]"
+                  >
+                    <span
+                      :class="[
+                        'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                        createForm.user_purchase_visible ? 'translate-x-6' : 'translate-x-1'
+                      ]"
+                    />
+                  </button>
+                  <span class="text-sm text-gray-500 dark:text-gray-400">
+                    {{
+                      createForm.user_purchase_visible
+                        ? t('admin.groups.subscription.visibleToUsers')
+                        : t('admin.groups.subscription.notVisibleToUsers')
+                    }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div v-if="createForm.user_purchase_visible">
+              <label class="input-label">{{ t('admin.groups.subscription.userPurchasePriceUSD') }}</label>
+              <input
+                v-model.number="createForm.user_purchase_price_usd"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input"
+                :placeholder="t('admin.groups.subscription.userPurchasePricePlaceholder')"
+              />
+              <p class="input-hint">{{ t('admin.groups.subscription.userPurchasePriceHint') }}</p>
+            </div>
             <div>
               <label class="input-label">{{ t('admin.groups.subscription.dailyLimit') }}</label>
               <input
@@ -1074,6 +1144,63 @@
             v-if="editForm.subscription_type === 'subscription'"
             class="space-y-4 border-l-2 border-primary-200 pl-4 dark:border-primary-800"
           >
+            <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <label class="input-label">{{ t('admin.groups.subscription.defaultValidityDays') }}</label>
+                <input
+                  v-model.number="editForm.default_validity_days"
+                  type="number"
+                  min="1"
+                  max="36500"
+                  step="1"
+                  class="input"
+                />
+                <p class="input-hint">{{ t('admin.groups.subscription.validityHint') }}</p>
+              </div>
+              <div>
+                <div class="mb-1.5 flex items-center gap-1">
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.groups.subscription.userPurchaseVisible') }}
+                  </label>
+                </div>
+                <div class="flex items-center gap-3">
+                  <button
+                    type="button"
+                    @click="editForm.user_purchase_visible = !editForm.user_purchase_visible"
+                    :class="[
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                      editForm.user_purchase_visible ? 'bg-primary-500' : 'bg-gray-300 dark:bg-dark-600'
+                    ]"
+                  >
+                    <span
+                      :class="[
+                        'inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform',
+                        editForm.user_purchase_visible ? 'translate-x-6' : 'translate-x-1'
+                      ]"
+                    />
+                  </button>
+                  <span class="text-sm text-gray-500 dark:text-gray-400">
+                    {{
+                      editForm.user_purchase_visible
+                        ? t('admin.groups.subscription.visibleToUsers')
+                        : t('admin.groups.subscription.notVisibleToUsers')
+                    }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div v-if="editForm.user_purchase_visible">
+              <label class="input-label">{{ t('admin.groups.subscription.userPurchasePriceUSD') }}</label>
+              <input
+                v-model.number="editForm.user_purchase_price_usd"
+                type="number"
+                step="0.01"
+                min="0"
+                class="input"
+                :placeholder="t('admin.groups.subscription.userPurchasePricePlaceholder')"
+              />
+              <p class="input-hint">{{ t('admin.groups.subscription.userPurchasePriceHint') }}</p>
+            </div>
             <div>
               <label class="input-label">{{ t('admin.groups.subscription.dailyLimit') }}</label>
               <input
@@ -1882,6 +2009,9 @@ const createForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  default_validity_days: 30,
+  user_purchase_visible: false,
+  user_purchase_price_usd: null as number | null,
   // 图片生成计费配置（仅 antigravity 平台使用）
   image_price_1k: null as number | null,
   image_price_2k: null as number | null,
@@ -2122,6 +2252,9 @@ const editForm = reactive({
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
   monthly_limit_usd: null as number | null,
+  default_validity_days: 30,
+  user_purchase_visible: false,
+  user_purchase_price_usd: null as number | null,
   // 图片生成计费配置（仅 antigravity 平台使用）
   image_price_1k: null as number | null,
   image_price_2k: null as number | null,
@@ -2222,6 +2355,9 @@ const closeCreateModal = () => {
   createForm.daily_limit_usd = null
   createForm.weekly_limit_usd = null
   createForm.monthly_limit_usd = null
+  createForm.default_validity_days = 30
+  createForm.user_purchase_visible = false
+  createForm.user_purchase_price_usd = null
   createForm.image_price_1k = null
   createForm.image_price_2k = null
   createForm.image_price_4k = null
@@ -2249,6 +2385,7 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createForm,
+      user_purchase_price_usd: createForm.user_purchase_visible ? createForm.user_purchase_price_usd : null,
       model_routing: convertRoutingRulesToApiFormat(createModelRoutingRules.value)
     }
     await adminAPI.groups.create(requestData)
@@ -2281,6 +2418,9 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.daily_limit_usd = group.daily_limit_usd
   editForm.weekly_limit_usd = group.weekly_limit_usd
   editForm.monthly_limit_usd = group.monthly_limit_usd
+  editForm.default_validity_days = group.default_validity_days || 30
+  editForm.user_purchase_visible = group.user_purchase_visible || false
+  editForm.user_purchase_price_usd = group.user_purchase_price_usd
   editForm.image_price_1k = group.image_price_1k
   editForm.image_price_2k = group.image_price_2k
   editForm.image_price_4k = group.image_price_4k
@@ -2323,6 +2463,7 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
+      user_purchase_price_usd: editForm.user_purchase_visible ? editForm.user_purchase_price_usd : null,
       fallback_group_id: editForm.fallback_group_id === null ? 0 : editForm.fallback_group_id,
       fallback_group_id_on_invalid_request:
         editForm.fallback_group_id_on_invalid_request === null
@@ -2371,7 +2512,27 @@ watch(
     if (newVal === 'subscription') {
       createForm.is_exclusive = true
       createForm.fallback_group_id_on_invalid_request = null
+      if (!createForm.default_validity_days || createForm.default_validity_days <= 0) {
+        createForm.default_validity_days = 30
+      }
+      return
     }
+    createForm.user_purchase_visible = false
+    createForm.user_purchase_price_usd = null
+  }
+)
+
+watch(
+  () => editForm.subscription_type,
+  (newVal) => {
+    if (newVal === 'subscription') {
+      if (!editForm.default_validity_days || editForm.default_validity_days <= 0) {
+        editForm.default_validity_days = 30
+      }
+      return
+    }
+    editForm.user_purchase_visible = false
+    editForm.user_purchase_price_usd = null
   }
 )
 

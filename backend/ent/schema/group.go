@@ -72,6 +72,14 @@ func (Group) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}),
 		field.Int("default_validity_days").
 			Default(30),
+		field.Bool("user_purchase_visible").
+			Default(false).
+			Comment("是否展示给用户作为可购买套餐（仅订阅分组）"),
+		field.Float("user_purchase_price_usd").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
+			Comment("用户侧套餐购买价格（USD），为空表示不可购买"),
 
 		// 图片生成计费配置（antigravity 和 gemini 平台使用）
 		field.Float("image_price_1k").

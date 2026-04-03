@@ -19,38 +19,45 @@ import (
 
 // CreatePaymentOrderRequest 定义创建订单请求
 type CreatePaymentOrderRequest struct {
-	UserID        int64
-	Username      string
-	AmountCNY     float64
-	Provider      string
-	Channel       string
-	PaymentMethod string
-	ClientIP      string
-	UserAgent     string
+	UserID          int64
+	Username        string
+	AmountCNY       float64
+	BizType         string
+	BizGroupID      *int64
+	BizValidityDays *int
+	Provider        string
+	Channel         string
+	PaymentMethod   string
+	ClientIP        string
+	UserAgent       string
 }
 
 // PaymentService 支付核心服务
 type PaymentService struct {
-	cfg              *config.PaymentConfig
-	orderRepo        PaymentOrderRepository
-	paymentCache     PaymentCache
-	balanceService   *BalanceService
-	bonusService     *BonusService
-	promotionService *PromotionService
-	referralService  *ReferralService
-	dingtalkService  *DingtalkService
-	entClient        *dbent.Client
+	cfg                 *config.PaymentConfig
+	orderRepo           PaymentOrderRepository
+	groupRepo           GroupRepository
+	paymentCache        PaymentCache
+	balanceService      *BalanceService
+	bonusService        *BonusService
+	promotionService    *PromotionService
+	referralService     *ReferralService
+	dingtalkService     *DingtalkService
+	subscriptionService *SubscriptionService
+	entClient           *dbent.Client
 }
 
 func NewPaymentService(
 	cfg *config.Config,
 	orderRepo PaymentOrderRepository,
+	groupRepo GroupRepository,
 	paymentCache PaymentCache,
 	balanceService *BalanceService,
 	bonusService *BonusService,
 	promotionService *PromotionService,
 	referralService *ReferralService,
 	dingtalkService *DingtalkService,
+	subscriptionService *SubscriptionService,
 	entClient *dbent.Client,
 ) *PaymentService {
 	var paymentCfg *config.PaymentConfig
@@ -58,15 +65,17 @@ func NewPaymentService(
 		paymentCfg = &cfg.Payment
 	}
 	return &PaymentService{
-		cfg:              paymentCfg,
-		orderRepo:        orderRepo,
-		paymentCache:     paymentCache,
-		balanceService:   balanceService,
-		bonusService:     bonusService,
-		promotionService: promotionService,
-		referralService:  referralService,
-		dingtalkService:  dingtalkService,
-		entClient:        entClient,
+		cfg:                 paymentCfg,
+		orderRepo:           orderRepo,
+		groupRepo:           groupRepo,
+		paymentCache:        paymentCache,
+		balanceService:      balanceService,
+		bonusService:        bonusService,
+		promotionService:    promotionService,
+		referralService:     referralService,
+		dingtalkService:     dingtalkService,
+		subscriptionService: subscriptionService,
+		entClient:           entClient,
 	}
 }
 
@@ -95,8 +104,18 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 		}
 	}
 
-	amountUSD := req.AmountCNY / s.cfg.ExchangeRate
+	bizType := normalizeCreateOrderBizType(req.BizType)
+	effectiveExchangeRate := s.cfg.ExchangeRate
+	if bizType == PaymentBizTypeSubscriptionPurchase {
+		// Subscription billing uses 1:1 display/pay mapping:
+		// displayed USD amount equals paid CNY amount (numeric).
+		effectiveExchangeRate = 1.0
+	}
+	amountUSD := req.AmountCNY / effectiveExchangeRate
 	discount := normalizedDiscountRate(s.cfg.DiscountRate)
+	if bizType == PaymentBizTypeSubscriptionPurchase {
+		discount = 1.0
+	}
 	creditsUSD := amountUSD
 	if discount > 0 && discount < 1 {
 		// amountUSD is the payable USD because AmountCNY is computed from:
@@ -104,21 +123,24 @@ func (s *PaymentService) CreateOrder(ctx context.Context, req *CreatePaymentOrde
 		creditsUSD = amountUSD / discount
 	}
 	order := &PaymentOrder{
-		OrderNo:       s.generateOrderNo(),
-		UserID:        req.UserID,
-		Username:      req.Username,
-		AmountCNY:     req.AmountCNY,
-		AmountUSD:     amountUSD,
-		TotalUSD:      creditsUSD,
-		ExchangeRate:  s.cfg.ExchangeRate,
-		DiscountRate:  discount,
-		Provider:      strings.ToLower(req.Provider),
-		Channel:       strings.ToLower(req.Channel),
-		PaymentMethod: req.PaymentMethod,
-		Status:        PaymentStatusPending,
-		ExpireAt:      time.Now().Add(time.Duration(s.cfg.OrderExpireMinutes) * time.Minute),
-		ClientIP:      req.ClientIP,
-		UserAgent:     req.UserAgent,
+		OrderNo:         s.generateOrderNo(),
+		UserID:          req.UserID,
+		Username:        req.Username,
+		AmountCNY:       req.AmountCNY,
+		AmountUSD:       amountUSD,
+		TotalUSD:        creditsUSD,
+		ExchangeRate:    effectiveExchangeRate,
+		DiscountRate:    discount,
+		BizType:         bizType,
+		BizGroupID:      req.BizGroupID,
+		BizValidityDays: req.BizValidityDays,
+		Provider:        strings.ToLower(req.Provider),
+		Channel:         strings.ToLower(req.Channel),
+		PaymentMethod:   req.PaymentMethod,
+		Status:          PaymentStatusPending,
+		ExpireAt:        time.Now().Add(time.Duration(s.cfg.OrderExpireMinutes) * time.Minute),
+		ClientIP:        req.ClientIP,
+		UserAgent:       req.UserAgent,
 	}
 
 	if err := s.orderRepo.Create(ctx, order); err != nil {
@@ -150,6 +172,19 @@ func (s *PaymentService) UpdateOrder(ctx context.Context, order *PaymentOrder) e
 type dingtalkNotification struct {
 	title string
 	text  string
+}
+
+type SubscriptionPurchasePlan struct {
+	GroupID               int64
+	GroupName             string
+	Description           string
+	Platform              string
+	PriceUSD              float64
+	ValidityDays          int
+	DailyLimitUSD         *float64
+	WeeklyLimitUSD        *float64
+	MonthlyLimitUSD       *float64
+	HasActiveSubscription bool
 }
 
 func (s *PaymentService) runInTx(ctx context.Context, fn func(txCtx context.Context) (*PaymentOrder, []dingtalkNotification, error)) (*PaymentOrder, error) {
@@ -293,6 +328,77 @@ func (s *PaymentService) SummaryOrders(ctx context.Context, filter PaymentOrderF
 	return s.orderRepo.Summary(ctx, filter)
 }
 
+func (s *PaymentService) GetSubscriptionPlans(ctx context.Context, userID int64) ([]SubscriptionPurchasePlan, error) {
+	if s == nil || s.groupRepo == nil {
+		return []SubscriptionPurchasePlan{}, nil
+	}
+
+	groups, err := s.groupRepo.ListActive(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	owned := make(map[int64]struct{})
+	if userID > 0 && s.subscriptionService != nil {
+		subs, subErr := s.subscriptionService.ListActiveUserSubscriptions(ctx, userID)
+		if subErr == nil {
+			for i := range subs {
+				owned[subs[i].GroupID] = struct{}{}
+			}
+		}
+	}
+
+	plans := make([]SubscriptionPurchasePlan, 0, len(groups))
+	for i := range groups {
+		g := groups[i]
+		if g.SubscriptionType != SubscriptionTypeSubscription {
+			continue
+		}
+		if !g.UserPurchaseVisible {
+			continue
+		}
+		if g.UserPurchasePriceUSD == nil || *g.UserPurchasePriceUSD <= 0 {
+			continue
+		}
+		validityDays := g.DefaultValidityDays
+		if validityDays <= 0 {
+			validityDays = 30
+		}
+		_, hasActive := owned[g.ID]
+		plans = append(plans, SubscriptionPurchasePlan{
+			GroupID:               g.ID,
+			GroupName:             g.Name,
+			Description:           g.Description,
+			Platform:              g.Platform,
+			PriceUSD:              *g.UserPurchasePriceUSD,
+			ValidityDays:          validityDays,
+			DailyLimitUSD:         g.DailyLimitUSD,
+			WeeklyLimitUSD:        g.WeeklyLimitUSD,
+			MonthlyLimitUSD:       g.MonthlyLimitUSD,
+			HasActiveSubscription: hasActive,
+		})
+	}
+
+	return plans, nil
+}
+
+func (s *PaymentService) GetSubscriptionPlanByGroupID(ctx context.Context, userID, groupID int64) (*SubscriptionPurchasePlan, error) {
+	if groupID <= 0 {
+		return nil, infraerrors.BadRequest("SUBSCRIPTION_PLAN_INVALID_GROUP", "subscription group id is invalid")
+	}
+	plans, err := s.GetSubscriptionPlans(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	for i := range plans {
+		if plans[i].GroupID == groupID {
+			plan := plans[i]
+			return &plan, nil
+		}
+	}
+	return nil, infraerrors.NotFound("SUBSCRIPTION_PLAN_NOT_FOUND", "subscription plan not found")
+}
+
 // MarkOrderPaid 处理支付成功逻辑
 func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo string, callbackPayload any) (*PaymentOrder, error) {
 	log.Printf("[Payment Service] MarkOrderPaid called: order_no=%s, trade_no=%s", orderNo, tradeNo)
@@ -325,6 +431,44 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 		order.TradeNo = &tradeNo
 		order.CallbackData = callbackData
 		order.CallbackAt = now
+
+		if order.IsSubscriptionPurchase() {
+			if order.BizGroupID == nil || *order.BizGroupID <= 0 {
+				return nil, nil, fmt.Errorf("subscription purchase order missing biz_group_id")
+			}
+			if s.subscriptionService == nil {
+				return nil, nil, fmt.Errorf("subscription service unavailable")
+			}
+			validityDays := 30
+			if order.BizValidityDays != nil && *order.BizValidityDays > 0 {
+				validityDays = *order.BizValidityDays
+			}
+			_, extended, err := s.subscriptionService.AssignOrExtendSubscription(txCtx, &AssignSubscriptionInput{
+				UserID:       order.UserID,
+				GroupID:      *order.BizGroupID,
+				ValidityDays: validityDays,
+				Notes:        fmt.Sprintf("payment order %s", order.OrderNo),
+			})
+			if err != nil {
+				return nil, nil, fmt.Errorf("assign subscription: %w", err)
+			}
+			if err := s.orderRepo.Update(txCtx, order); err != nil {
+				return nil, nil, fmt.Errorf("update order: %w", err)
+			}
+
+			action := "assigned"
+			if extended {
+				action = "extended"
+			}
+			log.Printf("[Payment Service] Subscription purchase completed: order_no=%s, user_id=%d, group_id=%d, validity_days=%d, action=%s",
+				order.OrderNo, order.UserID, *order.BizGroupID, validityDays, action)
+			notifications = append(notifications, dingtalkNotification{
+				title: "Subscription Purchased",
+				text: fmt.Sprintf("**Order**: %s\n\n**Group ID**: %d\n\n**Amount(CNY)**: %.2f\n\n**Validity Days**: %d\n\n**Action**: %s",
+					order.OrderNo, *order.BizGroupID, order.AmountCNY, validityDays, action),
+			})
+			return order, notifications, nil
+		}
 
 		// 使用BonusService处理赠送逻辑
 		log.Printf("[Payment Service] Checking bonusService availability: bonusService_is_nil=%v", s.bonusService == nil)
@@ -477,6 +621,7 @@ func (s *PaymentService) createActivityRechargeOrder(ctx context.Context, userID
 		TotalUSD:      amountUSD,
 		ExchangeRate:  exchangeRate,
 		DiscountRate:  1.0,
+		BizType:       PaymentBizTypeOnlineRecharge,
 		Provider:      "activity",
 		PaymentMethod: "admin",
 		Status:        PaymentStatusPaid,
@@ -548,4 +693,14 @@ func normalizedDiscountRate(discountRate float64) float64 {
 		return 1.0
 	}
 	return discountRate
+}
+
+func normalizeCreateOrderBizType(raw string) string {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	switch v {
+	case PaymentBizTypeSubscriptionPurchase:
+		return PaymentBizTypeSubscriptionPurchase
+	default:
+		return PaymentBizTypeOnlineRecharge
+	}
 }

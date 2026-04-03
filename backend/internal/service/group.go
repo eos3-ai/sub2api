@@ -15,11 +15,13 @@ type Group struct {
 	Status         string
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
-	SubscriptionType    string
-	DailyLimitUSD       *float64
-	WeeklyLimitUSD      *float64
-	MonthlyLimitUSD     *float64
-	DefaultValidityDays int
+	SubscriptionType     string
+	DailyLimitUSD        *float64
+	WeeklyLimitUSD       *float64
+	MonthlyLimitUSD      *float64
+	DefaultValidityDays  int
+	UserPurchaseVisible  bool
+	UserPurchasePriceUSD *float64
 
 	// 图片生成计费配置（antigravity 和 gemini 平台使用）
 	ImagePrice1K *float64

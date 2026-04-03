@@ -5,167 +5,235 @@
 
       <!-- Plans -->
       <div id="recharge-plans" class="card animate-fade-in-up p-6 stagger-1">
-        <div class="mb-6 rounded-2xl bg-primary-600 px-6 py-4 text-white">
-          <div class="flex items-center gap-3">
-            <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15">
-              <span class="text-lg font-bold">$</span>
-            </div>
-            <div class="text-lg font-semibold">{{ t('payment.onlineRecharge') }}</div>
-          </div>
-        </div>
-
-        <div v-if="loadingPlans" class="flex items-center justify-center py-10">
+        <div v-if="loadingPlans || loadingSubscriptionPlans" class="flex items-center justify-center py-10">
           <LoadingSpinner />
         </div>
 
         <template v-else>
-          <div
-            v-if="plansUnavailable"
-            class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-200"
-          >
-            <p class="text-sm font-medium">{{ t('payment.apiNotEnabledTitle') }}</p>
-            <p class="mt-1 text-xs opacity-90">
-              {{ t('payment.apiNotEnabledDesc') }}
-            </p>
-          </div>
-
-          <div v-else-if="plans.length === 0" class="py-10 text-center text-sm text-gray-500 dark:text-dark-400">
-            {{ t('payment.noPlans') }}
-          </div>
-
-          <div v-else class="space-y-4">
-            <div class="space-y-3">
-              <div class="text-sm font-semibold text-gray-900 dark:text-white">
-                {{ t('payment.quickSelectAmount') }}
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="space-y-4">
+              <div class="rounded-2xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white">
+                {{ t('payment.usageBasedBilling') }}
               </div>
 
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <button
-                v-for="plan in plans"
-                :key="plan.id"
-                type="button"
-                class="relative rounded-2xl border p-6 text-left shadow-sm transition hover:shadow-md"
-                :class="
-                  selectedKind === 'plan' && selectedPlan?.id === plan.id
-                    ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:border-primary-400 dark:bg-primary-900/10 dark:ring-primary-400/20'
-                    : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800'
-                "
-                @click="selectPlan(plan, true)"
+              <div
+                v-if="plansUnavailable"
+                class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-200"
               >
-                <span
-                  v-if="selectedKind === 'plan' && selectedPlan?.id === plan.id"
-                  class="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white shadow-sm"
-                  aria-label="selected"
-                >
-                  ✓
-                </span>
+                <p class="text-sm font-medium">{{ t('payment.apiNotEnabledTitle') }}</p>
+                <p class="mt-1 text-xs opacity-90">{{ t('payment.apiNotEnabledDesc') }}</p>
+              </div>
 
-                <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ formatUSDCompact(plan.amount_usd) }}</p>
-                <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-                  {{ t('payment.estimatedPay') }} ¥{{ estimatePayCNY(plan.amount_usd, plan.exchange_rate, plan.discount_rate).toFixed(2) }}
-                </p>
-              </button>
-
-              <button
-                type="button"
-                class="relative rounded-2xl border p-6 text-left shadow-sm transition hover:shadow-md"
-                :class="
-                  selectedKind === 'custom'
-                    ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:border-primary-400 dark:bg-primary-900/10 dark:ring-primary-400/20'
-                    : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800'
-                "
-                @click="selectCustom(true)"
+              <div
+                v-else-if="plans.length === 0"
+                class="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900/30 dark:text-dark-400"
               >
-                <span
-                  v-if="selectedKind === 'custom'"
-                  class="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white shadow-sm"
-                  aria-label="selected"
-                >
-                  ✓
-                </span>
+                {{ t('payment.noPlans') }}
+              </div>
 
-                <p class="text-3xl font-bold text-gray-900 dark:text-white">
-                  {{ customAmountUSD > 0 ? formatUSDCompact(customAmountUSD) : t('payment.other') }}
-                </p>
-                <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
-                  {{ t('payment.customAmountSubtitle') }}
-                </p>
-              </button>
+              <div v-else class="space-y-3">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('payment.quickSelectAmount') }}
+                </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <button
+                    v-for="plan in plans"
+                    :key="plan.id"
+                    type="button"
+                    class="relative rounded-2xl border p-6 text-left shadow-sm transition hover:shadow-md"
+                    :class="
+                      selectedKind === 'plan' && selectedPlan?.id === plan.id
+                        ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:border-primary-400 dark:bg-primary-900/10 dark:ring-primary-400/20'
+                        : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800'
+                    "
+                    @click="selectPlan(plan, true)"
+                  >
+                    <span
+                      v-if="selectedKind === 'plan' && selectedPlan?.id === plan.id"
+                      class="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white shadow-sm"
+                      aria-label="selected"
+                    >
+                      ✓
+                    </span>
+
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white">{{ formatUSDCompact(plan.amount_usd) }}</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+                      {{ t('payment.estimatedPay') }}
+                      ¥{{ estimatePayCNY(plan.amount_usd, plan.exchange_rate, plan.discount_rate).toFixed(2) }}
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    class="relative rounded-2xl border p-6 text-left shadow-sm transition hover:shadow-md"
+                    :class="
+                      selectedKind === 'custom'
+                        ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-500/20 dark:border-primary-400 dark:bg-primary-900/10 dark:ring-primary-400/20'
+                        : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800'
+                    "
+                    @click="selectCustom(true)"
+                  >
+                    <span
+                      v-if="selectedKind === 'custom'"
+                      class="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white shadow-sm"
+                      aria-label="selected"
+                    >
+                      ✓
+                    </span>
+
+                    <p class="text-3xl font-bold text-gray-900 dark:text-white">
+                      {{ customAmountUSD > 0 ? formatUSDCompact(customAmountUSD) : t('payment.other') }}
+                    </p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+                      {{ t('payment.customAmountSubtitle') }}
+                    </p>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="space-y-3 pt-2">
-              <div class="text-sm font-semibold text-gray-900 dark:text-white">
-                {{ t('payment.choosePayMethod') }}
+            <div class="space-y-4">
+              <div class="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white">
+                {{ t('payment.subscriptionBilling') }}
               </div>
-              <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <button
-                  v-if="availablePayMethods.includes('alipay')"
-                  type="button"
-                  class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
-                  :class="
-                    payMethod === 'alipay'
-                      ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
-                      : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
-                  "
-                  @click="payMethod = 'alipay'"
-                >
-                  <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
-                    <svg viewBox="0 0 24 24" class="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.4 6.1l-2.2 7.7h-1.8l-.9-2.7H8.8l-.9 2.7H6.1l2.7-7.7h1.8l.7 2.2h2.4l.7-2.2h1.8zM9.3 11.1h2.4l-1.2-3.5-1.2 3.5z"
-                      />
-                    </svg>
-                  </span>
-                  <span>{{ t('payment.alipay') }}</span>
-                </button>
 
-                <button
-                  v-if="availablePayMethods.includes('wechat')"
-                  type="button"
-                  class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
-                  :class="
-                    payMethod === 'wechat'
-                      ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
-                      : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
-                  "
-                  @click="payMethod = 'wechat'"
-                >
-                  <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
-                    <svg viewBox="0 0 24 24" class="h-6 w-6 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
-                      <path
-                        fill="currentColor"
-                        d="M8.2 4.8C4.8 4.8 2 7.1 2 10c0 1.7.9 3.2 2.3 4.2L3.6 16c-.1.2 0 .4.2.5.1.1.3.1.4 0l2-1.2c.6.2 1.3.3 2 .3 3.4 0 6.2-2.3 6.2-5.2S11.6 4.8 8.2 4.8zm-2 4.7c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zm4 0c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zM21.9 13.3c0-2.4-2.4-4.3-5.4-4.3-3 0-5.4 1.9-5.4 4.3s2.4 4.3 5.4 4.3c.5 0 1-.1 1.5-.2l1.6.9c.2.1.4.1.6-.1.1-.1.1-.3.1-.4l-.5-1.3c1.1-.8 1.9-1.9 1.9-3.2zm-7.4.3c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8zm3.5 0c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8z"
-                      />
-                    </svg>
-                  </span>
-                  <span>{{ t('payment.wechat') }}</span>
-                </button>
+              <div
+                v-if="subscriptionPlansUnavailable"
+                class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/30 dark:bg-amber-900/10 dark:text-amber-200"
+              >
+                <p class="text-sm font-medium">{{ t('payment.subscriptionApiNotEnabledTitle') }}</p>
+                <p class="mt-1 text-xs opacity-90">{{ t('payment.subscriptionApiNotEnabledDesc') }}</p>
               </div>
-              <p v-if="availablePayMethods.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
-                {{ t('payment.noPayMethodEnabled') }}
-              </p>
 
-              <div class="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="text-sm text-gray-700 dark:text-dark-200">
-                  <span class="font-medium">{{ t('payment.payAmountLabel') }}：</span>
-                  <span class="font-semibold">
-                    {{ formatUSD2(selectedAmountUSD) }}
-                  </span>
-                  <span class="text-gray-500 dark:text-dark-400">
-                    ({{ t('payment.estimatedPay') }} ¥{{ computedPayCNY.toFixed(2) }})
-                  </span>
+              <div
+                v-else-if="subscriptionPlans.length === 0"
+                class="rounded-xl border border-gray-200 bg-gray-50 p-6 text-center text-sm text-gray-500 dark:border-dark-700 dark:bg-dark-900/30 dark:text-dark-400"
+              >
+                {{ t('payment.noSubscriptionPlans') }}
+              </div>
+
+              <div v-else class="space-y-3">
+                <div class="text-sm font-semibold text-gray-900 dark:text-white">
+                  {{ t('payment.selectSubscriptionPlan') }}
                 </div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <button
+                    v-for="plan in subscriptionPlans"
+                    :key="plan.group_id"
+                    type="button"
+                    class="relative rounded-2xl border p-5 text-left shadow-sm transition hover:shadow-md"
+                    :class="
+                      selectedKind === 'subscription' && selectedSubscriptionPlan?.group_id === plan.group_id
+                        ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-900/10 dark:ring-emerald-400/20'
+                        : 'border-gray-200 bg-white dark:border-dark-700 dark:bg-dark-800'
+                    "
+                    @click="selectSubscriptionPlan(plan, true)"
+                  >
+                    <span
+                      v-if="selectedKind === 'subscription' && selectedSubscriptionPlan?.group_id === plan.group_id"
+                      class="absolute right-4 top-4 inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white shadow-sm"
+                      aria-label="selected"
+                    >
+                      ✓
+                    </span>
+                    <span
+                      v-if="plan.has_active_subscription"
+                      class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    >
+                      {{ t('payment.subscriptionOwned') }}
+                    </span>
 
-                <button
-                  class="inline-flex items-center justify-center rounded-2xl bg-primary-600 px-10 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
-                  :disabled="creatingOrder || !canPayNow"
-                  @click="payNow"
-                >
-                  {{ creatingOrder ? t('common.loading') : t('payment.rechargeNow') }}
-                </button>
+                    <p class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ plan.group_name }}</p>
+                    <p class="mt-1 line-clamp-2 text-xs text-gray-500 dark:text-dark-400">
+                      {{ plan.description || t('payment.subscriptionNoDescription') }}
+                    </p>
+                    <p class="mt-3 text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                      {{ formatUSD2(plan.price_usd) }}
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-dark-400">
+                      {{ t('payment.subscriptionValidityDays', { days: plan.validity_days }) }}
+                    </p>
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 border-t border-gray-100 pt-5 dark:border-dark-700">
+            <div class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t('payment.choosePayMethod') }}
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <button
+                v-if="availablePayMethods.includes('alipay')"
+                type="button"
+                class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
+                :class="
+                  payMethod === 'alipay'
+                    ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
+                    : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
+                "
+                @click="payMethod = 'alipay'"
+              >
+                <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
+                  <svg viewBox="0 0 24 24" class="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.4 6.1l-2.2 7.7h-1.8l-.9-2.7H8.8l-.9 2.7H6.1l2.7-7.7h1.8l.7 2.2h2.4l.7-2.2h1.8zM9.3 11.1h2.4l-1.2-3.5-1.2 3.5z"
+                    />
+                  </svg>
+                </span>
+                <span>{{ t('payment.alipay') }}</span>
+              </button>
+
+              <button
+                v-if="availablePayMethods.includes('wechat')"
+                type="button"
+                class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
+                :class="
+                  payMethod === 'wechat'
+                    ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
+                    : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
+                "
+                @click="payMethod = 'wechat'"
+              >
+                <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
+                  <svg viewBox="0 0 24 24" class="h-6 w-6 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+                    <path
+                      fill="currentColor"
+                      d="M8.2 4.8C4.8 4.8 2 7.1 2 10c0 1.7.9 3.2 2.3 4.2L3.6 16c-.1.2 0 .4.2.5.1.1.3.1.4 0l2-1.2c.6.2 1.3.3 2 .3 3.4 0 6.2-2.3 6.2-5.2S11.6 4.8 8.2 4.8zm-2 4.7c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zm4 0c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zM21.9 13.3c0-2.4-2.4-4.3-5.4-4.3-3 0-5.4 1.9-5.4 4.3s2.4 4.3 5.4 4.3c.5 0 1-.1 1.5-.2l1.6.9c.2.1.4.1.6-.1.1-.1.1-.3.1-.4l-.5-1.3c1.1-.8 1.9-1.9 1.9-3.2zm-7.4.3c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8zm3.5 0c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8z"
+                    />
+                  </svg>
+                </span>
+                <span>{{ t('payment.wechat') }}</span>
+              </button>
+            </div>
+            <p v-if="availablePayMethods.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
+              {{ t('payment.noPayMethodEnabled') }}
+            </p>
+
+            <div class="flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
+              <div class="text-sm text-gray-700 dark:text-dark-200">
+                <span class="font-medium">{{ t('payment.payAmountLabel') }}：</span>
+                <span class="font-semibold">{{ formatUSD2(selectedAmountUSD) }}</span>
+                <span class="text-gray-500 dark:text-dark-400">
+                  ({{ t('payment.estimatedPay') }} ¥{{ computedPayCNY.toFixed(2) }})
+                </span>
+              </div>
+
+              <button
+                class="inline-flex items-center justify-center rounded-2xl bg-primary-600 px-10 py-4 text-base font-semibold text-white shadow-sm transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-60"
+                :disabled="creatingOrder || !canPayNow"
+                @click="payNow"
+              >
+                {{
+                  creatingOrder
+                    ? t('common.loading')
+                    : selectedKind === 'subscription'
+                      ? t('payment.purchaseNow')
+                      : t('payment.rechargeNow')
+                }}
+              </button>
             </div>
           </div>
         </template>
@@ -322,6 +390,41 @@
               </p>
             </div>
 
+            <div
+              v-if="selectedKind === 'subscription' && selectedSubscriptionPlan"
+              class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900/40 dark:bg-emerald-900/10"
+            >
+              <p class="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                {{ t('payment.subscriptionLimitsTitle') }}
+              </p>
+              <p class="mt-1 text-xs text-emerald-700/90 dark:text-emerald-300/90">
+                {{ t('payment.subscriptionLimitsDesc') }}
+              </p>
+              <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div class="rounded-xl bg-white/90 p-3 dark:bg-dark-800/80">
+                  <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('payment.subscriptionLimitDaily') }}</p>
+                  <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ formatSubscriptionLimit(selectedSubscriptionPlan.daily_limit_usd) }}
+                  </p>
+                </div>
+                <div class="rounded-xl bg-white/90 p-3 dark:bg-dark-800/80">
+                  <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('payment.subscriptionLimitWeekly') }}</p>
+                  <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ formatSubscriptionLimit(selectedSubscriptionPlan.weekly_limit_usd) }}
+                  </p>
+                </div>
+                <div class="rounded-xl bg-white/90 p-3 dark:bg-dark-800/80">
+                  <p class="text-xs text-gray-500 dark:text-dark-400">{{ t('payment.subscriptionLimitMonthly') }}</p>
+                  <p class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">
+                    {{ formatSubscriptionLimit(selectedSubscriptionPlan.monthly_limit_usd) }}
+                  </p>
+                </div>
+              </div>
+              <p class="mt-3 text-xs leading-relaxed text-gray-600 dark:text-dark-300">
+                {{ t('payment.subscriptionLimitsExplain') }}
+              </p>
+            </div>
+
             <div class="mt-5 space-y-3">
               <div class="flex items-center justify-between text-sm text-gray-700 dark:text-dark-200">
                 <span>{{ t('payment.exchangeRate') }}</span>
@@ -436,7 +539,13 @@ import Modal from '@/components/common/Modal.vue'
 import Icon from '@/components/icons/Icon.vue'
 import InvoiceRequestModal from '@/components/user/InvoiceRequestModal.vue'
 import { useAppStore } from '@/stores'
-import { paymentAPI, type PaymentOrder, type PaymentPayMethod, type PaymentPlan } from '@/api/payment'
+import {
+  paymentAPI,
+  type PaymentOrder,
+  type PaymentPayMethod,
+  type PaymentPlan,
+  type PaymentSubscriptionPlan
+} from '@/api/payment'
 import { formatDateTime } from '@/utils/format'
 import QRCode from 'qrcode'
 
@@ -446,13 +555,17 @@ const appStore = useAppStore()
 const loadingPlans = ref(false)
 const plansUnavailable = ref(false)
 const plans = ref<PaymentPlan[]>([])
+const loadingSubscriptionPlans = ref(false)
+const subscriptionPlansUnavailable = ref(false)
+const subscriptionPlans = ref<PaymentSubscriptionPlan[]>([])
 
 const loadingOrders = ref(false)
 const ordersUnavailable = ref(false)
 const orders = ref<PaymentOrder[]>([])
 
-const selectedKind = ref<'plan' | 'custom' | null>(null)
+const selectedKind = ref<'plan' | 'custom' | 'subscription' | null>(null)
 const selectedPlan = ref<PaymentPlan | null>(null)
+const selectedSubscriptionPlan = ref<PaymentSubscriptionPlan | null>(null)
 const customAmountUSDInput = ref('')
 const payMethod = ref<PaymentPayMethod | ''>('alipay')
 const creatingOrder = ref(false)
@@ -469,11 +582,13 @@ let pollTimer: number | null = null
 const invoiceOpen = ref(false)
 
 const exchangeRate = computed(() => {
-  const rate = selectedPlan.value?.exchange_rate ?? plans.value[0]?.exchange_rate
+  const rate =
+    selectedSubscriptionPlan.value?.exchange_rate ?? selectedPlan.value?.exchange_rate ?? plans.value[0]?.exchange_rate
   return typeof rate === 'number' && rate > 0 ? rate : 7.2
 })
 
 const discountRate = computed(() => {
+  if (selectedKind.value === 'subscription') return 1
   const rate = selectedPlan.value?.discount_rate ?? plans.value[0]?.discount_rate
   return typeof rate === 'number' && rate > 0 && rate <= 1 ? rate : 1
 })
@@ -485,14 +600,18 @@ const customAmountUSD = computed(() => {
 
 const availablePayMethods = computed<PaymentPayMethod[]>(() => {
   const legacyDefaults: PaymentPayMethod[] = ['alipay', 'wechat']
-  if (plans.value.length === 0) return legacyDefaults
+  const allChannelConfigs = [
+    ...plans.value.map((plan) => plan.available_channels),
+    ...subscriptionPlans.value.map((plan) => plan.available_channels)
+  ]
+  if (allChannelConfigs.length === 0) return legacyDefaults
 
-  const hasExplicitChannels = plans.value.some((plan) => Array.isArray(plan.available_channels))
+  const hasExplicitChannels = allChannelConfigs.some((channels) => Array.isArray(channels))
   if (!hasExplicitChannels) return legacyDefaults
 
   const enabled = new Set<PaymentPayMethod>()
-  for (const plan of plans.value) {
-    for (const channel of plan.available_channels || []) {
+  for (const channels of allChannelConfigs) {
+    for (const channel of channels || []) {
       if (channel === 'alipay' || channel === 'wechat') {
         enabled.add(channel)
       }
@@ -502,6 +621,7 @@ const availablePayMethods = computed<PaymentPayMethod[]>(() => {
 })
 
 const selectedAmountUSD = computed(() => {
+  if (selectedKind.value === 'subscription') return selectedSubscriptionPlan.value?.price_usd ?? 0
   if (selectedKind.value === 'custom') return customAmountUSD.value
   return selectedPlan.value?.amount_usd ?? 0
 })
@@ -515,16 +635,26 @@ const computedPayUSD = computed(() => {
 })
 
 const computedPayCNY = computed(() => {
+  if (selectedKind.value === 'subscription') {
+    // 套餐计费：显示多少 USD，实付多少 CNY（数值一致）。
+    return selectedAmountUSD.value > 0 ? selectedAmountUSD.value : 0
+  }
   const payUSD = computedPayUSD.value
   return payUSD > 0 ? payUSD * exchangeRate.value : 0
 })
 
 const formulaText = computed(() => {
   const usd = selectedAmountUSD.value
+  const cny = computedPayCNY.value
+  if (!(usd > 0)) return '$0.00 = ¥0.00'
+
+  if (selectedKind.value === 'subscription') {
+    return `${formatUSD2(usd)} = ¥${cny.toFixed(2)}`
+  }
+
   const rate = exchangeRate.value
   const discount = discountRate.value
-  const cny = computedPayCNY.value
-  if (!(usd > 0) || !(rate > 0)) return '$0.00 × 0.00 × 0.0000 = ¥0.00'
+  if (!(rate > 0)) return '$0.00 × 0.00 × 0.0000 = ¥0.00'
   const usdText = formatUSD2(usd)
   const rateText = rate.toFixed(2)
   const discountText = discount.toFixed(4)
@@ -535,6 +665,7 @@ const formulaText = computed(() => {
 const canPayNow = computed(() => {
   if (!selectedKind.value) return false
   if (selectedKind.value === 'plan' && !selectedPlan.value) return false
+  if (selectedKind.value === 'subscription' && !selectedSubscriptionPlan.value) return false
   if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) return false
   if (!payMethod.value) return false
   return true
@@ -565,6 +696,13 @@ function formatUSD2(amount: number): string {
   return `$${amount.toFixed(2)}`
 }
 
+function formatSubscriptionLimit(limit?: number | null): string {
+  if (typeof limit === 'number' && Number.isFinite(limit) && limit > 0) {
+    return `$${limit.toFixed(2)}`
+  }
+  return t('payment.subscriptionLimitUnlimited')
+}
+
 function estimatePayCNY(usd: number, rate?: number, discount?: number): number {
   const resolvedRate = typeof rate === 'number' && rate > 0 ? rate : exchangeRate.value
   const resolvedDiscount = typeof discount === 'number' && discount > 0 && discount <= 1 ? discount : discountRate.value
@@ -591,15 +729,41 @@ async function loadPlans() {
   }
 }
 
+async function loadSubscriptionPlans() {
+  loadingSubscriptionPlans.value = true
+  try {
+    subscriptionPlansUnavailable.value = false
+    subscriptionPlans.value = await paymentAPI.getSubscriptionPlans()
+  } catch (error) {
+    if (isNotFoundError(error)) {
+      subscriptionPlansUnavailable.value = true
+      subscriptionPlans.value = []
+      return
+    }
+    appStore.showError(paymentErrorMessage(error))
+  } finally {
+    loadingSubscriptionPlans.value = false
+  }
+}
+
 function selectPlan(plan: PaymentPlan, openModal: boolean) {
   selectedKind.value = 'plan'
   selectedPlan.value = plan
+  selectedSubscriptionPlan.value = null
   if (openModal) checkoutOpen.value = true
 }
 
 function selectCustom(openModal: boolean) {
   selectedKind.value = 'custom'
   selectedPlan.value = null
+  selectedSubscriptionPlan.value = null
+  if (openModal) checkoutOpen.value = true
+}
+
+function selectSubscriptionPlan(plan: PaymentSubscriptionPlan, openModal = true) {
+  selectedKind.value = 'subscription'
+  selectedPlan.value = null
+  selectedSubscriptionPlan.value = plan
   if (openModal) checkoutOpen.value = true
 }
 
@@ -718,6 +882,10 @@ async function payNow() {
     appStore.showWarning(t('payment.invalidAmount'))
     return
   }
+  if (selectedKind.value === 'subscription' && !selectedSubscriptionPlan.value) {
+    appStore.showWarning(t('payment.selectSubscriptionPlan'))
+    return
+  }
   if (selectedKind.value === 'plan' && !selectedPlan.value) {
     appStore.showWarning(t('payment.selectAmount'))
     return
@@ -726,16 +894,27 @@ async function payNow() {
   try {
     creatingOrder.value = true
     appStore.showInfo(t('payment.creatingOrder'))
-    const resp =
-      selectedKind.value === 'custom'
-        ? await paymentAPI.createPaymentOrder({
-            amount_usd: customAmountUSD.value,
-            channel: payMethod.value as PaymentPayMethod
-          })
-        : await paymentAPI.createPaymentOrder({
-            plan_id: selectedPlan.value!.id,
-            channel: payMethod.value as PaymentPayMethod
-          })
+    let resp: {
+      order: PaymentOrder
+      pay_url?: string
+      qr_url?: string
+    }
+    if (selectedKind.value === 'custom') {
+      resp = await paymentAPI.createPaymentOrder({
+        amount_usd: customAmountUSD.value,
+        channel: payMethod.value as PaymentPayMethod
+      })
+    } else if (selectedKind.value === 'subscription') {
+      resp = await paymentAPI.createPaymentOrder({
+        subscription_group_id: selectedSubscriptionPlan.value!.group_id,
+        channel: payMethod.value as PaymentPayMethod
+      })
+    } else {
+      resp = await paymentAPI.createPaymentOrder({
+        plan_id: selectedPlan.value!.id,
+        channel: payMethod.value as PaymentPayMethod
+      })
+    }
     appStore.showSuccess(t('payment.orderCreated') + ` (${resp.order.order_no})`)
     await loadOrders()
     closeCheckout()
@@ -800,7 +979,7 @@ function channelLabel(channel: string): string {
 
 function shouldShowChannel(orderType?: string): boolean {
   const value = String(orderType || '').toLowerCase()
-  return value === '' || value === 'online_recharge'
+  return value === '' || value === 'online_recharge' || value === 'subscription_purchase'
 }
 
 function shouldShowPayAmount(orderType?: string): boolean {
@@ -809,6 +988,7 @@ function shouldShowPayAmount(orderType?: string): boolean {
 
 function orderTypeLabel(orderType?: string): string {
   const value = String(orderType || '').toLowerCase()
+  if (value === 'subscription_purchase') return t('payment.orderTypeSubscriptionPurchase')
   if (value === 'admin_recharge') return t('payment.orderTypeAdmin')
   if (value === 'activity_recharge') return t('payment.orderTypeActivity')
   return t('payment.orderTypeOnline')
@@ -855,6 +1035,7 @@ async function copyOrderNo(orderNo: string) {
 
 onMounted(() => {
   loadPlans()
+  loadSubscriptionPlans()
   loadOrders()
 })
 

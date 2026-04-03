@@ -41,9 +41,10 @@ func NewPaymentHandler(
 }
 
 type createPaymentOrderRequest struct {
-	PlanID    string   `json:"plan_id"`
-	AmountUSD *float64 `json:"amount_usd,omitempty"`
-	Channel   string   `json:"channel" binding:"required,oneof=zpay stripe alipay wechat"`
+	PlanID              string   `json:"plan_id"`
+	AmountUSD           *float64 `json:"amount_usd,omitempty"`
+	SubscriptionGroupID *int64   `json:"subscription_group_id,omitempty"`
+	Channel             string   `json:"channel" binding:"required,oneof=zpay stripe alipay wechat"`
 }
 
 // GetPlans returns configured payment packages as "plans".
@@ -81,6 +82,52 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	response.Success(c, plans)
 }
 
+// GetSubscriptionPlans returns user-visible subscription purchase packages.
+// GET /api/v1/payment/subscription-plans
+func (h *PaymentHandler) GetSubscriptionPlans(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	if h.cfg == nil {
+		response.Success(c, []dto.PaymentSubscriptionPlan{})
+		return
+	}
+
+	plans, err := h.paymentService.GetSubscriptionPlans(c.Request.Context(), subject.UserID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	// Subscription billing should be "displayed USD amount = paid CNY amount".
+	// Keep exchange rate as 1 for subscription plan presentation.
+	exchangeRate := 1.0
+	availableChannels := h.availableUserPaymentChannels()
+	out := make([]dto.PaymentSubscriptionPlan, 0, len(plans))
+	for i := range plans {
+		item := plans[i]
+		out = append(out, dto.PaymentSubscriptionPlan{
+			GroupID:               item.GroupID,
+			GroupName:             item.GroupName,
+			Description:           item.Description,
+			Platform:              item.Platform,
+			PriceUSD:              item.PriceUSD,
+			ValidityDays:          item.ValidityDays,
+			DailyLimitUSD:         item.DailyLimitUSD,
+			WeeklyLimitUSD:        item.WeeklyLimitUSD,
+			MonthlyLimitUSD:       item.MonthlyLimitUSD,
+			ExchangeRate:          exchangeRate,
+			AvailableChannels:     append([]string(nil), availableChannels...),
+			HasActiveSubscription: item.HasActiveSubscription,
+		})
+	}
+
+	response.Success(c, out)
+}
+
 // CreateOrder creates an order record using existing PaymentService.
 // POST /api/v1/payment/orders
 func (h *PaymentHandler) CreateOrder(c *gin.Context) {
@@ -108,7 +155,46 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	channel := h.resolveCreateChannel(req.Channel)
 
 	var amountCNY float64
+	bizType := service.PaymentBizTypeOnlineRecharge
+	var bizGroupID *int64
+	var bizValidityDays *int
+	selectionCount := 0
 	if req.PlanID != "" {
+		selectionCount++
+	}
+	if req.AmountUSD != nil && *req.AmountUSD > 0 {
+		selectionCount++
+	}
+	if req.SubscriptionGroupID != nil {
+		selectionCount++
+	}
+	if selectionCount == 0 {
+		response.BadRequest(c, "one of plan_id, amount_usd or subscription_group_id is required")
+		return
+	}
+	if selectionCount > 1 {
+		response.BadRequest(c, "plan_id, amount_usd and subscription_group_id are mutually exclusive")
+		return
+	}
+
+	if req.SubscriptionGroupID != nil {
+		if *req.SubscriptionGroupID <= 0 {
+			response.BadRequest(c, "subscription_group_id must be positive")
+			return
+		}
+		plan, err := h.paymentService.GetSubscriptionPlanByGroupID(c.Request.Context(), subject.UserID, *req.SubscriptionGroupID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		// 套餐计费采用 1:1：显示多少 USD，实付多少 CNY（数值一致）。
+		amountCNY = plan.PriceUSD
+		bizType = service.PaymentBizTypeSubscriptionPurchase
+		groupID := plan.GroupID
+		bizGroupID = &groupID
+		validityDays := plan.ValidityDays
+		bizValidityDays = &validityDays
+	} else if req.PlanID != "" {
 		v, err := h.amountCNYFromPlanID(req.PlanID)
 		if err != nil {
 			response.BadRequest(c, err.Error())
@@ -119,22 +205,22 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		discount := normalizedDiscountRate(h.cfg.Payment.DiscountRate)
 		payUSD := (*req.AmountUSD) * discount
 		amountCNY = payUSD * h.cfg.Payment.ExchangeRate
-	} else {
-		response.BadRequest(c, "either plan_id or amount_usd is required")
-		return
 	}
 
 	provider := normalizePaymentProvider(channel)
 
 	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
-		UserID:        subject.UserID,
-		Username:      "",
-		AmountCNY:     amountCNY,
-		Provider:      provider,
-		Channel:       channel,
-		PaymentMethod: "web",
-		ClientIP:      c.ClientIP(),
-		UserAgent:     c.GetHeader("User-Agent"),
+		UserID:          subject.UserID,
+		Username:        "",
+		AmountCNY:       amountCNY,
+		BizType:         bizType,
+		BizGroupID:      bizGroupID,
+		BizValidityDays: bizValidityDays,
+		Provider:        provider,
+		Channel:         channel,
+		PaymentMethod:   "web",
+		ClientIP:        c.ClientIP(),
+		UserAgent:       c.GetHeader("User-Agent"),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

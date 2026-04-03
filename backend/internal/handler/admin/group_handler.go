@@ -82,15 +82,18 @@ func NewGroupHandler(adminService service.AdminService, dashboardService *servic
 
 // CreateGroupRequest represents create group request
 type CreateGroupRequest struct {
-	Name             string             `json:"name" binding:"required"`
-	Description      string             `json:"description"`
-	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity sora"`
-	RateMultiplier   float64            `json:"rate_multiplier"`
-	IsExclusive      bool               `json:"is_exclusive"`
-	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
-	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
-	WeeklyLimitUSD   optionalLimitField `json:"weekly_limit_usd"`
-	MonthlyLimitUSD  optionalLimitField `json:"monthly_limit_usd"`
+	Name                 string             `json:"name" binding:"required"`
+	Description          string             `json:"description"`
+	Platform             string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity sora"`
+	RateMultiplier       float64            `json:"rate_multiplier"`
+	IsExclusive          bool               `json:"is_exclusive"`
+	SubscriptionType     string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
+	DailyLimitUSD        optionalLimitField `json:"daily_limit_usd"`
+	WeeklyLimitUSD       optionalLimitField `json:"weekly_limit_usd"`
+	MonthlyLimitUSD      optionalLimitField `json:"monthly_limit_usd"`
+	DefaultValidityDays  int                `json:"default_validity_days" binding:"omitempty,min=1,max=36500"`
+	UserPurchaseVisible  bool               `json:"user_purchase_visible"`
+	UserPurchasePriceUSD optionalLimitField `json:"user_purchase_price_usd"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
 	ImagePrice1K                    *float64 `json:"image_price_1k"`
 	ImagePrice2K                    *float64 `json:"image_price_2k"`
@@ -119,16 +122,19 @@ type CreateGroupRequest struct {
 
 // UpdateGroupRequest represents update group request
 type UpdateGroupRequest struct {
-	Name             string             `json:"name"`
-	Description      string             `json:"description"`
-	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity sora"`
-	RateMultiplier   *float64           `json:"rate_multiplier"`
-	IsExclusive      *bool              `json:"is_exclusive"`
-	Status           string             `json:"status" binding:"omitempty,oneof=active inactive"`
-	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
-	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
-	WeeklyLimitUSD   optionalLimitField `json:"weekly_limit_usd"`
-	MonthlyLimitUSD  optionalLimitField `json:"monthly_limit_usd"`
+	Name                 string             `json:"name"`
+	Description          string             `json:"description"`
+	Platform             string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity sora"`
+	RateMultiplier       *float64           `json:"rate_multiplier"`
+	IsExclusive          *bool              `json:"is_exclusive"`
+	Status               string             `json:"status" binding:"omitempty,oneof=active inactive"`
+	SubscriptionType     string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
+	DailyLimitUSD        optionalLimitField `json:"daily_limit_usd"`
+	WeeklyLimitUSD       optionalLimitField `json:"weekly_limit_usd"`
+	MonthlyLimitUSD      optionalLimitField `json:"monthly_limit_usd"`
+	DefaultValidityDays  *int               `json:"default_validity_days" binding:"omitempty,min=1,max=36500"`
+	UserPurchaseVisible  *bool              `json:"user_purchase_visible"`
+	UserPurchasePriceUSD optionalLimitField `json:"user_purchase_price_usd"`
 	// 图片生成计费配置（antigravity 和 gemini 平台使用，负数表示清除配置）
 	ImagePrice1K                    *float64 `json:"image_price_1k"`
 	ImagePrice2K                    *float64 `json:"image_price_2k"`
@@ -251,6 +257,9 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
 		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
+		DefaultValidityDays:             req.DefaultValidityDays,
+		UserPurchaseVisible:             req.UserPurchaseVisible,
+		UserPurchasePriceUSD:            req.UserPurchasePriceUSD.ToServiceInput(),
 		ImagePrice1K:                    req.ImagePrice1K,
 		ImagePrice2K:                    req.ImagePrice2K,
 		ImagePrice4K:                    req.ImagePrice4K,
@@ -304,6 +313,9 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
 		MonthlyLimitUSD:                 req.MonthlyLimitUSD.ToServiceInput(),
+		DefaultValidityDays:             req.DefaultValidityDays,
+		UserPurchaseVisible:             req.UserPurchaseVisible,
+		UserPurchasePriceUSD:            req.UserPurchasePriceUSD.ToServiceInput(),
 		ImagePrice1K:                    req.ImagePrice1K,
 		ImagePrice2K:                    req.ImagePrice2K,
 		ImagePrice4K:                    req.ImagePrice4K,

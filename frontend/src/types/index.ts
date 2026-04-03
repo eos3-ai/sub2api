@@ -456,6 +456,9 @@ export interface Group {
   daily_limit_usd: number | null
   weekly_limit_usd: number | null
   monthly_limit_usd: number | null
+  default_validity_days: number
+  user_purchase_visible: boolean
+  user_purchase_price_usd: number | null
   // 图片生成计费配置（仅 antigravity 平台使用）
   image_price_1k: number | null
   image_price_2k: number | null
@@ -570,6 +573,9 @@ export interface CreateGroupRequest {
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
   monthly_limit_usd?: number | null
+  default_validity_days?: number
+  user_purchase_visible?: boolean
+  user_purchase_price_usd?: number | null
   image_price_1k?: number | null
   image_price_2k?: number | null
   image_price_4k?: number | null
@@ -599,6 +605,9 @@ export interface UpdateGroupRequest {
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
   monthly_limit_usd?: number | null
+  default_validity_days?: number
+  user_purchase_visible?: boolean
+  user_purchase_price_usd?: number | null
   image_price_1k?: number | null
   image_price_2k?: number | null
   image_price_4k?: number | null

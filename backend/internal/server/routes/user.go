@@ -55,6 +55,7 @@ func RegisterUserRoutes(
 		payment := authenticated.Group("/payment")
 		{
 			payment.GET("/plans", h.Payment.GetPlans)
+			payment.GET("/subscription-plans", h.Payment.GetSubscriptionPlans)
 			payment.POST("/orders", h.Payment.CreateOrder)
 			payment.GET("/orders", h.Payment.ListMyOrders)
 			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
