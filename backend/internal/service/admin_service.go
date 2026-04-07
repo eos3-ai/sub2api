@@ -421,8 +421,8 @@ const (
 	defaultScheduledTestCronExpression = "* * * * *"
 	defaultScheduledTestMaxResults     = 50
 
-	defaultScheduledTestModelAnthropic = "haiku4.5"
-	defaultScheduledTestModelOpenAI    = "gpt5.3-codex"
+	defaultScheduledTestModelAnthropic = "claude-haiku-4-5-20251001"
+	defaultScheduledTestModelOpenAI    = "gpt-5.3-codex"
 	defaultScheduledTestModelGemini    = "gemini-3-pro-preview"
 )
 
