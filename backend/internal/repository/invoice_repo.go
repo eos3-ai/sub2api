@@ -52,6 +52,7 @@ LEFT JOIN invoice_order_items ioi
 		`
 SELECT po.id, po.order_no, po.trade_no, po.user_id, po.username, po.remark,
        po.amount_cny, po.amount_usd, po.bonus_usd, po.total_usd, po.exchange_rate,
+       po.biz_type, po.biz_group_id, po.biz_validity_days,
        po.provider, po.channel, po.payment_method, po.payment_url,
        po.status, po.paid_at, po.expire_at,
        po.promotion_tier, po.promotion_used,
@@ -101,6 +102,7 @@ func (r *invoiceRepository) GetEligibleOrdersByOrderNos(ctx context.Context, use
 	query := `
 SELECT po.id, po.order_no, po.trade_no, po.user_id, po.username, po.remark,
        po.amount_cny, po.amount_usd, po.bonus_usd, po.total_usd, po.exchange_rate,
+       po.biz_type, po.biz_group_id, po.biz_validity_days,
        po.provider, po.channel, po.payment_method, po.payment_url,
        po.status, po.paid_at, po.expire_at,
        po.promotion_tier, po.promotion_used,
