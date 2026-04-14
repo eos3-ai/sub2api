@@ -327,6 +327,24 @@ func ProvideAPIKeyAuthCacheInvalidator(apiKeyService *APIKeyService) APIKeyAuthC
 	return apiKeyService
 }
 
+// ProvideAPIKeyService creates APIKeyService and wires the rate limit cache invalidator.
+func ProvideAPIKeyService(
+	apiKeyRepo APIKeyRepository,
+	userRepo UserRepository,
+	groupRepo GroupRepository,
+	userSubRepo UserSubscriptionRepository,
+	userGroupRateRepo UserGroupRateRepository,
+	cache APIKeyCache,
+	billingCache BillingCache,
+	cfg *config.Config,
+) *APIKeyService {
+	svc := NewAPIKeyService(apiKeyRepo, userRepo, groupRepo, userSubRepo, userGroupRateRepo, cache, cfg)
+	if billingCache != nil {
+		svc.SetRateLimitCacheInvalidator(billingCache)
+	}
+	return svc
+}
+
 // ProvidePaymentMaintenanceService creates and starts PaymentMaintenanceService when payment module is enabled.
 func ProvidePaymentMaintenanceService(cfg *config.Config, paymentService *PaymentService) *PaymentMaintenanceService {
 	svc := NewPaymentMaintenanceService(paymentService, time.Minute)
@@ -364,7 +382,7 @@ var ProviderSet = wire.NewSet(
 	// Core services
 	NewAuthService,
 	NewUserService,
-	NewAPIKeyService,
+	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	NewGroupService,
 	NewAccountService,
