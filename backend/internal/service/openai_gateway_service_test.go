@@ -92,6 +92,12 @@ type cancelReadCloser struct{}
 func (c cancelReadCloser) Read(p []byte) (int, error) { return 0, context.Canceled }
 func (c cancelReadCloser) Close() error               { return nil }
 
+type errReader struct {
+	err error
+}
+
+func (r errReader) Read(p []byte) (int, error) { return 0, r.err }
+
 type failingGinWriter struct {
 	gin.ResponseWriter
 	failAfter int
@@ -904,7 +910,7 @@ func TestOpenAIStreamingTimeout(t *testing.T) {
 	}
 
 	start := time.Now()
-	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, start, "model", "model")
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, start, "model", "model", false)
 	_ = pw.Close()
 	_ = pr.Close()
 
@@ -939,7 +945,7 @@ func TestOpenAIStreamingContextCanceledReturnsIncompleteErrorWithoutInjectingErr
 		Header:     http.Header{},
 	}
 
-	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model")
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
 	if err == nil || !strings.Contains(err.Error(), "stream usage incomplete") {
 		t.Fatalf("expected incomplete stream error, got %v", err)
 	}
@@ -977,7 +983,7 @@ func TestOpenAIStreamingClientDisconnectDrainsUpstreamUsage(t *testing.T) {
 		_, _ = pw.Write([]byte("data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":3,\"output_tokens\":5,\"input_tokens_details\":{\"cached_tokens\":1}}}}\n\n"))
 	}()
 
-	result, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model")
+	result, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
 	_ = pr.Close()
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
@@ -1020,11 +1026,118 @@ func TestOpenAIStreamingMissingTerminalEventReturnsIncompleteError(t *testing.T)
 		_, _ = pw.Write([]byte("data: {\"type\":\"response.in_progress\",\"response\":{}}\n\n"))
 	}()
 
-	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model")
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
 	_ = pr.Close()
 	if err == nil || !strings.Contains(err.Error(), "missing terminal event") {
 		t.Fatalf("expected missing terminal event error, got %v", err)
 	}
+}
+
+func TestOpenAIGatewayService_Forward_StreamReadErrorBeforeDownstreamWriteTriggersFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
+
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       io.NopCloser(errReader{err: io.ErrUnexpectedEOF}),
+		},
+	}
+	svc := &OpenAIGatewayService{
+		cfg: &config.Config{
+			Gateway: config.GatewayConfig{
+				OpenAIWS: config.GatewayOpenAIWSConfig{
+					Enabled:   false,
+					ForceHTTP: true,
+				},
+				StreamDataIntervalTimeout: 0,
+				StreamKeepaliveInterval:   0,
+				MaxLineSize:               defaultMaxLineSize,
+			},
+		},
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID:             1001,
+		Name:           "openai-http",
+		Platform:       PlatformOpenAI,
+		Type:           AccountTypeAPIKey,
+		Concurrency:    1,
+		Credentials:    map[string]any{"api_key": "sk-test"},
+		Status:         StatusActive,
+		Schedulable:    true,
+		RateMultiplier: f64p(1),
+	}
+	body := []byte(`{"model":"gpt-5","stream":true,"input":[{"role":"user","content":"hello"}]}`)
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+	require.Error(t, err)
+
+	var failoverErr *UpstreamFailoverError
+	require.ErrorAs(t, err, &failoverErr)
+	require.Equal(t, http.StatusBadGateway, failoverErr.StatusCode)
+	require.True(t, failoverErr.RetryableOnSameAccount)
+	require.False(t, c.Writer.Written(), "首字节前断流应留给上层 failover，不应先写 SSE 错误事件")
+}
+
+func TestOpenAIGatewayService_Forward_StreamReadErrorAfterDownstreamWriteDoesNotTriggerFailover(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(nil))
+	SetOpenAIClientTransport(c, OpenAIClientTransportHTTP)
+
+	streamBody := io.NopCloser(io.MultiReader(
+		strings.NewReader("data: {\"type\":\"response.created\",\"response\":{\"id\":\"resp_123\"}}\n\n"),
+		errReader{err: io.ErrUnexpectedEOF},
+	))
+	upstream := &httpUpstreamRecorder{
+		resp: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       streamBody,
+		},
+	}
+	svc := &OpenAIGatewayService{
+		cfg: &config.Config{
+			Gateway: config.GatewayConfig{
+				OpenAIWS: config.GatewayOpenAIWSConfig{
+					Enabled:   false,
+					ForceHTTP: true,
+				},
+				StreamDataIntervalTimeout: 0,
+				StreamKeepaliveInterval:   0,
+				MaxLineSize:               defaultMaxLineSize,
+			},
+		},
+		httpUpstream: upstream,
+	}
+	account := &Account{
+		ID:             1002,
+		Name:           "openai-http",
+		Platform:       PlatformOpenAI,
+		Type:           AccountTypeAPIKey,
+		Concurrency:    1,
+		Credentials:    map[string]any{"api_key": "sk-test"},
+		Status:         StatusActive,
+		Schedulable:    true,
+		RateMultiplier: f64p(1),
+	}
+	body := []byte(`{"model":"gpt-5","stream":true,"input":[{"role":"user","content":"hello"}]}`)
+
+	_, err := svc.Forward(context.Background(), c, account, body)
+	require.Error(t, err)
+
+	var failoverErr *UpstreamFailoverError
+	require.False(t, errors.As(err, &failoverErr), "已经向下游写出流内容后不应再触发 failover")
+	require.True(t, c.Writer.Written())
+	require.Contains(t, rec.Body.String(), "response.created")
 }
 
 func TestOpenAIStreamingPassthroughMissingTerminalEventReturnsIncompleteError(t *testing.T) {
@@ -1123,7 +1236,7 @@ func TestOpenAIStreamingTooLong(t *testing.T) {
 		_, _ = pw.Write([]byte(payload))
 	}()
 
-	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 2}, time.Now(), "model", "model")
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 2}, time.Now(), "model", "model", false)
 	_ = pr.Close()
 
 	if !errors.Is(err, bufio.ErrTooLong) {
@@ -1228,7 +1341,7 @@ func TestOpenAIStreamingHeadersOverride(t *testing.T) {
 		_, _ = pw.Write([]byte("data: {\"type\":\"response.completed\",\"response\":{}}\n\n"))
 	}()
 
-	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model")
+	_, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
 	_ = pr.Close()
 	if err != nil {
 		t.Fatalf("handleStreamingResponse error: %v", err)
@@ -1272,7 +1385,7 @@ func TestOpenAIStreamingReuseScannerBufferAndStillWorks(t *testing.T) {
 		_, _ = pw.Write([]byte("data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":1,\"output_tokens\":2,\"input_tokens_details\":{\"cached_tokens\":3}}}}\n\n"))
 	}()
 
-	result, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model")
+	result, err := svc.handleStreamingResponse(c.Request.Context(), resp, c, &Account{ID: 1}, time.Now(), "model", "model", false)
 	_ = pr.Close()
 	require.NoError(t, err)
 	require.NotNil(t, result)

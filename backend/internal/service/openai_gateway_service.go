@@ -1022,6 +1022,35 @@ func isOpenAITransientProcessingError(upstreamStatusCode int, upstreamMsg string
 	return match(string(upstreamBody))
 }
 
+func isRetryableOpenAIStreamError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, bufio.ErrTooLong) {
+		return false
+	}
+
+	lower := strings.ToLower(strings.TrimSpace(err.Error()))
+	if lower == "" {
+		return false
+	}
+	if strings.Contains(lower, "after disconnect") {
+		return false
+	}
+
+	if errors.Is(err, io.ErrUnexpectedEOF) ||
+		strings.Contains(lower, "unexpected eof") ||
+		strings.Contains(lower, "connection reset by peer") ||
+		strings.Contains(lower, "broken pipe") ||
+		strings.Contains(lower, "use of closed network connection") {
+		return true
+	}
+
+	return strings.Contains(lower, "stream usage incomplete") ||
+		strings.Contains(lower, "stream read error") ||
+		strings.Contains(lower, "stream data interval timeout")
+}
+
 // ExtractSessionID extracts the raw session ID from headers or body without hashing.
 // Used by ForwardAsAnthropic to pass as prompt_cache_key for upstream cache.
 func (s *OpenAIGatewayService) ExtractSessionID(c *gin.Context, body []byte) string {
@@ -2236,8 +2265,21 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		var usage *OpenAIUsage
 		var firstTokenMs *int
 		if reqStream {
-			streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, mappedModel)
+			streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, mappedModel, true)
 			if err != nil {
+				if streamResult != nil && !streamResult.wroteClientBytes && isRetryableOpenAIStreamError(err) {
+					logger.LegacyPrintf(
+						"service.openai_gateway",
+						"[OpenAI] Stream failed before downstream write, trigger failover: account=%d model=%s err=%v",
+						account.ID,
+						originalModel,
+						err,
+					)
+					return nil, &UpstreamFailoverError{
+						StatusCode:             http.StatusBadGateway,
+						RetryableOnSameAccount: true,
+					}
+				}
 				return nil, err
 			}
 			usage = streamResult.usage
@@ -3224,11 +3266,12 @@ func (s *OpenAIGatewayService) handleCompatErrorResponse(
 
 // openaiStreamingResult streaming response result
 type openaiStreamingResult struct {
-	usage        *OpenAIUsage
-	firstTokenMs *int
+	usage            *OpenAIUsage
+	firstTokenMs     *int
+	wroteClientBytes bool
 }
 
-func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel string) (*openaiStreamingResult, error) {
+func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp *http.Response, c *gin.Context, account *Account, startTime time.Time, originalModel, mappedModel string, allowPreWriteFailover bool) (*openaiStreamingResult, error) {
 	if s.responseHeaderFilter != nil {
 		responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 	}
@@ -3260,6 +3303,7 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 
 	usage := &OpenAIUsage{}
 	var firstTokenMs *int
+	wroteClientBytes := false
 	scanner := bufio.NewScanner(resp.Body)
 	maxLineSize := defaultMaxLineSize
 	if s.cfg != nil && s.cfg.Gateway.MaxLineSize > 0 {
@@ -3322,12 +3366,17 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 		}
 		if err := flushBuffered(); err != nil {
 			clientDisconnected = true
+			return
 		}
+		wroteClientBytes = true
 	}
 
 	needModelReplace := originalModel != mappedModel
 	resultWithUsage := func() *openaiStreamingResult {
-		return &openaiStreamingResult{usage: usage, firstTokenMs: firstTokenMs}
+		return &openaiStreamingResult{usage: usage, firstTokenMs: firstTokenMs, wroteClientBytes: wroteClientBytes}
+	}
+	shouldDeferRetryableError := func(err error) bool {
+		return allowPreWriteFailover && !wroteClientBytes && isRetryableOpenAIStreamError(err)
 	}
 	finalizeStream := func() (*openaiStreamingResult, error) {
 		if !clientDisconnected {
@@ -3362,6 +3411,9 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			logger.LegacyPrintf("service.openai_gateway", "SSE line too long: account=%d max_size=%d error=%v", account.ID, maxLineSize, scanErr)
 			sendErrorEvent("response_too_large")
 			return resultWithUsage(), scanErr, true
+		}
+		if shouldDeferRetryableError(scanErr) {
+			return resultWithUsage(), fmt.Errorf("stream read error: %w", scanErr), true
 		}
 		sendErrorEvent("stream_read_error")
 		return resultWithUsage(), fmt.Errorf("stream read error: %w", scanErr), true
@@ -3407,7 +3459,11 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 					if err := flushBuffered(); err != nil {
 						clientDisconnected = true
 						logger.LegacyPrintf("service.openai_gateway", "Client disconnected during streaming flush, continuing to drain upstream for billing")
+					} else {
+						wroteClientBytes = true
 					}
+				} else {
+					wroteClientBytes = true
 				}
 			}
 
@@ -3432,7 +3488,11 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 				if err := flushBuffered(); err != nil {
 					clientDisconnected = true
 					logger.LegacyPrintf("service.openai_gateway", "Client disconnected during streaming flush, continuing to drain upstream for billing")
+				} else {
+					wroteClientBytes = true
 				}
+			} else {
+				wroteClientBytes = true
 			}
 		}
 	}
@@ -3505,7 +3565,9 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			if s.rateLimitService != nil {
 				s.rateLimitService.HandleStreamTimeout(ctx, account, originalModel)
 			}
-			sendErrorEvent("stream_timeout")
+			if !shouldDeferRetryableError(errors.New("stream data interval timeout")) {
+				sendErrorEvent("stream_timeout")
+			}
 			return resultWithUsage(), fmt.Errorf("stream data interval timeout")
 
 		case <-keepaliveCh:
@@ -3523,6 +3585,8 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 			if err := flushBuffered(); err != nil {
 				clientDisconnected = true
 				logger.LegacyPrintf("service.openai_gateway", "Client disconnected during keepalive flush, continuing to drain upstream for billing")
+			} else {
+				wroteClientBytes = true
 			}
 		}
 	}
