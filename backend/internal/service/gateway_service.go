@@ -3585,6 +3585,17 @@ func (s *GatewayService) shouldRetryUpstreamError(account *Account, statusCode i
 	return !account.ShouldHandleErrorCode(statusCode)
 }
 
+func (s *GatewayService) shouldEnterRetryExhaustedFlow(account *Account, statusCode int) bool {
+	if statusCode < 400 {
+		return false
+	}
+	// 400 只走专用整流/直返逻辑，不应被重新包装成“after retries”。
+	if statusCode == http.StatusBadRequest {
+		return false
+	}
+	return s.shouldRetryUpstreamError(account, statusCode)
+}
+
 // shouldFailoverUpstreamError determines whether an upstream error should trigger account failover.
 func (s *GatewayService) shouldFailoverUpstreamError(statusCode int) bool {
 	switch statusCode {
@@ -4370,7 +4381,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	defer func() { _ = resp.Body.Close() }()
 
 	// 处理重试耗尽的情况
-	if resp.StatusCode >= 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
+	if s.shouldEnterRetryExhaustedFlow(account, resp.StatusCode) {
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 			_ = resp.Body.Close()
@@ -4670,7 +4681,7 @@ func (s *GatewayService) forwardAnthropicAPIKeyPassthroughWithInput(
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode >= 400 && s.shouldRetryUpstreamError(account, resp.StatusCode) {
+	if s.shouldEnterRetryExhaustedFlow(account, resp.StatusCode) {
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 			_ = resp.Body.Close()
@@ -5391,7 +5402,7 @@ func (s *GatewayService) handleBedrockUpstreamErrors(
 	account *Account,
 ) (*ForwardResult, error) {
 	// retry exhausted + failover
-	if s.shouldRetryUpstreamError(account, resp.StatusCode) {
+	if s.shouldEnterRetryExhaustedFlow(account, resp.StatusCode) {
 		if s.shouldFailoverUpstreamError(resp.StatusCode) {
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 			_ = resp.Body.Close()
