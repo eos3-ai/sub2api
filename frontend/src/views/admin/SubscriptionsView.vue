@@ -174,6 +174,8 @@
           :data="subscriptions"
           :loading="loading"
           :server-side-sort="true"
+          default-sort-key="created_at"
+          default-sort-order="desc"
           @sort="handleSort"
         >
           <template #cell-user="{ row }">
@@ -744,6 +746,7 @@ import type { UserSubscription, Group, GroupPlatform, SubscriptionType } from '@
 import type { SimpleUser } from '@/api/admin/usage'
 import type { Column } from '@/components/common/types'
 import { formatDateOnly } from '@/utils/format'
+import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -928,7 +931,7 @@ const sortState = reactive({
 
 const pagination = reactive({
   page: 1,
-  page_size: 20,
+  page_size: getPersistedPageSize(),
   total: 0,
   pages: 0
 })
@@ -964,8 +967,7 @@ const platformFilterOptions = computed(() => [
   { value: 'anthropic', label: 'Anthropic' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'gemini', label: 'Gemini' },
-  { value: 'antigravity', label: 'Antigravity' },
-  { value: 'sora', label: 'Sora' }
+  { value: 'antigravity', label: 'Antigravity' }
 ])
 
 // Group options for assign (only subscription type groups)

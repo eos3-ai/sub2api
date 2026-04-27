@@ -22,6 +22,19 @@ const (
 	PrivacyModeCFBlocked   = "training_set_cf_blocked"
 )
 
+func shouldSkipOpenAIPrivacyEnsure(extra map[string]any) bool {
+	if extra == nil {
+		return false
+	}
+	raw, ok := extra["privacy_mode"]
+	if !ok {
+		return false
+	}
+	mode, _ := raw.(string)
+	mode = strings.TrimSpace(mode)
+	return mode != PrivacyModeFailed && mode != PrivacyModeCFBlocked
+}
+
 // disableOpenAITraining calls ChatGPT settings API to turn off "Improve the model for everyone".
 // Returns privacy_mode value: "training_off" on success, "cf_blocked" / "failed" on failure.
 func disableOpenAITraining(ctx context.Context, clientFactory PrivacyClientFactory, accessToken, proxyURL string) string {
@@ -43,6 +56,10 @@ func disableOpenAITraining(ctx context.Context, clientFactory PrivacyClientFacto
 		SetHeader("Authorization", "Bearer "+accessToken).
 		SetHeader("Origin", "https://chatgpt.com").
 		SetHeader("Referer", "https://chatgpt.com/").
+		SetHeader("Accept", "application/json").
+		SetHeader("sec-fetch-mode", "cors").
+		SetHeader("sec-fetch-site", "same-origin").
+		SetHeader("sec-fetch-dest", "empty").
 		SetQueryParam("feature", "training_allowed").
 		SetQueryParam("value", "false").
 		Patch(openAISettingsURL)

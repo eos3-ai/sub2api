@@ -19,13 +19,25 @@ const (
 	RoleUser     = domain.RoleUser
 )
 
+// Affiliate rebate settings
+const (
+	AffiliateRebateRateDefault          = 20.0
+	AffiliateRebateRateMin              = 0.0
+	AffiliateRebateRateMax              = 100.0
+	AffiliateEnabledDefault             = false // 邀请返利总开关默认关闭
+	AffiliateRebateFreezeHoursDefault   = 0     // 0 = 不冻结（向后兼容）
+	AffiliateRebateFreezeHoursMax       = 720   // 最大 30 天
+	AffiliateRebateDurationDaysDefault  = 0     // 0 = 永久有效
+	AffiliateRebateDurationDaysMax      = 3650  // ~10 年
+	AffiliateRebatePerInviteeCapDefault = 0.0   // 0 = 无上限
+)
+
 // Platform constants
 const (
 	PlatformAnthropic   = domain.PlatformAnthropic
 	PlatformOpenAI      = domain.PlatformOpenAI
 	PlatformGemini      = domain.PlatformGemini
 	PlatformAntigravity = domain.PlatformAntigravity
-	PlatformSora        = domain.PlatformSora
 )
 
 // Account type constants
@@ -73,6 +85,12 @@ const (
 // LinuxDoConnectSyntheticEmailDomain 是 LinuxDo Connect 用户的合成邮箱后缀（RFC 保留域名）。
 const LinuxDoConnectSyntheticEmailDomain = "@linuxdo-connect.invalid"
 
+// OIDCConnectSyntheticEmailDomain 是 OIDC 用户的合成邮箱后缀（RFC 保留域名）。
+const OIDCConnectSyntheticEmailDomain = "@oidc-connect.invalid"
+
+// WeChatConnectSyntheticEmailDomain 是 WeChat Connect 用户的合成邮箱后缀（RFC 保留域名）。
+const WeChatConnectSyntheticEmailDomain = "@wechat-connect.invalid"
+
 // Setting keys
 const (
 	// 注册设置
@@ -104,6 +122,48 @@ const (
 	SettingKeyLinuxDoConnectClientID     = "linuxdo_connect_client_id"
 	SettingKeyLinuxDoConnectClientSecret = "linuxdo_connect_client_secret"
 	SettingKeyLinuxDoConnectRedirectURL  = "linuxdo_connect_redirect_url"
+
+	// WeChat Connect OAuth 登录设置
+	SettingKeyWeChatConnectEnabled             = "wechat_connect_enabled"
+	SettingKeyWeChatConnectAppID               = "wechat_connect_app_id"
+	SettingKeyWeChatConnectAppSecret           = "wechat_connect_app_secret"
+	SettingKeyWeChatConnectOpenAppID           = "wechat_connect_open_app_id"
+	SettingKeyWeChatConnectOpenAppSecret       = "wechat_connect_open_app_secret"
+	SettingKeyWeChatConnectMPAppID             = "wechat_connect_mp_app_id"
+	SettingKeyWeChatConnectMPAppSecret         = "wechat_connect_mp_app_secret"
+	SettingKeyWeChatConnectMobileAppID         = "wechat_connect_mobile_app_id"
+	SettingKeyWeChatConnectMobileAppSecret     = "wechat_connect_mobile_app_secret"
+	SettingKeyWeChatConnectOpenEnabled         = "wechat_connect_open_enabled"
+	SettingKeyWeChatConnectMPEnabled           = "wechat_connect_mp_enabled"
+	SettingKeyWeChatConnectMobileEnabled       = "wechat_connect_mobile_enabled"
+	SettingKeyWeChatConnectMode                = "wechat_connect_mode"
+	SettingKeyWeChatConnectScopes              = "wechat_connect_scopes"
+	SettingKeyWeChatConnectRedirectURL         = "wechat_connect_redirect_url"
+	SettingKeyWeChatConnectFrontendRedirectURL = "wechat_connect_frontend_redirect_url"
+
+	// Generic OIDC OAuth 登录设置
+	SettingKeyOIDCConnectEnabled              = "oidc_connect_enabled"
+	SettingKeyOIDCConnectProviderName         = "oidc_connect_provider_name"
+	SettingKeyOIDCConnectClientID             = "oidc_connect_client_id"
+	SettingKeyOIDCConnectClientSecret         = "oidc_connect_client_secret"
+	SettingKeyOIDCConnectIssuerURL            = "oidc_connect_issuer_url"
+	SettingKeyOIDCConnectDiscoveryURL         = "oidc_connect_discovery_url"
+	SettingKeyOIDCConnectAuthorizeURL         = "oidc_connect_authorize_url"
+	SettingKeyOIDCConnectTokenURL             = "oidc_connect_token_url"
+	SettingKeyOIDCConnectUserInfoURL          = "oidc_connect_userinfo_url"
+	SettingKeyOIDCConnectJWKSURL              = "oidc_connect_jwks_url"
+	SettingKeyOIDCConnectScopes               = "oidc_connect_scopes"
+	SettingKeyOIDCConnectRedirectURL          = "oidc_connect_redirect_url"
+	SettingKeyOIDCConnectFrontendRedirectURL  = "oidc_connect_frontend_redirect_url"
+	SettingKeyOIDCConnectTokenAuthMethod      = "oidc_connect_token_auth_method"
+	SettingKeyOIDCConnectUsePKCE              = "oidc_connect_use_pkce"
+	SettingKeyOIDCConnectValidateIDToken      = "oidc_connect_validate_id_token"
+	SettingKeyOIDCConnectAllowedSigningAlgs   = "oidc_connect_allowed_signing_algs"
+	SettingKeyOIDCConnectClockSkewSeconds     = "oidc_connect_clock_skew_seconds"
+	SettingKeyOIDCConnectRequireEmailVerified = "oidc_connect_require_email_verified"
+	SettingKeyOIDCConnectUserInfoEmailPath    = "oidc_connect_userinfo_email_path"
+	SettingKeyOIDCConnectUserInfoIDPath       = "oidc_connect_userinfo_id_path"
+	SettingKeyOIDCConnectUserInfoUsernamePath = "oidc_connect_userinfo_username_path"
 
 	// OEM设置
 	SettingKeySiteName                    = "site_name"                     // 网站名称
@@ -172,6 +232,23 @@ const (
 	SettingKeyOpsRuntimeLogConfig = "ops_runtime_log_config"
 
 	// =========================
+	// Channel Monitor (渠道监控)
+	// =========================
+
+	// SettingKeyChannelMonitorEnabled is a DB-backed soft switch for the channel monitor feature.
+	// When false: runner skips scheduling and user-facing endpoints return an empty list.
+	SettingKeyChannelMonitorEnabled = "channel_monitor_enabled"
+
+	// SettingKeyChannelMonitorDefaultIntervalSeconds controls the default interval (seconds)
+	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
+	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"
+
+	// SettingKeyAvailableChannelsEnabled is a DB-backed soft switch for the "Available Channels"
+	// user-facing aggregate view. When false: user endpoint returns an empty list and the
+	// sidebar entry is hidden. Defaults to false (opt-in feature).
+	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
+
+	// =========================
 	// Overload Cooldown (529)
 	// =========================
 
@@ -227,11 +304,34 @@ const (
 	// SettingKeyMinClaudeCodeVersion 最低 Claude Code 版本号要求 (semver, 如 "2.1.0"，空值=不检查)
 	SettingKeyMinClaudeCodeVersion = "min_claude_code_version"
 
+	// SettingKeyMaxClaudeCodeVersion 最高 Claude Code 版本号限制 (semver, 如 "3.0.0"，空值=不检查)
+	SettingKeyMaxClaudeCodeVersion = "max_claude_code_version"
+
 	// SettingKeyAllowUngroupedKeyScheduling 允许未分组 API Key 调度（默认 false：未分组 Key 返回 403）
 	SettingKeyAllowUngroupedKeyScheduling = "allow_ungrouped_key_scheduling"
 
 	// SettingKeyBackendModeEnabled Backend 模式：禁用用户注册和自助服务，仅管理员可登录
 	SettingKeyBackendModeEnabled = "backend_mode_enabled"
+
+	// Gateway Forwarding Behavior
+	// SettingKeyEnableFingerprintUnification 是否统一 OAuth 账号的 X-Stainless-* 指纹头（默认 true）
+	SettingKeyEnableFingerprintUnification = "enable_fingerprint_unification"
+	// SettingKeyEnableMetadataPassthrough 是否透传客户端原始 metadata.user_id（默认 false）
+	SettingKeyEnableMetadataPassthrough = "enable_metadata_passthrough"
+	// SettingKeyEnableCCHSigning 是否对 billing header 中的 cch 进行 xxHash64 签名（默认 false）
+	SettingKeyEnableCCHSigning = "enable_cch_signing"
+
+	// Balance Low Notification
+	SettingKeyBalanceLowNotifyEnabled     = "balance_low_notify_enabled"      // 全局开关
+	SettingKeyBalanceLowNotifyThreshold   = "balance_low_notify_threshold"    // 默认阈值（USD）
+	SettingKeyBalanceLowNotifyRechargeURL = "balance_low_notify_recharge_url" // 充值页面 URL
+
+	// Account Quota Notification
+	SettingKeyAccountQuotaNotifyEnabled = "account_quota_notify_enabled" // 全局开关
+	SettingKeyAccountQuotaNotifyEmails  = "account_quota_notify_emails"  // 管理员通知邮箱列表（JSON 数组）
+
+	// Web Search Emulation
+	SettingKeyWebSearchEmulationConfig = "web_search_emulation_config" // JSON 配置
 )
 
 // Admin API key prefixes (distinct from user "sk-" keys).

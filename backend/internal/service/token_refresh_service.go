@@ -11,6 +11,9 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/config"
 )
 
+// tokenRefreshTempUnschedDuration token 刷新重试耗尽后临时不可调度的持续时间
+const tokenRefreshTempUnschedDuration = 10 * time.Minute
+
 // TokenRefreshService OAuth token自动刷新服务
 // 定期检查并刷新即将过期的token
 type TokenRefreshService struct {
@@ -21,8 +24,9 @@ type TokenRefreshService struct {
 	accountAlert     *AccountAlertService
 	schedulerCache   SchedulerCache // 用于同步更新调度器缓存，解决 token 刷新后缓存不一致问题
 
-	stopCh chan struct{}
-	wg     sync.WaitGroup
+	stopCh   chan struct{}
+	stopOnce sync.Once
+	wg       sync.WaitGroup
 }
 
 // NewTokenRefreshService 创建token刷新服务
@@ -46,7 +50,6 @@ func NewTokenRefreshService(
 	}
 
 	openAIRefresher := NewOpenAITokenRefresher(openaiOAuthService, accountRepo)
-	openAIRefresher.SetSyncLinkedSoraAccounts(cfg.TokenRefresh.SyncLinkedSoraAccounts)
 
 	// 注册平台特定的刷新器
 	s.refreshers = []TokenRefresher{
@@ -87,9 +90,11 @@ func (s *TokenRefreshService) Start() {
 	)
 }
 
-// Stop 停止刷新服务
+// Stop 停止刷新服务（可安全多次调用）
 func (s *TokenRefreshService) Stop() {
-	close(s.stopCh)
+	s.stopOnce.Do(func() {
+		close(s.stopCh)
+	})
 	s.wg.Wait()
 	slog.Info("token_refresh.service_stopped")
 }
@@ -271,6 +276,9 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 				account.Status = StatusError
 				account.ErrorMessage = errorMsg
 			}
+			// 刷新失败但 access_token 可能仍有效，尝试设置隐私
+			s.ensureOpenAIPrivacy(ctx, account)
+			s.ensureAntigravityPrivacy(ctx, account)
 			return err
 		}
 
@@ -311,6 +319,25 @@ func (s *TokenRefreshService) refreshWithRetry(ctx context.Context, account *Acc
 		}
 	}
 
+	// 刷新失败但 access_token 可能仍有效，尝试设置隐私
+	s.ensureOpenAIPrivacy(ctx, account)
+	s.ensureAntigravityPrivacy(ctx, account)
+
+	// 设置临时不可调度 10 分钟（不标记 error，保持 status=active 让下个刷新周期能继续尝试）
+	until := time.Now().Add(tokenRefreshTempUnschedDuration)
+	reason := fmt.Sprintf("token refresh retry exhausted: %v", lastErr)
+	if setErr := s.accountRepo.SetTempUnschedulable(ctx, account.ID, until, reason); setErr != nil {
+		slog.Warn("token_refresh.set_temp_unschedulable_failed",
+			"account_id", account.ID,
+			"error", setErr,
+		)
+	} else {
+		slog.Info("token_refresh.temp_unschedulable_set",
+			"account_id", account.ID,
+			"until", until.Format(time.RFC3339),
+		)
+	}
+
 	return lastErr
 }
 
@@ -328,6 +355,7 @@ func isNonRetryableRefreshError(err error) bool {
 		"unauthorized_client", // 客户端未授权
 		"access_denied",       // 访问被拒绝
 		"missing_project_id",  // 缺少 project_id
+		"no refresh token available",
 	}
 	for _, needle := range nonRetryable {
 		if strings.Contains(msg, needle) {

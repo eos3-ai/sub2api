@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -81,9 +83,24 @@ type AuthResponse struct {
 	User         *dto.User `json:"user"`
 }
 
+func ensureLoginUserActive(user *service.User) error {
+	if user == nil {
+		return infraerrors.Unauthorized("INVALID_USER", "user not found")
+	}
+	if !user.IsActive() {
+		return service.ErrUserNotActive
+	}
+	return nil
+}
+
 // respondWithTokenPair 生成 Token 对并返回认证响应
 // 如果 Token 对生成失败，回退到只返回 Access Token（向后兼容）
 func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
+	if err := ensureLoginUserActive(user); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
 	tokenPair, err := h.authService.GenerateTokenPair(c.Request.Context(), user, "")
 	if err != nil {
 		slog.Error("failed to generate token pair", "error", err, "user_id", user.ID)
@@ -107,6 +124,34 @@ func (h *AuthHandler) respondWithTokenPair(c *gin.Context, user *service.User) {
 		TokenType:    "Bearer",
 		User:         dto.UserFromService(user),
 	})
+}
+
+func (h *AuthHandler) ensureBackendModeAllowsUser(ctx context.Context, user *service.User) error {
+	if user == nil {
+		return infraerrors.Unauthorized("INVALID_USER", "user not found")
+	}
+	if h == nil || !h.isBackendModeEnabled(ctx) || user.IsAdmin() {
+		return nil
+	}
+	return infraerrors.Forbidden("BACKEND_MODE_ADMIN_ONLY", "Backend mode is active. Only admin login is allowed.")
+}
+
+func (h *AuthHandler) ensureBackendModeAllowsNewUserLogin(ctx context.Context) error {
+	if h == nil || !h.isBackendModeEnabled(ctx) {
+		return nil
+	}
+	return infraerrors.Forbidden("BACKEND_MODE_ADMIN_ONLY", "Backend mode is active. Only admin login is allowed.")
+}
+
+func (h *AuthHandler) isBackendModeEnabled(ctx context.Context) bool {
+	if h == nil || h.settingSvc == nil {
+		return false
+	}
+	settings, err := h.settingSvc.GetPublicSettings(ctx)
+	if err == nil && settings != nil {
+		return settings.BackendModeEnabled
+	}
+	return h.settingSvc.IsBackendModeEnabled(ctx)
 }
 
 // Register handles user registration
@@ -183,6 +228,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 	_ = token // token 由 authService.Login 返回但此处由 respondWithTokenPair 重新生成
+
+	if err := h.ensureBackendModeAllowsUser(c.Request.Context(), user); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	// Check if TOTP 2FA is enabled for this user
 	if h.totpService != nil && h.settingSvc.IsTotpEnabled(c.Request.Context()) && user.TotpEnabled {
@@ -286,8 +336,14 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
+	identities, err := h.userService.GetProfileIdentitySummaries(c.Request.Context(), subject.UserID, user)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
 	type UserResponse struct {
-		*dto.User
+		userProfileResponse
 		RunMode string `json:"run_mode"`
 	}
 
@@ -296,7 +352,10 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 		runMode = h.cfg.RunMode
 	}
 
-	response.Success(c, UserResponse{User: dto.UserFromService(user), RunMode: runMode})
+	response.Success(c, UserResponse{
+		userProfileResponse: userProfileResponseFromService(user, identities),
+		RunMode:             runMode,
+	})
 }
 
 // ValidatePromoCodeRequest 验证优惠码请求
@@ -568,6 +627,8 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 			// 不影响登出流程
 		}
 	}
+	h.consumePendingOAuthSessionOnLogout(c)
+	clearOAuthLogoutCookies(c)
 
 	response.Success(c, LogoutResponse{
 		Message: "Logged out successfully",
@@ -588,7 +649,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.RevokeAllUserSessions(c.Request.Context(), subject.UserID); err != nil {
+	if err := h.authService.RevokeAllUserTokens(c.Request.Context(), subject.UserID); err != nil {
 		slog.Error("failed to revoke all sessions", "user_id", subject.UserID, "error", err)
 		response.InternalError(c, "Failed to revoke sessions")
 		return

@@ -46,12 +46,16 @@
         <input v-model.number="form.concurrency" type="number" class="input" />
       </div>
       <div>
-        <label class="input-label">{{ t('admin.users.soraStorageQuota') }}</label>
-        <div class="flex items-center gap-2">
-          <input v-model.number="form.sora_storage_quota_gb" type="number" min="0" step="0.1" class="input" placeholder="0" />
-          <span class="shrink-0 text-sm text-gray-500">GB</span>
-        </div>
-        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.users.soraStorageQuotaHint') }}</p>
+        <label class="input-label">{{ t('admin.users.form.rpmLimit') }}</label>
+        <input
+          v-model.number="form.rpm_limit"
+          type="number"
+          min="0"
+          step="1"
+          class="input"
+          :placeholder="t('admin.users.form.rpmLimitPlaceholder')"
+        />
+        <p class="input-hint">{{ t('admin.users.form.rpmLimitHint') }}</p>
       </div>
       <UserAttributeForm v-model="form.customAttributes" :user-id="user?.id" />
     </form>

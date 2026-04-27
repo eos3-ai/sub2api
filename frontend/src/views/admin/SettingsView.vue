@@ -3,7 +3,9 @@
     <div class="mx-auto max-w-4xl space-y-6">
       <!-- Loading State -->
       <div v-if="loading" class="flex items-center justify-center py-12">
-        <div class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"></div>
+        <div
+          class="h-8 w-8 animate-spin rounded-full border-b-2 border-primary-600"
+        ></div>
       </div>
 
       <!-- Settings Form -->
@@ -21,127 +23,152 @@
           <div class="space-y-4 p-6">
             <!-- Security Warning -->
             <div
-              class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
-              <div class="flex items-start">
-                <Icon
-                  name="exclamationTriangle"
-                  size="md"
-                  class="mt-0.5 flex-shrink-0 text-amber-500"
-                />
-                <p class="ml-3 text-sm text-amber-700 dark:text-amber-300">
-                  {{ t('admin.settings.adminApiKey.securityWarning') }}
-                </p>
-              </div>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.adminApiKey.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.adminApiKey.description") }}
+              </p>
             </div>
-
-            <!-- Loading State -->
-            <div v-if="adminApiKeyLoading" class="flex items-center gap-2 text-gray-500">
-              <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></div>
-              {{ t('common.loading') }}
-            </div>
-
-            <!-- No Key Configured -->
-            <div v-else-if="!adminApiKeyExists" class="flex items-center justify-between">
-              <span class="text-gray-500 dark:text-gray-400">
-                {{ t('admin.settings.adminApiKey.notConfigured') }}
-              </span>
-              <button
-                type="button"
-                @click="createAdminApiKey"
-                :disabled="adminApiKeyOperating"
-                class="btn btn-primary btn-sm"
-              >
-                <svg
-                  v-if="adminApiKeyOperating"
-                  class="mr-1 h-4 w-4 animate-spin"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    class="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    stroke-width="4"
-                  ></circle>
-                  <path
-                    class="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                  ></path>
-                </svg>
-                {{
-                  adminApiKeyOperating
-                    ? t('admin.settings.adminApiKey.creating')
-                    : t('admin.settings.adminApiKey.create')
-                }}
-              </button>
-            </div>
-
-            <!-- Key Exists -->
-            <div v-else class="space-y-4">
-              <div class="flex items-center justify-between">
-                <div>
-                  <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ t('admin.settings.adminApiKey.currentKey') }}
-                  </label>
-                  <code
-                    class="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900 dark:bg-dark-700 dark:text-gray-100"
-                  >
-                    {{ adminApiKeyMasked }}
-                  </code>
-                </div>
-                <div class="flex gap-2">
-                  <button
-                    type="button"
-                    @click="regenerateAdminApiKey"
-                    :disabled="adminApiKeyOperating"
-                    class="btn btn-secondary btn-sm"
-                  >
-                    {{
-                      adminApiKeyOperating
-                        ? t('admin.settings.adminApiKey.regenerating')
-                        : t('admin.settings.adminApiKey.regenerate')
-                    }}
-                  </button>
-                  <button
-                    type="button"
-                    @click="deleteAdminApiKey"
-                    :disabled="adminApiKeyOperating"
-                    class="btn btn-secondary btn-sm text-red-600 hover:text-red-700 dark:text-red-400"
-                  >
-                    {{ t('admin.settings.adminApiKey.delete') }}
-                  </button>
-                </div>
-              </div>
-
-              <!-- Newly Generated Key Display -->
+            <div class="space-y-4 p-6">
+              <!-- Security Warning -->
               <div
-                v-if="newAdminApiKey"
-                class="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
+                class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20"
               >
-                <p class="text-sm font-medium text-green-700 dark:text-green-300">
-                  {{ t('admin.settings.adminApiKey.keyWarning') }}
-                </p>
-                <div class="flex items-center gap-2">
-                  <code
-                    class="flex-1 select-all break-all rounded border border-green-300 bg-white px-3 py-2 font-mono text-sm dark:border-green-700 dark:bg-dark-800"
-                  >
-                    {{ newAdminApiKey }}
-                  </code>
-                  <button
-                    type="button"
-                    @click="copyNewKey"
-                    class="btn btn-primary btn-sm flex-shrink-0"
-                  >
-                    {{ t('admin.settings.adminApiKey.copyKey') }}
-                  </button>
+                <div class="flex items-start">
+                  <Icon
+                    name="exclamationTriangle"
+                    size="md"
+                    class="mt-0.5 flex-shrink-0 text-amber-500"
+                  />
+                  <p class="ml-3 text-sm text-amber-700 dark:text-amber-300">
+                    {{ t("admin.settings.adminApiKey.securityWarning") }}
+                  </p>
                 </div>
-                <p class="text-xs text-green-600 dark:text-green-400">
-                  {{ t('admin.settings.adminApiKey.usage') }}
-                </p>
+              </div>
+
+              <!-- Loading State -->
+              <div
+                v-if="adminApiKeyLoading"
+                class="flex items-center gap-2 text-gray-500"
+              >
+                <div
+                  class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"
+                ></div>
+                {{ t("common.loading") }}
+              </div>
+
+              <!-- No Key Configured -->
+              <div
+                v-else-if="!adminApiKeyExists"
+                class="flex items-center justify-between"
+              >
+                <span class="text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.adminApiKey.notConfigured") }}
+                </span>
+                <button
+                  type="button"
+                  @click="createAdminApiKey"
+                  :disabled="adminApiKeyOperating"
+                  class="btn btn-primary btn-sm"
+                >
+                  <svg
+                    v-if="adminApiKeyOperating"
+                    class="mr-1 h-4 w-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  {{
+                    adminApiKeyOperating
+                      ? t("admin.settings.adminApiKey.creating")
+                      : t("admin.settings.adminApiKey.create")
+                  }}
+                </button>
+              </div>
+
+              <!-- Key Exists -->
+              <div v-else class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label
+                      class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      {{ t("admin.settings.adminApiKey.currentKey") }}
+                    </label>
+                    <code
+                      class="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900 dark:bg-dark-700 dark:text-gray-100"
+                    >
+                      {{ adminApiKeyMasked }}
+                    </code>
+                  </div>
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      @click="regenerateAdminApiKey"
+                      :disabled="adminApiKeyOperating"
+                      class="btn btn-secondary btn-sm"
+                    >
+                      {{
+                        adminApiKeyOperating
+                          ? t("admin.settings.adminApiKey.regenerating")
+                          : t("admin.settings.adminApiKey.regenerate")
+                      }}
+                    </button>
+                    <button
+                      type="button"
+                      @click="deleteAdminApiKey"
+                      :disabled="adminApiKeyOperating"
+                      class="btn btn-secondary btn-sm text-red-600 hover:text-red-700 dark:text-red-400"
+                    >
+                      {{ t("admin.settings.adminApiKey.delete") }}
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Newly Generated Key Display -->
+                <div
+                  v-if="newAdminApiKey"
+                  class="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20"
+                >
+                  <p
+                    class="text-sm font-medium text-green-700 dark:text-green-300"
+                  >
+                    {{ t("admin.settings.adminApiKey.keyWarning") }}
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <code
+                      class="flex-1 select-all break-all rounded border border-green-300 bg-white px-3 py-2 font-mono text-sm dark:border-green-700 dark:bg-dark-800"
+                    >
+                      {{ newAdminApiKey }}
+                    </code>
+                    <button
+                      type="button"
+                      @click="copyNewKey"
+                      class="btn btn-primary btn-sm flex-shrink-0"
+                    >
+                      {{ t("admin.settings.adminApiKey.copyKey") }}
+                    </button>
+                  </div>
+                  <p class="text-xs text-green-600 dark:text-green-400">
+                    {{ t("admin.settings.adminApiKey.usage") }}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -453,18 +480,119 @@
 
             <!-- Email Verification -->
             <div
-              class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
             >
-              <div>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.registration.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.registration.description") }}
+              </p>
+            </div>
+            <div class="space-y-5 p-6">
+              <!-- Enable Registration -->
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.registration.enableRegistration")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{
+                      t("admin.settings.registration.enableRegistrationHint")
+                    }}
+                  </p>
+                </div>
+                <Toggle v-model="form.registration_enabled" />
+              </div>
+
+              <!-- Email Verification -->
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.registration.emailVerification")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.registration.emailVerificationHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.email_verify_enabled" />
+              </div>
+
+              <!-- Email Suffix Whitelist -->
+              <div class="border-t border-gray-100 pt-4 dark:border-dark-700">
                 <label class="font-medium text-gray-900 dark:text-white">{{
-                  t('admin.settings.registration.emailVerification')
+                  t("admin.settings.registration.emailSuffixWhitelist")
                 }}</label>
-                <p class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.registration.emailVerificationHint') }}
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{
+                    t("admin.settings.registration.emailSuffixWhitelistHint")
+                  }}
+                </p>
+                <div
+                  class="mt-3 rounded-lg border border-gray-300 bg-white p-2 dark:border-dark-500 dark:bg-dark-700"
+                >
+                  <div class="flex flex-wrap items-center gap-2">
+                    <span
+                      v-for="suffix in registrationEmailSuffixWhitelistTags"
+                      :key="suffix"
+                      class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-700 dark:bg-dark-600 dark:text-gray-200"
+                    >
+                      <span class="text-gray-400 dark:text-gray-500">@</span>
+                      <span>{{ suffix }}</span>
+                      <button
+                        type="button"
+                        class="rounded-full text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-300 dark:hover:bg-dark-500 dark:hover:text-white"
+                        @click="
+                          removeRegistrationEmailSuffixWhitelistTag(suffix)
+                        "
+                      >
+                        <Icon
+                          name="x"
+                          size="xs"
+                          class="h-3.5 w-3.5"
+                          :stroke-width="2"
+                        />
+                      </button>
+                    </span>
+
+                    <div
+                      class="flex min-w-[220px] flex-1 items-center gap-1 rounded border border-transparent px-2 py-1 focus-within:border-primary-300 dark:focus-within:border-primary-700"
+                    >
+                      <span
+                        class="font-mono text-sm text-gray-400 dark:text-gray-500"
+                        >@</span
+                      >
+                      <input
+                        v-model="registrationEmailSuffixWhitelistDraft"
+                        type="text"
+                        class="w-full bg-transparent text-sm font-mono text-gray-900 outline-none placeholder:text-gray-400 dark:text-white dark:placeholder:text-gray-500"
+                        :placeholder="
+                          t(
+                            'admin.settings.registration.emailSuffixWhitelistPlaceholder',
+                          )
+                        "
+                        @input="
+                          handleRegistrationEmailSuffixWhitelistDraftInput
+                        "
+                        @keydown="
+                          handleRegistrationEmailSuffixWhitelistDraftKeydown
+                        "
+                        @blur="commitRegistrationEmailSuffixWhitelistDraft"
+                        @paste="handleRegistrationEmailSuffixWhitelistPaste"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {{
+                    t(
+                      "admin.settings.registration.emailSuffixWhitelistInputHint",
+                    )
+                  }}
                 </p>
               </div>
-              <Toggle v-model="form.email_verify_enabled" />
-            </div>
 
             <!-- Promo Code -->
             <div
@@ -715,28 +843,178 @@
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.settings.defaults.title') }}
+              {{ t('admin.settings.features.channelMonitor.title') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.settings.defaults.description') }}
+              {{ t('admin.settings.features.channelMonitor.description') }}
+            </p>
+            <p class="mt-1.5 text-xs">
+              <router-link
+                to="/admin/channels/monitor"
+                class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
+              >
+                {{ t('admin.settings.features.channelMonitor.configureLink') }}
+                <span aria-hidden="true">→</span>
+              </router-link>
             </p>
           </div>
           <div class="p-6">
             <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
               <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.defaults.defaultBalance') }}
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.channelMonitor.enabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.channelMonitor.enabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.channel_monitor_enabled" />
+            </div>
+
+            <div v-if="form.channel_monitor_enabled">
+              <label class="input-label">
+                {{ t('admin.settings.features.channelMonitor.defaultInterval') }}
+                <span class="text-red-500">*</span>
+              </label>
+              <input
+                v-model.number="form.channel_monitor_default_interval_seconds"
+                type="number"
+                min="15"
+                max="3600"
+                class="input"
+              />
+              <p class="mt-1 text-xs text-gray-400">
+                {{ t('admin.settings.features.channelMonitor.defaultIntervalHint') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.features.availableChannels.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.features.availableChannels.description') }}
+            </p>
+            <p class="mt-1.5 text-xs">
+              <router-link
+                to="/admin/channels/pricing"
+                class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
+              >
+                {{ t('admin.settings.features.availableChannels.configureLink') }}
+                <span aria-hidden="true">→</span>
+              </router-link>
+            </p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.availableChannels.enabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.availableChannels.enabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.available_channels_enabled" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Affiliate (邀请返利) feature card -->
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.features.affiliate.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.features.affiliate.description') }}
+            </p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.affiliate.enabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.affiliate.enabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.affiliate_enabled" />
+            </div>
+
+            <div v-if="form.affiliate_enabled" class="space-y-6">
+              <div>
+                <label class="input-label">
+                  {{ t('admin.settings.features.affiliate.rebateRate') }}
+                </label>
+                <div class="relative">
+                  <input
+                    v-model.number="form.affiliate_rebate_rate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    class="input pr-8"
+                    placeholder="20"
+                  />
+                  <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                </div>
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.rebateRateHint') }}
+                </p>
+              </div>
+
+              <div>
+                <label class="input-label">
+                  {{ t('admin.settings.features.affiliate.freezeHours') }}
                 </label>
                 <input
-                  v-model.number="form.default_balance"
+                  v-model.number="form.affiliate_rebate_freeze_hours"
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="720"
+                  class="input"
+                />
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.freezeHoursDesc') }}
+                </p>
+              </div>
+
+              <div>
+                <label class="input-label">
+                  {{ t('admin.settings.features.affiliate.durationDays') }}
+                </label>
+                <input
+                  v-model.number="form.affiliate_rebate_duration_days"
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="3650"
+                  class="input"
+                />
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.durationDaysDesc') }}
+                </p>
+              </div>
+
+              <div>
+                <label class="input-label">
+                  {{ t('admin.settings.features.affiliate.perInviteeCap') }}
+                </label>
+                <input
+                  v-model.number="form.affiliate_rebate_per_invitee_cap"
                   type="number"
                   step="0.01"
                   min="0"
                   class="input"
-                  placeholder="0.00"
                 />
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.defaults.defaultBalanceHint') }}
+                <p class="mt-1 text-xs text-gray-400">
+                  {{ t('admin.settings.features.affiliate.perInviteeCapDesc') }}
                 </p>
               </div>
               <div>
@@ -957,121 +1235,436 @@
           >
             <div>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                {{ t('admin.settings.smtp.title') }}
+                {{ t("admin.settings.payment.title") }}
               </h2>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {{ t('admin.settings.smtp.description') }}
+                {{ t("admin.settings.payment.description") }}
+                <a
+                  :href="paymentGuideHref"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="ml-2 inline-flex items-center text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                >
+                  <svg
+                    class="mr-0.5 h-3.5 w-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                    />
+                  </svg>
+                  {{ t("admin.settings.payment.configGuide") }}
+                </a>
               </p>
             </div>
-            <button
-              type="button"
-              @click="testSmtpConnection"
-              :disabled="testingSmtp"
-              class="btn btn-secondary btn-sm"
-            >
-              <svg v-if="testingSmtp" class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                ></circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              {{
-                testingSmtp
-                  ? t('admin.settings.smtp.testing')
-                  : t('admin.settings.smtp.testConnection')
-              }}
-            </button>
-          </div>
-          <div class="space-y-6 p-6">
-            <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.host') }}
-                </label>
-                <input
-                  v-model="form.smtp_host"
-                  type="text"
-                  class="input"
-                  :placeholder="t('admin.settings.smtp.hostPlaceholder')"
-                />
+            <div class="space-y-4 p-6">
+              <!-- Enable toggle -->
+              <div class="flex items-center justify-between">
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.payment.enabled")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.payment.enabledHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.payment_enabled" />
               </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.port') }}
-                </label>
-                <input
-                  v-model.number="form.smtp_port"
-                  type="number"
-                  min="1"
-                  max="65535"
-                  class="input"
-                  :placeholder="t('admin.settings.smtp.portPlaceholder')"
-                />
-              </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.username') }}
-                </label>
-                <input
-                  v-model="form.smtp_username"
-                  type="text"
-                  class="input"
-                  :placeholder="t('admin.settings.smtp.usernamePlaceholder')"
-                />
-              </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.password') }}
-                </label>
-                <input
-                  v-model="form.smtp_password"
-                  type="password"
-                  class="input"
-                  :placeholder="
-                    form.smtp_password_configured
-                      ? t('admin.settings.smtp.passwordConfiguredPlaceholder')
-                      : t('admin.settings.smtp.passwordPlaceholder')
-                  "
-                />
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{
-                    form.smtp_password_configured
-                      ? t('admin.settings.smtp.passwordConfiguredHint')
-                      : t('admin.settings.smtp.passwordHint')
-                  }}
-                </p>
-              </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.fromEmail') }}
-                </label>
-                <input
-                  v-model="form.smtp_from_email"
-                  type="email"
-                  class="input"
-                  :placeholder="t('admin.settings.smtp.fromEmailPlaceholder')"
-                />
-              </div>
-              <div>
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.smtp.fromName') }}
-                </label>
-                <input
-                  v-model="form.smtp_from_name"
-                  type="text"
-                  class="input"
-                  :placeholder="t('admin.settings.smtp.fromNamePlaceholder')"
-                />
-              </div>
+              <template v-if="form.payment_enabled">
+                <!-- Row 1: Product name -->
+                <div class="grid grid-cols-3 gap-3">
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.productNamePrefix")
+                    }}</label
+                    ><input
+                      v-model="form.payment_product_name_prefix"
+                      type="text"
+                      class="input"
+                      placeholder="Sub2API"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.productNameSuffix")
+                    }}</label
+                    ><input
+                      v-model="form.payment_product_name_suffix"
+                      type="text"
+                      class="input"
+                      placeholder="CNY"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.preview")
+                    }}</label>
+                    <div
+                      class="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300"
+                    >
+                      {{
+                        (form.payment_product_name_prefix || "Sub2API") +
+                        " 100 " +
+                        (form.payment_product_name_suffix || "CNY")
+                      }}
+                    </div>
+                  </div>
+                </div>
+                <!-- Row 2: Balance toggle + amounts -->
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.minAmount")
+                    }}</label
+                    ><input
+                      :value="form.payment_min_amount || ''"
+                      @input="
+                        form.payment_min_amount =
+                          parseFloat(
+                            ($event.target as HTMLInputElement).value,
+                          ) || 0
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input"
+                      :placeholder="t('admin.settings.payment.noLimit')"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.maxAmount")
+                    }}</label
+                    ><input
+                      :value="form.payment_max_amount || ''"
+                      @input="
+                        form.payment_max_amount =
+                          parseFloat(
+                            ($event.target as HTMLInputElement).value,
+                          ) || 0
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input"
+                      :placeholder="t('admin.settings.payment.noLimit')"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.dailyLimit")
+                    }}</label
+                    ><input
+                      :value="form.payment_daily_limit || ''"
+                      @input="
+                        form.payment_daily_limit =
+                          parseFloat(
+                            ($event.target as HTMLInputElement).value,
+                          ) || 0
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      class="input"
+                      :placeholder="t('admin.settings.payment.noLimit')"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.balanceRechargeMultiplier")
+                    }}</label>
+                    <input
+                      :value="form.payment_balance_recharge_multiplier || ''"
+                      @input="
+                        form.payment_balance_recharge_multiplier =
+                          parseFloat(
+                            ($event.target as HTMLInputElement).value,
+                          ) || 1
+                      "
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      class="input"
+                    />
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{
+                        t(
+                          "admin.settings.payment.balanceRechargeMultiplierHint",
+                        )
+                      }}
+                    </p>
+                    <p
+                      class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400"
+                    >
+                      {{
+                        t("admin.settings.payment.balanceRechargePreview", {
+                          usd: (
+                            Number(form.payment_balance_recharge_multiplier) ||
+                            1
+                          ).toFixed(2),
+                        })
+                      }}
+                    </p>
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.rechargeFeeRate")
+                    }}</label>
+                    <div class="relative">
+                      <input
+                        :value="form.payment_recharge_fee_rate ?? ''"
+                        @input="
+                          form.payment_recharge_fee_rate = Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              Math.round(
+                                parseFloat(
+                                  ($event.target as HTMLInputElement).value ||
+                                    '0',
+                                ) * 100,
+                              ) / 100,
+                            ),
+                          )
+                        "
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        class="input pr-8"
+                      />
+                      <span
+                        class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                        >%</span
+                      >
+                    </div>
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{ t("admin.settings.payment.rechargeFeeRateHint") }}
+                    </p>
+                    <p
+                      v-if="(Number(form.payment_recharge_fee_rate) || 0) > 0"
+                      class="mt-1 text-xs font-medium text-primary-600 dark:text-primary-400"
+                    >
+                      {{
+                        t("admin.settings.payment.rechargeFeePreview", {
+                          fee: (
+                            Number(form.payment_recharge_fee_rate) || 0
+                          ).toFixed(2),
+                        })
+                      }}
+                    </p>
+                  </div>
+                  <div>
+                    <label class="input-label"
+                      >{{ t("admin.settings.payment.orderTimeout") }}
+                      <span class="text-red-500">*</span></label
+                    ><input
+                      v-model.number="form.payment_order_timeout_minutes"
+                      type="number"
+                      min="1"
+                      class="input"
+                      required
+                    />
+                    <p class="mt-0.5 text-xs text-gray-400">
+                      {{ t("admin.settings.payment.orderTimeoutHint") }}
+                    </p>
+                  </div>
+                </div>
+                <!-- Row 3: Pending orders + load balance + cancel rate limit (all in one row) -->
+                <div class="flex flex-wrap items-end gap-4">
+                  <div class="w-28">
+                    <label class="input-label">{{
+                      t("admin.settings.payment.maxPendingOrders")
+                    }}</label
+                    ><input
+                      v-model.number="form.payment_max_pending_orders"
+                      type="number"
+                      min="1"
+                      class="input"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.loadBalanceStrategy")
+                    }}</label>
+                    <Select
+                      v-model="form.payment_load_balance_strategy"
+                      :options="loadBalanceOptions"
+                      class="w-40"
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.cancelRateLimit")
+                    }}</label>
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        :class="[
+                          'relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2',
+                          form.payment_cancel_rate_limit_enabled
+                            ? 'bg-primary-500'
+                            : 'bg-gray-300 dark:bg-dark-600',
+                        ]"
+                        @click="
+                          form.payment_cancel_rate_limit_enabled =
+                            !form.payment_cancel_rate_limit_enabled
+                        "
+                      >
+                        <span
+                          :class="[
+                            'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out',
+                            form.payment_cancel_rate_limit_enabled
+                              ? 'translate-x-5'
+                              : 'translate-x-0',
+                          ]"
+                        />
+                      </button>
+                      <Select
+                        v-model="form.payment_cancel_rate_limit_window_mode"
+                        :options="cancelRateLimitModeOptions"
+                        class="w-24"
+                        :disabled="!form.payment_cancel_rate_limit_enabled"
+                      />
+                      <span
+                        :class="[
+                          'text-sm whitespace-nowrap',
+                          form.payment_cancel_rate_limit_enabled
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-gray-400 dark:text-gray-600',
+                        ]"
+                        >{{
+                          t("admin.settings.payment.cancelRateLimitEvery")
+                        }}</span
+                      >
+                      <input
+                        v-model.number="form.payment_cancel_rate_limit_window"
+                        type="number"
+                        min="1"
+                        required
+                        class="input w-14 text-center"
+                        :disabled="!form.payment_cancel_rate_limit_enabled"
+                      />
+                      <Select
+                        v-model="form.payment_cancel_rate_limit_unit"
+                        :options="cancelRateLimitUnitOptions"
+                        class="w-28"
+                        :disabled="!form.payment_cancel_rate_limit_enabled"
+                      />
+                      <span
+                        :class="[
+                          'text-sm whitespace-nowrap',
+                          form.payment_cancel_rate_limit_enabled
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-gray-400 dark:text-gray-600',
+                        ]"
+                        >{{
+                          t("admin.settings.payment.cancelRateLimitAllowMax")
+                        }}</span
+                      >
+                      <input
+                        v-model.number="form.payment_cancel_rate_limit_max"
+                        type="number"
+                        min="1"
+                        required
+                        class="input w-14 text-center"
+                        :disabled="!form.payment_cancel_rate_limit_enabled"
+                      />
+                      <span
+                        :class="[
+                          'text-sm whitespace-nowrap',
+                          form.payment_cancel_rate_limit_enabled
+                            ? 'text-gray-700 dark:text-gray-300'
+                            : 'text-gray-400 dark:text-gray-600',
+                        ]"
+                        >{{
+                          t("admin.settings.payment.cancelRateLimitTimes")
+                        }}</span
+                      >
+                    </div>
+                  </div>
+                </div>
+                <!-- Row 4: Enabled payment types (provider badges like sub2apipay) -->
+                <div>
+                  <label class="input-label">{{
+                    t("admin.settings.payment.enabledPaymentTypes")
+                  }}</label>
+                  <div class="mt-1.5 flex flex-wrap gap-2">
+                    <button
+                      v-for="pt in allPaymentTypes"
+                      :key="pt.value"
+                      type="button"
+                      @click="togglePaymentType(pt.value)"
+                      :class="[
+                        'rounded-lg border px-3 py-1.5 text-sm font-medium transition-all',
+                        isPaymentTypeEnabled(pt.value)
+                          ? 'border-primary-500 bg-primary-500 text-white shadow-sm'
+                          : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400 hover:bg-gray-50 dark:border-dark-600 dark:bg-dark-800 dark:text-gray-300 dark:hover:border-dark-500',
+                      ]"
+                    >
+                      {{ pt.label }}
+                    </button>
+                  </div>
+                  <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                    {{ t("admin.settings.payment.enabledPaymentTypesHint") }}
+                    <a
+                      :href="paymentMethodsHref"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="ml-1 text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300"
+                    >
+                      {{ t("admin.settings.payment.findProvider") }}
+                      <svg
+                        class="mb-0.5 ml-0.5 inline h-3 w-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                        />
+                      </svg>
+                    </a>
+                  </p>
+                </div>
+                <!-- Row 5: Help image + text -->
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.helpImage")
+                    }}</label>
+                    <ImageUpload
+                      v-model="form.payment_help_image_url"
+                      :upload-label="t('admin.settings.site.uploadImage')"
+                      :remove-label="t('admin.settings.site.remove')"
+                      :placeholder="
+                        t('admin.settings.payment.helpImagePlaceholder')
+                      "
+                    />
+                  </div>
+                  <div>
+                    <label class="input-label">{{
+                      t("admin.settings.payment.helpText")
+                    }}</label>
+                    <textarea
+                      v-model="form.payment_help_text"
+                      rows="3"
+                      class="input"
+                      :placeholder="
+                        t('admin.settings.payment.helpTextPlaceholder')
+                      "
+                    ></textarea>
+                  </div>
+                </div>
+              </template>
             </div>
 
             <!-- Use TLS Toggle -->
@@ -1134,39 +1727,69 @@
               </p>
             </div>
           </div>
+
+          <!-- Provider Management -->
+          <PaymentProviderList
+            v-if="form.payment_enabled"
+            :providers="providers"
+            :loading="providersLoading"
+            :can-create="hasAnyPaymentTypeEnabled"
+            :enabled-payment-types="form.payment_enabled_types"
+            :all-payment-types="allPaymentTypes"
+            :redirect-label="t('admin.settings.payment.easypayRedirect')"
+            @refresh="loadProviders"
+            @create="openCreateProvider"
+            @edit="openEditProvider"
+            @delete="confirmDeleteProvider"
+            @toggle-field="handleToggleField"
+            @toggle-type="handleToggleType"
+            @reorder="handleReorderProviders"
+          />
         </div>
 
-        <!-- Send Test Email - Only show when email verification is enabled -->
-        <div v-if="form.email_verify_enabled" class="card">
-          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
-            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.settings.testEmail.title') }}
-            </h2>
-            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.settings.testEmail.description') }}
-            </p>
-          </div>
-          <div class="p-6">
-            <div class="flex items-end gap-4">
-              <div class="flex-1">
-                <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.testEmail.recipientEmail') }}
-                </label>
-                <input
-                  v-model="testEmailAddress"
-                  type="email"
-                  class="input"
-                  :placeholder="t('admin.settings.testEmail.recipientEmailPlaceholder')"
+        <div v-show="activeTab === 'email'" class="space-y-6">
+          <!-- Email disabled hint - show when email_verify_enabled is off -->
+          <div v-if="!form.email_verify_enabled" class="card">
+            <div class="p-6">
+              <div class="flex items-start gap-3">
+                <Icon
+                  name="mail"
+                  size="md"
+                  class="mt-0.5 flex-shrink-0 text-gray-400 dark:text-gray-500"
                 />
+                <div>
+                  <h3 class="font-medium text-gray-900 dark:text-white">
+                    {{ t("admin.settings.emailTabDisabledTitle") }}
+                  </h3>
+                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.emailTabDisabledHint") }}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SMTP Settings - Only show when email verification is enabled -->
+          <div v-if="form.email_verify_enabled" class="card">
+            <div
+              class="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <div>
+                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                  {{ t("admin.settings.smtp.title") }}
+                </h2>
+                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.smtp.description") }}
+                </p>
               </div>
               <button
                 type="button"
-                @click="sendTestEmail"
-                :disabled="sendingTestEmail || !testEmailAddress"
-                class="btn btn-secondary"
+                @click="testSmtpConnection"
+                :disabled="testingSmtp || loadFailed"
+                class="btn btn-secondary btn-sm"
               >
                 <svg
-                  v-if="sendingTestEmail"
+                  v-if="testingSmtp"
                   class="h-4 w-4 animate-spin"
                   fill="none"
                   viewBox="0 0 24 24"
@@ -1186,11 +1809,328 @@
                   ></path>
                 </svg>
                 {{
-                  sendingTestEmail
-                    ? t('admin.settings.testEmail.sending')
-                    : t('admin.settings.testEmail.sendTestEmail')
+                  testingSmtp
+                    ? t("admin.settings.smtp.testing")
+                    : t("admin.settings.smtp.testConnection")
                 }}
               </button>
+            </div>
+            <div class="space-y-6 p-6">
+              <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.host") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_host"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.hostPlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.port") }}
+                  </label>
+                  <input
+                    v-model.number="form.smtp_port"
+                    type="number"
+                    min="1"
+                    max="65535"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.portPlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.username") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_username"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.usernamePlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.password") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_password"
+                    type="password"
+                    class="input"
+                    autocomplete="new-password"
+                    autocapitalize="off"
+                    spellcheck="false"
+                    @keydown="smtpPasswordManuallyEdited = true"
+                    @paste="smtpPasswordManuallyEdited = true"
+                    :placeholder="
+                      form.smtp_password_configured
+                        ? t('admin.settings.smtp.passwordConfiguredPlaceholder')
+                        : t('admin.settings.smtp.passwordPlaceholder')
+                    "
+                  />
+                  <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{
+                      form.smtp_password_configured
+                        ? t("admin.settings.smtp.passwordConfiguredHint")
+                        : t("admin.settings.smtp.passwordHint")
+                    }}
+                  </p>
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.fromEmail") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_from_email"
+                    type="email"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.fromEmailPlaceholder')"
+                  />
+                </div>
+                <div>
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.smtp.fromName") }}
+                  </label>
+                  <input
+                    v-model="form.smtp_from_name"
+                    type="text"
+                    class="input"
+                    :placeholder="t('admin.settings.smtp.fromNamePlaceholder')"
+                  />
+                </div>
+              </div>
+
+              <!-- Use TLS Toggle -->
+              <div
+                class="flex items-center justify-between border-t border-gray-100 pt-4 dark:border-dark-700"
+              >
+                <div>
+                  <label class="font-medium text-gray-900 dark:text-white">{{
+                    t("admin.settings.smtp.useTls")
+                  }}</label>
+                  <p class="text-sm text-gray-500 dark:text-gray-400">
+                    {{ t("admin.settings.smtp.useTlsHint") }}
+                  </p>
+                </div>
+                <Toggle v-model="form.smtp_use_tls" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Send Test Email - Only show when email verification is enabled -->
+          <div v-if="form.email_verify_enabled" class="card">
+            <div
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                {{ t("admin.settings.testEmail.title") }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.testEmail.description") }}
+              </p>
+            </div>
+            <div class="p-6">
+              <div class="flex items-end gap-4">
+                <div class="flex-1">
+                  <label
+                    class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    {{ t("admin.settings.testEmail.recipientEmail") }}
+                  </label>
+                  <input
+                    v-model="testEmailAddress"
+                    type="email"
+                    class="input"
+                    :placeholder="
+                      t('admin.settings.testEmail.recipientEmailPlaceholder')
+                    "
+                  />
+                </div>
+                <button
+                  type="button"
+                  @click="sendTestEmail"
+                  :disabled="
+                    sendingTestEmail || !testEmailAddress || loadFailed
+                  "
+                  class="btn btn-secondary"
+                >
+                  <svg
+                    v-if="sendingTestEmail"
+                    class="h-4 w-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    ></circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  {{
+                    sendingTestEmail
+                      ? t("admin.settings.testEmail.sending")
+                      : t("admin.settings.testEmail.sendTestEmail")
+                  }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <!-- Balance Low Notification -->
+          <div class="card">
+            <div
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <h3 class="text-base font-medium text-gray-900 dark:text-white">
+                {{ t("admin.settings.balanceNotify.title") }}
+              </h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.balanceNotify.description") }}
+              </p>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <label
+                  class="mb-0 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t("admin.settings.balanceNotify.enabled") }}</label
+                >
+                <Toggle v-model="form.balance_low_notify_enabled" />
+              </div>
+              <div v-if="form.balance_low_notify_enabled">
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t("admin.settings.balanceNotify.threshold") }}</label
+                >
+                <div class="relative">
+                  <span
+                    class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    >$</span
+                  >
+                  <input
+                    v-model.number="form.balance_low_notify_threshold"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    class="input pl-7"
+                  />
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.balanceNotify.thresholdHint") }}
+                </p>
+              </div>
+              <div>
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t("admin.settings.balanceNotify.rechargeUrl") }}</label
+                >
+                <input
+                  v-model="form.balance_low_notify_recharge_url"
+                  type="url"
+                  class="input"
+                  :placeholder="currentOrigin"
+                />
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.balanceNotify.rechargeUrlHint") }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Account Quota Notification -->
+          <div class="card">
+            <div
+              class="border-b border-gray-100 px-6 py-4 dark:border-dark-700"
+            >
+              <h3 class="text-base font-medium text-gray-900 dark:text-white">
+                {{ t("admin.settings.quotaNotify.title") }}
+              </h3>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.quotaNotify.description") }}
+              </p>
+            </div>
+            <div class="px-6 py-6 space-y-4">
+              <div class="flex items-center justify-between">
+                <label
+                  class="mb-0 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t("admin.settings.quotaNotify.enabled") }}</label
+                >
+                <Toggle v-model="form.account_quota_notify_enabled" />
+              </div>
+              <div v-if="form.account_quota_notify_enabled">
+                <label
+                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >{{ t("admin.settings.quotaNotify.emails") }}</label
+                >
+                <div class="space-y-2">
+                  <div
+                    v-for="(entry, index) in form.account_quota_notify_emails ||
+                    []"
+                    :key="index"
+                    class="flex items-center gap-2"
+                  >
+                    <label
+                      class="relative inline-flex items-center cursor-pointer shrink-0"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="!entry.disabled"
+                        @change="entry.disabled = !entry.disabled"
+                        class="sr-only peer"
+                      />
+                      <div
+                        class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:border-gray-500 peer-checked:bg-primary-600"
+                      ></div>
+                    </label>
+                    <input
+                      v-model="entry.email"
+                      type="email"
+                      class="input flex-1"
+                      :placeholder="
+                        t('admin.settings.quotaNotify.emailPlaceholder')
+                      "
+                    />
+                    <button
+                      @click="form.account_quota_notify_emails.splice(index, 1)"
+                      class="btn btn-secondary px-2"
+                      type="button"
+                    >
+                      <Icon name="x" size="xs" class="h-4 w-4" />
+                    </button>
+                  </div>
+                  <button
+                    @click="addQuotaNotifyEmail"
+                    class="btn btn-secondary btn-sm"
+                    type="button"
+                  >
+                    + {{ t("admin.settings.quotaNotify.addEmail") }}
+                  </button>
+                </div>
+                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t("admin.settings.quotaNotify.emailsHint") }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -1213,10 +2153,46 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            {{ saving ? t('admin.settings.saving') : t('admin.settings.saveSettings') }}
+            {{
+              saving
+                ? t("admin.settings.saving")
+                : t("admin.settings.saveSettings")
+            }}
           </button>
         </div>
       </form>
+
+      <!-- Provider dialogs placed outside the settings form to prevent form submission bubbling -->
+      <PaymentProviderDialog
+        ref="providerDialogRef"
+        :show="showProviderDialog"
+        :saving="providerSaving"
+        :editing="editingProvider"
+        :all-key-options="providerKeyOptions"
+        :enabled-key-options="enabledProviderKeyOptions"
+        :all-payment-types="allPaymentTypes"
+        :redirect-label="t('admin.settings.payment.easypayRedirect')"
+        @close="showProviderDialog = false"
+        @save="handleSaveProvider"
+      />
+      <ConfirmDialog
+        :show="showDeleteProviderDialog"
+        :title="t('admin.settings.payment.deleteProvider')"
+        :message="t('admin.settings.payment.deleteProviderConfirm')"
+        :confirm-text="t('common.delete')"
+        danger
+        @confirm="handleDeleteProvider"
+        @cancel="showDeleteProviderDialog = false"
+      />
+      <ConfirmDialog
+        :show="affiliateConfirmDialog.show"
+        :title="affiliateConfirmDialog.title"
+        :message="affiliateConfirmDialog.message"
+        :confirm-text="affiliateConfirmDialog.confirmText"
+        danger
+        @confirm="handleAffiliateConfirm"
+        @cancel="cancelAffiliateConfirm"
+      />
     </div>
   </AppLayout>
 </template>
@@ -1258,15 +2234,15 @@ const adminApiKeyReadOnlyOperating = ref(false)
 const newAdminApiKeyReadOnly = ref('')
 
 // Stream Timeout 状态
-const streamTimeoutLoading = ref(true)
-const streamTimeoutSaving = ref(false)
+const streamTimeoutLoading = ref(true);
+const streamTimeoutSaving = ref(false);
 const streamTimeoutForm = reactive({
   enabled: true,
-  action: 'temp_unsched' as 'temp_unsched' | 'error' | 'none',
+  action: "temp_unsched" as "temp_unsched" | "error" | "none",
   temp_unsched_minutes: 5,
   threshold_count: 3,
-  threshold_window_minutes: 10
-})
+  threshold_window_minutes: 10,
+});
 
 type SettingsForm = SystemSettings & {
   smtp_password: string
@@ -1285,6 +2261,10 @@ const form = reactive<SettingsForm>({
   totp_enabled: false,
   totp_encryption_key_configured: false,
   default_balance: 0,
+  affiliate_rebate_rate: 20,
+  affiliate_rebate_freeze_hours: 0,
+  affiliate_rebate_duration_days: 0,
+  affiliate_rebate_per_invitee_cap: 0,
   default_concurrency: 1,
   default_subscriptions: [],
   site_name: 'Sub2API',
@@ -1302,36 +2282,80 @@ const form = reactive<SettingsForm>({
   custom_menu_items: [],
   smtp_host: '',
   smtp_port: 587,
-  smtp_username: '',
-  smtp_password: '',
+  smtp_username: "",
+  smtp_password: "",
   smtp_password_configured: false,
-  smtp_from_email: '',
-  smtp_from_name: '',
+  smtp_from_email: "",
+  smtp_from_name: "",
   smtp_use_tls: true,
   // Cloudflare Turnstile
   turnstile_enabled: false,
-  turnstile_site_key: '',
-  turnstile_secret_key: '',
+  turnstile_site_key: "",
+  turnstile_secret_key: "",
   turnstile_secret_key_configured: false,
   // LinuxDo Connect OAuth 登录
   linuxdo_connect_enabled: false,
-  linuxdo_connect_client_id: '',
-  linuxdo_connect_client_secret: '',
+  linuxdo_connect_client_id: "",
+  linuxdo_connect_client_secret: "",
   linuxdo_connect_client_secret_configured: false,
-  linuxdo_connect_redirect_url: '',
+  linuxdo_connect_redirect_url: "",
+  wechat_connect_enabled: false,
+  wechat_connect_app_id: "",
+  wechat_connect_app_secret: "",
+  wechat_connect_app_secret_configured: false,
+  wechat_connect_open_app_id: "",
+  wechat_connect_open_app_secret: "",
+  wechat_connect_open_app_secret_configured: false,
+  wechat_connect_mp_app_id: "",
+  wechat_connect_mp_app_secret: "",
+  wechat_connect_mp_app_secret_configured: false,
+  wechat_connect_mobile_app_id: "",
+  wechat_connect_mobile_app_secret: "",
+  wechat_connect_mobile_app_secret_configured: false,
+  wechat_connect_open_enabled: false,
+  wechat_connect_mp_enabled: false,
+  wechat_connect_mobile_enabled: false,
+  wechat_connect_mode: "open",
+  wechat_connect_scopes: "snsapi_login",
+  wechat_connect_redirect_url: "",
+  wechat_connect_frontend_redirect_url: "/auth/wechat/callback",
+  // Generic OIDC OAuth 登录
+  oidc_connect_enabled: false,
+  oidc_connect_provider_name: "OIDC",
+  oidc_connect_client_id: "",
+  oidc_connect_client_secret: "",
+  oidc_connect_client_secret_configured: false,
+  oidc_connect_issuer_url: "",
+  oidc_connect_discovery_url: "",
+  oidc_connect_authorize_url: "",
+  oidc_connect_token_url: "",
+  oidc_connect_userinfo_url: "",
+  oidc_connect_jwks_url: "",
+  oidc_connect_scopes: "openid email profile",
+  oidc_connect_redirect_url: "",
+  oidc_connect_frontend_redirect_url: "/auth/oidc/callback",
+  oidc_connect_token_auth_method: "client_secret_post",
+  oidc_connect_use_pkce: false,
+  oidc_connect_validate_id_token: false,
+  oidc_connect_allowed_signing_algs: "RS256,ES256,PS256",
+  oidc_connect_clock_skew_seconds: 120,
+  oidc_connect_require_email_verified: false,
+  oidc_connect_userinfo_email_path: "",
+  oidc_connect_userinfo_id_path: "",
+  oidc_connect_userinfo_username_path: "",
   // Model fallback
   enable_model_fallback: false,
-  fallback_model_anthropic: 'claude-3-5-sonnet-20241022',
-  fallback_model_openai: 'gpt-4o',
-  fallback_model_gemini: 'gemini-2.5-pro',
-  fallback_model_antigravity: 'gemini-2.5-pro',
+  fallback_model_anthropic: "claude-3-5-sonnet-20241022",
+  fallback_model_openai: "gpt-4o",
+  fallback_model_gemini: "gemini-2.5-pro",
+  fallback_model_antigravity: "gemini-2.5-pro",
   // Identity patch (Claude -> Gemini)
   enable_identity_patch: true,
-  identity_patch_prompt: '',
+  identity_patch_prompt: "",
   // Ops monitoring (vNext)
   ops_monitoring_enabled: true,
   ops_realtime_monitoring_enabled: true,
-  ops_query_mode_default: 'auto',
+  ops_query_mode_default: "auto",
   ops_metrics_interval_seconds: 60,
   min_claude_code_version: '',
   allow_ungrouped_key_scheduling: false
@@ -1339,18 +2363,107 @@ const form = reactive<SettingsForm>({
 
 // LinuxDo OAuth redirect URL suggestion
 const linuxdoRedirectUrlSuggestion = computed(() => {
-  if (typeof window === 'undefined') return ''
+  if (typeof window === "undefined") return "";
   const origin =
-    window.location.origin || `${window.location.protocol}//${window.location.host}`
-  return `${origin}/api/v1/auth/oauth/linuxdo/callback`
-})
+    window.location.origin ||
+    `${window.location.protocol}//${window.location.host}`;
+  return `${origin}/api/v1/auth/oauth/linuxdo/callback`;
+});
 
 async function setAndCopyLinuxdoRedirectUrl() {
-  const url = linuxdoRedirectUrlSuggestion.value
-  if (!url) return
+  const url = linuxdoRedirectUrlSuggestion.value;
+  if (!url) return;
 
-  form.linuxdo_connect_redirect_url = url
-  await copyToClipboard(url, t('admin.settings.linuxdo.redirectUrlSetAndCopied'))
+  form.linuxdo_connect_redirect_url = url;
+  await copyToClipboard(
+    url,
+    t("admin.settings.linuxdo.redirectUrlSetAndCopied"),
+  );
+}
+
+const wechatRedirectUrlSuggestion = computed(() => {
+  if (typeof window === "undefined") return "";
+  const origin =
+    window.location.origin ||
+    `${window.location.protocol}//${window.location.host}`;
+  return `${origin}/api/v1/auth/oauth/wechat/callback`;
+});
+
+function syncWeChatConnectMode(preferredMode?: WeChatConnectMode) {
+  if (form.wechat_connect_mp_enabled && form.wechat_connect_mobile_enabled) {
+    if (preferredMode === "mobile") {
+      form.wechat_connect_mp_enabled = false;
+    } else {
+      form.wechat_connect_mobile_enabled = false;
+    }
+  }
+
+  const capabilities = resolveWeChatConnectModeCapabilities(
+    form.wechat_connect_open_enabled,
+    form.wechat_connect_mp_enabled,
+    form.wechat_connect_mobile_enabled,
+    form.wechat_connect_mode,
+  );
+  form.wechat_connect_open_enabled = capabilities.openEnabled;
+  form.wechat_connect_mp_enabled = capabilities.mpEnabled;
+  form.wechat_connect_mobile_enabled = capabilities.mobileEnabled;
+  form.wechat_connect_mode = deriveWeChatConnectStoredMode(
+    capabilities.openEnabled,
+    capabilities.mpEnabled,
+    capabilities.mobileEnabled,
+    form.wechat_connect_mode,
+  );
+  form.wechat_connect_scopes = defaultWeChatConnectScopesForMode(
+    form.wechat_connect_mode,
+  );
+}
+
+function handleWeChatOpenEnabledChange(value: boolean) {
+  form.wechat_connect_open_enabled = value;
+  syncWeChatConnectMode(value ? "open" : undefined);
+}
+
+function handleWeChatMPEnabledChange(value: boolean) {
+  form.wechat_connect_mp_enabled = value;
+  if (value) {
+    form.wechat_connect_mobile_enabled = false;
+  }
+  syncWeChatConnectMode(value ? "mp" : undefined);
+}
+
+function handleWeChatMobileEnabledChange(value: boolean) {
+  form.wechat_connect_mobile_enabled = value;
+  if (value) {
+    form.wechat_connect_mp_enabled = false;
+  }
+  syncWeChatConnectMode(value ? "mobile" : undefined);
+}
+
+async function setAndCopyWeChatRedirectUrl() {
+  const url = wechatRedirectUrlSuggestion.value;
+  if (!url) return;
+
+  form.wechat_connect_redirect_url = url;
+  await copyToClipboard(
+    url,
+    t("admin.settings.wechatConnect.redirectUrlSetAndCopied"),
+  );
+}
+
+const oidcRedirectUrlSuggestion = computed(() => {
+  if (typeof window === "undefined") return "";
+  const origin =
+    window.location.origin ||
+    `${window.location.protocol}//${window.location.host}`;
+  return `${origin}/api/v1/auth/oauth/oidc/callback`;
+});
+
+async function setAndCopyOIDCRedirectUrl() {
+  const url = oidcRedirectUrlSuggestion.value;
+  if (!url) return;
+
+  form.oidc_connect_redirect_url = url;
+  await copyToClipboard(url, t("admin.settings.oidc.redirectUrlSetAndCopied"));
 }
 
 function handleLogoUpload(event: Event) {
@@ -1392,7 +2505,8 @@ function handleLogoUpload(event: Event) {
 }
 
 async function loadSettings() {
-  loading.value = true
+  loading.value = true;
+  loadFailed.value = false;
   try {
     const settings = await adminAPI.settings.getSettings()
     Object.assign(form, settings)
@@ -1401,15 +2515,15 @@ async function loadSettings() {
     form.linuxdo_connect_client_secret = ''
   } catch (error: any) {
     appStore.showError(
-      t('admin.settings.failedToLoad') + ': ' + (error.message || t('common.unknownError'))
-    )
+      extractApiErrorMessage(error, t("admin.settings.failedToLoad")),
+    );
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 async function saveSettings() {
-  saving.value = true
+  saving.value = true;
   try {
     const payload: UpdateSettingsRequest = {
       registration_enabled: form.registration_enabled,
@@ -1421,6 +2535,13 @@ async function saveSettings() {
       frontend_url: form.frontend_url,
       totp_enabled: form.totp_enabled,
       default_balance: form.default_balance,
+      affiliate_rebate_rate: Math.min(
+        100,
+        Math.max(0, Number(form.affiliate_rebate_rate) || 0),
+      ),
+      affiliate_rebate_freeze_hours: Math.max(0, Math.min(720, Number(form.affiliate_rebate_freeze_hours) || 0)),
+      affiliate_rebate_duration_days: Math.max(0, Math.min(3650, Math.floor(Number(form.affiliate_rebate_duration_days) || 0))),
+      affiliate_rebate_per_invitee_cap: Math.max(0, Number(form.affiliate_rebate_per_invitee_cap) || 0),
       default_concurrency: form.default_concurrency,
       default_subscriptions: form.default_subscriptions,
       site_name: form.site_name,
@@ -1448,8 +2569,59 @@ async function saveSettings() {
       turnstile_secret_key: form.turnstile_secret_key || undefined,
       linuxdo_connect_enabled: form.linuxdo_connect_enabled,
       linuxdo_connect_client_id: form.linuxdo_connect_client_id,
-      linuxdo_connect_client_secret: form.linuxdo_connect_client_secret || undefined,
+      linuxdo_connect_client_secret:
+        form.linuxdo_connect_client_secret || undefined,
       linuxdo_connect_redirect_url: form.linuxdo_connect_redirect_url,
+      wechat_connect_enabled: form.wechat_connect_enabled,
+      wechat_connect_app_id:
+        form.wechat_connect_open_app_id ||
+        form.wechat_connect_mp_app_id ||
+        form.wechat_connect_mobile_app_id ||
+        form.wechat_connect_app_id,
+      wechat_connect_app_secret: form.wechat_connect_app_secret || undefined,
+      wechat_connect_open_app_id: form.wechat_connect_open_app_id,
+      wechat_connect_open_app_secret:
+        form.wechat_connect_open_app_secret || undefined,
+      wechat_connect_mp_app_id: form.wechat_connect_mp_app_id,
+      wechat_connect_mp_app_secret:
+        form.wechat_connect_mp_app_secret || undefined,
+      wechat_connect_mobile_app_id: form.wechat_connect_mobile_app_id,
+      wechat_connect_mobile_app_secret:
+        form.wechat_connect_mobile_app_secret || undefined,
+      wechat_connect_open_enabled: form.wechat_connect_open_enabled,
+      wechat_connect_mp_enabled: form.wechat_connect_mp_enabled,
+      wechat_connect_mobile_enabled: form.wechat_connect_mobile_enabled,
+      wechat_connect_mode: wechatStoredMode,
+      wechat_connect_scopes:
+        defaultWeChatConnectScopesForMode(wechatStoredMode),
+      wechat_connect_redirect_url: form.wechat_connect_redirect_url,
+      wechat_connect_frontend_redirect_url:
+        form.wechat_connect_frontend_redirect_url,
+      oidc_connect_enabled: form.oidc_connect_enabled,
+      oidc_connect_provider_name: form.oidc_connect_provider_name,
+      oidc_connect_client_id: form.oidc_connect_client_id,
+      oidc_connect_client_secret: form.oidc_connect_client_secret || undefined,
+      oidc_connect_issuer_url: form.oidc_connect_issuer_url,
+      oidc_connect_discovery_url: form.oidc_connect_discovery_url,
+      oidc_connect_authorize_url: form.oidc_connect_authorize_url,
+      oidc_connect_token_url: form.oidc_connect_token_url,
+      oidc_connect_userinfo_url: form.oidc_connect_userinfo_url,
+      oidc_connect_jwks_url: form.oidc_connect_jwks_url,
+      oidc_connect_scopes: form.oidc_connect_scopes,
+      oidc_connect_redirect_url: form.oidc_connect_redirect_url,
+      oidc_connect_frontend_redirect_url:
+        form.oidc_connect_frontend_redirect_url,
+      oidc_connect_token_auth_method: form.oidc_connect_token_auth_method,
+      oidc_connect_use_pkce: form.oidc_connect_use_pkce,
+      oidc_connect_validate_id_token: form.oidc_connect_validate_id_token,
+      oidc_connect_allowed_signing_algs: form.oidc_connect_allowed_signing_algs,
+      oidc_connect_clock_skew_seconds: form.oidc_connect_clock_skew_seconds,
+      oidc_connect_require_email_verified:
+        form.oidc_connect_require_email_verified,
+      oidc_connect_userinfo_email_path: form.oidc_connect_userinfo_email_path,
+      oidc_connect_userinfo_id_path: form.oidc_connect_userinfo_id_path,
+      oidc_connect_userinfo_username_path:
+        form.oidc_connect_userinfo_username_path,
       enable_model_fallback: form.enable_model_fallback,
       fallback_model_anthropic: form.fallback_model_anthropic,
       fallback_model_openai: form.fallback_model_openai,
@@ -1462,7 +2634,65 @@ async function saveSettings() {
       ops_query_mode_default: form.ops_query_mode_default,
       ops_metrics_interval_seconds: form.ops_metrics_interval_seconds,
       min_claude_code_version: form.min_claude_code_version,
-      allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling
+      max_claude_code_version: form.max_claude_code_version,
+      allow_ungrouped_key_scheduling: form.allow_ungrouped_key_scheduling,
+      enable_fingerprint_unification: form.enable_fingerprint_unification,
+      enable_metadata_passthrough: form.enable_metadata_passthrough,
+      enable_cch_signing: form.enable_cch_signing,
+      // Payment configuration
+      payment_enabled: form.payment_enabled,
+      payment_min_amount: Number(form.payment_min_amount) || 0,
+      payment_max_amount: Number(form.payment_max_amount) || 0,
+      payment_daily_limit: Number(form.payment_daily_limit) || 0,
+      payment_max_pending_orders: Number(form.payment_max_pending_orders) || 0,
+      payment_order_timeout_minutes:
+        Number(form.payment_order_timeout_minutes) || 0,
+      payment_balance_disabled: form.payment_balance_disabled,
+      payment_balance_recharge_multiplier:
+        Number(form.payment_balance_recharge_multiplier) || 1,
+      payment_recharge_fee_rate: Number(form.payment_recharge_fee_rate) || 0,
+      payment_enabled_types: form.payment_enabled_types,
+      payment_load_balance_strategy: form.payment_load_balance_strategy,
+      payment_product_name_prefix: form.payment_product_name_prefix,
+      payment_product_name_suffix: form.payment_product_name_suffix,
+      payment_help_image_url: form.payment_help_image_url,
+      payment_help_text: form.payment_help_text,
+      payment_cancel_rate_limit_enabled: form.payment_cancel_rate_limit_enabled,
+      payment_cancel_rate_limit_max:
+        Number(form.payment_cancel_rate_limit_max) || 10,
+      payment_cancel_rate_limit_window:
+        Number(form.payment_cancel_rate_limit_window) || 1,
+      payment_cancel_rate_limit_unit: form.payment_cancel_rate_limit_unit,
+      payment_cancel_rate_limit_window_mode:
+        form.payment_cancel_rate_limit_window_mode,
+      openai_advanced_scheduler_enabled: form.openai_advanced_scheduler_enabled,
+      // Balance & quota notification
+      balance_low_notify_enabled: form.balance_low_notify_enabled,
+      balance_low_notify_threshold:
+        Number(form.balance_low_notify_threshold) || 0,
+      balance_low_notify_recharge_url: (form.balance_low_notify_recharge_url =
+        form.balance_low_notify_recharge_url || currentOrigin),
+      account_quota_notify_enabled: form.account_quota_notify_enabled,
+      account_quota_notify_emails: (
+        form.account_quota_notify_emails || []
+      ).filter((e) => e.email.trim() !== ""),
+      // Channel Monitor feature switch
+      channel_monitor_enabled: form.channel_monitor_enabled,
+      channel_monitor_default_interval_seconds:
+        Number(form.channel_monitor_default_interval_seconds) || 60,
+      // Available Channels feature switch
+      available_channels_enabled: form.available_channels_enabled,
+      // Affiliate (邀请返利) feature switch
+      affiliate_enabled: form.affiliate_enabled,
+    };
+
+    appendAuthSourceDefaultsToUpdateRequest(payload, authSourceDefaults);
+
+    const updated = await adminAPI.settings.updateSettings(payload);
+    for (const [key, value] of Object.entries(updated)) {
+      if (value !== null && value !== undefined) {
+        (form as Record<string, unknown>)[key] = value;
+      }
     }
     const updated = await adminAPI.settings.updateSettings(payload)
     Object.assign(form, updated)
@@ -1474,110 +2704,119 @@ async function saveSettings() {
     appStore.showSuccess(t('admin.settings.settingsSaved'))
   } catch (error: any) {
     appStore.showError(
-      t('admin.settings.failedToSave') + ': ' + (error.message || t('common.unknownError'))
-    )
+      extractApiErrorMessage(error, t("admin.settings.failedToSave")),
+    );
   } finally {
-    saving.value = false
+    saving.value = false;
   }
 }
 
 async function testSmtpConnection() {
-  testingSmtp.value = true
+  testingSmtp.value = true;
   try {
+    const smtpPasswordForTest = smtpPasswordManuallyEdited.value
+      ? form.smtp_password
+      : "";
     const result = await adminAPI.settings.testSmtpConnection({
       smtp_host: form.smtp_host,
       smtp_port: form.smtp_port,
       smtp_username: form.smtp_username,
-      smtp_password: form.smtp_password,
-      smtp_use_tls: form.smtp_use_tls
-    })
+      smtp_password: smtpPasswordForTest,
+      smtp_use_tls: form.smtp_use_tls,
+    });
     // API returns { message: "..." } on success, errors are thrown as exceptions
-    appStore.showSuccess(result.message || t('admin.settings.smtpConnectionSuccess'))
-  } catch (error: any) {
+    appStore.showSuccess(
+      result.message || t("admin.settings.smtpConnectionSuccess"),
+    );
+  } catch (error: unknown) {
     appStore.showError(
-      t('admin.settings.failedToTestSmtp') + ': ' + (error.message || t('common.unknownError'))
-    )
+      extractApiErrorMessage(error, t("admin.settings.failedToTestSmtp")),
+    );
   } finally {
-    testingSmtp.value = false
+    testingSmtp.value = false;
   }
 }
 
 async function sendTestEmail() {
   if (!testEmailAddress.value) {
-    appStore.showError(t('admin.settings.testEmail.enterRecipientHint'))
-    return
+    appStore.showError(t("admin.settings.testEmail.enterRecipientHint"));
+    return;
   }
 
-  sendingTestEmail.value = true
+  sendingTestEmail.value = true;
   try {
+    const smtpPasswordForSend = smtpPasswordManuallyEdited.value
+      ? form.smtp_password
+      : "";
     const result = await adminAPI.settings.sendTestEmail({
       email: testEmailAddress.value,
       smtp_host: form.smtp_host,
       smtp_port: form.smtp_port,
       smtp_username: form.smtp_username,
-      smtp_password: form.smtp_password,
+      smtp_password: smtpPasswordForSend,
       smtp_from_email: form.smtp_from_email,
       smtp_from_name: form.smtp_from_name,
-      smtp_use_tls: form.smtp_use_tls
-    })
+      smtp_use_tls: form.smtp_use_tls,
+    });
     // API returns { message: "..." } on success, errors are thrown as exceptions
-    appStore.showSuccess(result.message || t('admin.settings.testEmailSent'))
-  } catch (error: any) {
+    appStore.showSuccess(result.message || t("admin.settings.testEmailSent"));
+  } catch (error: unknown) {
     appStore.showError(
-      t('admin.settings.failedToSendTestEmail') + ': ' + (error.message || t('common.unknownError'))
-    )
+      extractApiErrorMessage(error, t("admin.settings.failedToSendTestEmail")),
+    );
   } finally {
-    sendingTestEmail.value = false
+    sendingTestEmail.value = false;
   }
 }
 
 // Admin API Key 方法
 async function loadAdminApiKey() {
-  adminApiKeyLoading.value = true
+  adminApiKeyLoading.value = true;
   try {
-    const status = await adminAPI.settings.getAdminApiKey()
-    adminApiKeyExists.value = status.exists
-    adminApiKeyMasked.value = status.masked_key
-  } catch (error: any) {
-    console.error('Failed to load admin API key status:', error)
+    const status = await adminAPI.settings.getAdminApiKey();
+    adminApiKeyExists.value = status.exists;
+    adminApiKeyMasked.value = status.masked_key;
+  } catch (_error: unknown) {
+    // Silent fail - admin API key status is non-critical
   } finally {
-    adminApiKeyLoading.value = false
+    adminApiKeyLoading.value = false;
   }
 }
 
 async function createAdminApiKey() {
-  adminApiKeyOperating.value = true
+  adminApiKeyOperating.value = true;
   try {
-    const result = await adminAPI.settings.regenerateAdminApiKey()
-    newAdminApiKey.value = result.key
-    adminApiKeyExists.value = true
-    adminApiKeyMasked.value = result.key.substring(0, 10) + '...' + result.key.slice(-4)
-    appStore.showSuccess(t('admin.settings.adminApiKey.keyGenerated'))
-  } catch (error: any) {
-    appStore.showError(error.message || t('common.error'))
+    const result = await adminAPI.settings.regenerateAdminApiKey();
+    newAdminApiKey.value = result.key;
+    adminApiKeyExists.value = true;
+    adminApiKeyMasked.value =
+      result.key.substring(0, 10) + "..." + result.key.slice(-4);
+    appStore.showSuccess(t("admin.settings.adminApiKey.keyGenerated"));
+  } catch (error: unknown) {
+    appStore.showError(extractApiErrorMessage(error, t("common.error")));
   } finally {
-    adminApiKeyOperating.value = false
+    adminApiKeyOperating.value = false;
   }
 }
 
 async function regenerateAdminApiKey() {
-  if (!confirm(t('admin.settings.adminApiKey.regenerateConfirm'))) return
-  await createAdminApiKey()
+  if (!confirm(t("admin.settings.adminApiKey.regenerateConfirm"))) return;
+  await createAdminApiKey();
 }
 
 async function deleteAdminApiKey() {
-  if (!confirm(t('admin.settings.adminApiKey.deleteConfirm'))) return
-  adminApiKeyOperating.value = true
+  if (!confirm(t("admin.settings.adminApiKey.deleteConfirm"))) return;
+  adminApiKeyOperating.value = true;
   try {
-    await adminAPI.settings.deleteAdminApiKey()
-    adminApiKeyExists.value = false
-    adminApiKeyMasked.value = ''
-    newAdminApiKey.value = ''
-    appStore.showSuccess(t('admin.settings.adminApiKey.keyDeleted'))
-  } catch (error: any) {
-    appStore.showError(error.message || t('common.error'))
+    await adminAPI.settings.deleteAdminApiKey();
+    adminApiKeyExists.value = false;
+    adminApiKeyMasked.value = "";
+    newAdminApiKey.value = "";
+    appStore.showSuccess(t("admin.settings.adminApiKey.keyDeleted"));
+  } catch (error: unknown) {
+    appStore.showError(extractApiErrorMessage(error, t("common.error")));
   } finally {
-    adminApiKeyOperating.value = false
+    adminApiKeyOperating.value = false;
   }
 }
 
@@ -1585,11 +2824,11 @@ function copyNewKey() {
   navigator.clipboard
     .writeText(newAdminApiKey.value)
     .then(() => {
-      appStore.showSuccess(t('admin.settings.adminApiKey.keyCopied'))
+      appStore.showSuccess(t("admin.settings.adminApiKey.keyCopied"));
     })
     .catch(() => {
-      appStore.showError(t('common.copyFailed'))
-    })
+      appStore.showError(t("common.copyFailed"));
+    });
 }
 
 // Read-only Admin API Key 方法
@@ -1655,35 +2894,38 @@ function copyNewReadOnlyKey() {
 
 // Stream Timeout 方法
 async function loadStreamTimeoutSettings() {
-  streamTimeoutLoading.value = true
+  streamTimeoutLoading.value = true;
   try {
-    const settings = await adminAPI.settings.getStreamTimeoutSettings()
-    Object.assign(streamTimeoutForm, settings)
-  } catch (error: any) {
-    console.error('Failed to load stream timeout settings:', error)
+    const settings = await adminAPI.settings.getStreamTimeoutSettings();
+    Object.assign(streamTimeoutForm, settings);
+  } catch (_error: unknown) {
+    // Silent fail - settings will use defaults
   } finally {
-    streamTimeoutLoading.value = false
+    streamTimeoutLoading.value = false;
   }
 }
 
 async function saveStreamTimeoutSettings() {
-  streamTimeoutSaving.value = true
+  streamTimeoutSaving.value = true;
   try {
     const updated = await adminAPI.settings.updateStreamTimeoutSettings({
       enabled: streamTimeoutForm.enabled,
       action: streamTimeoutForm.action,
       temp_unsched_minutes: streamTimeoutForm.temp_unsched_minutes,
       threshold_count: streamTimeoutForm.threshold_count,
-      threshold_window_minutes: streamTimeoutForm.threshold_window_minutes
-    })
-    Object.assign(streamTimeoutForm, updated)
-    appStore.showSuccess(t('admin.settings.streamTimeout.saved'))
-  } catch (error: any) {
+      threshold_window_minutes: streamTimeoutForm.threshold_window_minutes,
+    });
+    Object.assign(streamTimeoutForm, updated);
+    appStore.showSuccess(t("admin.settings.streamTimeout.saved"));
+  } catch (error: unknown) {
     appStore.showError(
-      t('admin.settings.streamTimeout.saveFailed') + ': ' + (error.message || t('common.unknownError'))
-    )
+      extractApiErrorMessage(
+        error,
+        t("admin.settings.streamTimeout.saveFailed"),
+      ),
+    );
   } finally {
-    streamTimeoutSaving.value = false
+    streamTimeoutSaving.value = false;
   }
 }
 

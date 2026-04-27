@@ -3,7 +3,6 @@ package admin
 import (
 	"log"
 	"strings"
-	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
@@ -36,6 +35,11 @@ func NewSettingHandler(settingService *service.SettingService, emailService *ser
 // GET /api/v1/admin/settings
 func (h *SettingHandler) GetSettings(c *gin.Context) {
 	settings, err := h.settingService.GetAllSettings(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	authSourceDefaults, err := h.settingService.GetAuthSourceDefaultSettings(c.Request.Context())
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -122,6 +126,48 @@ type UpdateSettingsRequest struct {
 	LinuxDoConnectClientSecret string `json:"linuxdo_connect_client_secret"`
 	LinuxDoConnectRedirectURL  string `json:"linuxdo_connect_redirect_url"`
 
+	// WeChat Connect OAuth 登录
+	WeChatConnectEnabled             bool   `json:"wechat_connect_enabled"`
+	WeChatConnectAppID               string `json:"wechat_connect_app_id"`
+	WeChatConnectAppSecret           string `json:"wechat_connect_app_secret"`
+	WeChatConnectOpenAppID           string `json:"wechat_connect_open_app_id"`
+	WeChatConnectOpenAppSecret       string `json:"wechat_connect_open_app_secret"`
+	WeChatConnectMPAppID             string `json:"wechat_connect_mp_app_id"`
+	WeChatConnectMPAppSecret         string `json:"wechat_connect_mp_app_secret"`
+	WeChatConnectMobileAppID         string `json:"wechat_connect_mobile_app_id"`
+	WeChatConnectMobileAppSecret     string `json:"wechat_connect_mobile_app_secret"`
+	WeChatConnectOpenEnabled         bool   `json:"wechat_connect_open_enabled"`
+	WeChatConnectMPEnabled           bool   `json:"wechat_connect_mp_enabled"`
+	WeChatConnectMobileEnabled       bool   `json:"wechat_connect_mobile_enabled"`
+	WeChatConnectMode                string `json:"wechat_connect_mode"`
+	WeChatConnectScopes              string `json:"wechat_connect_scopes"`
+	WeChatConnectRedirectURL         string `json:"wechat_connect_redirect_url"`
+	WeChatConnectFrontendRedirectURL string `json:"wechat_connect_frontend_redirect_url"`
+
+	// Generic OIDC OAuth 登录
+	OIDCConnectEnabled              bool   `json:"oidc_connect_enabled"`
+	OIDCConnectProviderName         string `json:"oidc_connect_provider_name"`
+	OIDCConnectClientID             string `json:"oidc_connect_client_id"`
+	OIDCConnectClientSecret         string `json:"oidc_connect_client_secret"`
+	OIDCConnectIssuerURL            string `json:"oidc_connect_issuer_url"`
+	OIDCConnectDiscoveryURL         string `json:"oidc_connect_discovery_url"`
+	OIDCConnectAuthorizeURL         string `json:"oidc_connect_authorize_url"`
+	OIDCConnectTokenURL             string `json:"oidc_connect_token_url"`
+	OIDCConnectUserInfoURL          string `json:"oidc_connect_userinfo_url"`
+	OIDCConnectJWKSURL              string `json:"oidc_connect_jwks_url"`
+	OIDCConnectScopes               string `json:"oidc_connect_scopes"`
+	OIDCConnectRedirectURL          string `json:"oidc_connect_redirect_url"`
+	OIDCConnectFrontendRedirectURL  string `json:"oidc_connect_frontend_redirect_url"`
+	OIDCConnectTokenAuthMethod      string `json:"oidc_connect_token_auth_method"`
+	OIDCConnectUsePKCE              *bool  `json:"oidc_connect_use_pkce"`
+	OIDCConnectValidateIDToken      *bool  `json:"oidc_connect_validate_id_token"`
+	OIDCConnectAllowedSigningAlgs   string `json:"oidc_connect_allowed_signing_algs"`
+	OIDCConnectClockSkewSeconds     int    `json:"oidc_connect_clock_skew_seconds"`
+	OIDCConnectRequireEmailVerified bool   `json:"oidc_connect_require_email_verified"`
+	OIDCConnectUserInfoEmailPath    string `json:"oidc_connect_userinfo_email_path"`
+	OIDCConnectUserInfoIDPath       string `json:"oidc_connect_userinfo_id_path"`
+	OIDCConnectUserInfoUsernamePath string `json:"oidc_connect_userinfo_username_path"`
+
 	// OEM设置
 	SiteName                    string  `json:"site_name"`
 	SiteLogo                    string  `json:"site_logo"`
@@ -170,6 +216,11 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	previousAuthSourceDefaults, err := h.settingService.GetAuthSourceDefaultSettings(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
 
 	// 验证参数
 	if req.DefaultConcurrency < 1 {
@@ -178,6 +229,55 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	if req.DefaultBalance < 0 {
 		req.DefaultBalance = 0
 	}
+	affiliateRebateRate := previousSettings.AffiliateRebateRate
+	if req.AffiliateRebateRate != nil {
+		affiliateRebateRate = *req.AffiliateRebateRate
+	}
+	if affiliateRebateRate < service.AffiliateRebateRateMin {
+		affiliateRebateRate = service.AffiliateRebateRateMin
+	}
+	if affiliateRebateRate > service.AffiliateRebateRateMax {
+		affiliateRebateRate = service.AffiliateRebateRateMax
+	}
+	affiliateRebateFreezeHours := previousSettings.AffiliateRebateFreezeHours
+	if req.AffiliateRebateFreezeHours != nil {
+		affiliateRebateFreezeHours = *req.AffiliateRebateFreezeHours
+	}
+	if affiliateRebateFreezeHours < 0 {
+		affiliateRebateFreezeHours = service.AffiliateRebateFreezeHoursDefault
+	}
+	if affiliateRebateFreezeHours > service.AffiliateRebateFreezeHoursMax {
+		affiliateRebateFreezeHours = service.AffiliateRebateFreezeHoursMax
+	}
+	affiliateRebateDurationDays := previousSettings.AffiliateRebateDurationDays
+	if req.AffiliateRebateDurationDays != nil {
+		affiliateRebateDurationDays = *req.AffiliateRebateDurationDays
+	}
+	if affiliateRebateDurationDays < 0 {
+		affiliateRebateDurationDays = service.AffiliateRebateDurationDaysDefault
+	}
+	if affiliateRebateDurationDays > service.AffiliateRebateDurationDaysMax {
+		affiliateRebateDurationDays = service.AffiliateRebateDurationDaysMax
+	}
+	affiliateRebatePerInviteeCap := previousSettings.AffiliateRebatePerInviteeCap
+	if req.AffiliateRebatePerInviteeCap != nil {
+		affiliateRebatePerInviteeCap = *req.AffiliateRebatePerInviteeCap
+	}
+	if affiliateRebatePerInviteeCap < 0 {
+		affiliateRebatePerInviteeCap = service.AffiliateRebatePerInviteeCapDefault
+	}
+	// 通用表格配置：兼容旧客户端未传字段时保留当前值。
+	if req.TableDefaultPageSize <= 0 {
+		req.TableDefaultPageSize = previousSettings.TableDefaultPageSize
+	}
+	if req.TablePageSizeOptions == nil {
+		req.TablePageSizeOptions = previousSettings.TablePageSizeOptions
+	}
+	req.SMTPHost = strings.TrimSpace(req.SMTPHost)
+	req.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
+	req.SMTPPassword = strings.TrimSpace(req.SMTPPassword)
+	req.SMTPFrom = strings.TrimSpace(req.SMTPFrom)
+	req.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
 	if req.SMTPPort <= 0 {
 		req.SMTPPort = 587
 	}
@@ -248,6 +348,275 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		}
 	}
 
+	if req.WeChatConnectEnabled {
+		req.WeChatConnectAppID = strings.TrimSpace(req.WeChatConnectAppID)
+		req.WeChatConnectAppSecret = strings.TrimSpace(req.WeChatConnectAppSecret)
+		req.WeChatConnectOpenAppID = strings.TrimSpace(req.WeChatConnectOpenAppID)
+		req.WeChatConnectOpenAppSecret = strings.TrimSpace(req.WeChatConnectOpenAppSecret)
+		req.WeChatConnectMPAppID = strings.TrimSpace(req.WeChatConnectMPAppID)
+		req.WeChatConnectMPAppSecret = strings.TrimSpace(req.WeChatConnectMPAppSecret)
+		req.WeChatConnectMobileAppID = strings.TrimSpace(req.WeChatConnectMobileAppID)
+		req.WeChatConnectMobileAppSecret = strings.TrimSpace(req.WeChatConnectMobileAppSecret)
+		req.WeChatConnectMode = strings.ToLower(strings.TrimSpace(req.WeChatConnectMode))
+		req.WeChatConnectScopes = strings.TrimSpace(req.WeChatConnectScopes)
+		req.WeChatConnectRedirectURL = strings.TrimSpace(req.WeChatConnectRedirectURL)
+		req.WeChatConnectFrontendRedirectURL = strings.TrimSpace(req.WeChatConnectFrontendRedirectURL)
+		req.WeChatConnectAppID = strings.TrimSpace(firstNonEmpty(req.WeChatConnectAppID, previousSettings.WeChatConnectAppID))
+		req.WeChatConnectRedirectURL = strings.TrimSpace(firstNonEmpty(req.WeChatConnectRedirectURL, previousSettings.WeChatConnectRedirectURL))
+		req.WeChatConnectFrontendRedirectURL = strings.TrimSpace(firstNonEmpty(req.WeChatConnectFrontendRedirectURL, previousSettings.WeChatConnectFrontendRedirectURL))
+		if req.WeChatConnectMode == "" {
+			req.WeChatConnectMode = strings.ToLower(strings.TrimSpace(previousSettings.WeChatConnectMode))
+		}
+		if req.WeChatConnectScopes == "" {
+			req.WeChatConnectScopes = strings.TrimSpace(previousSettings.WeChatConnectScopes)
+		}
+
+		if req.WeChatConnectMPEnabled && req.WeChatConnectMobileEnabled {
+			response.BadRequest(c, "WeChat Official Account and Mobile App cannot be enabled at the same time")
+			return
+		}
+		if req.WeChatConnectMode != "" {
+			switch req.WeChatConnectMode {
+			case "open", "mp", "mobile":
+			default:
+				response.BadRequest(c, "WeChat mode must be open, mp, or mobile")
+				return
+			}
+		}
+		if !req.WeChatConnectOpenEnabled && !req.WeChatConnectMPEnabled && !req.WeChatConnectMobileEnabled {
+			switch req.WeChatConnectMode {
+			case "mp":
+				req.WeChatConnectMPEnabled = true
+			case "mobile":
+				req.WeChatConnectMobileEnabled = true
+			default:
+				req.WeChatConnectOpenEnabled = true
+			}
+		}
+		if req.WeChatConnectMode == "" {
+			if req.WeChatConnectMPEnabled {
+				req.WeChatConnectMode = "mp"
+			} else if req.WeChatConnectMobileEnabled {
+				req.WeChatConnectMode = "mobile"
+			} else {
+				req.WeChatConnectMode = "open"
+			}
+		}
+
+		req.WeChatConnectOpenAppID = strings.TrimSpace(firstNonEmpty(req.WeChatConnectOpenAppID, req.WeChatConnectAppID, previousSettings.WeChatConnectOpenAppID, previousSettings.WeChatConnectAppID))
+		req.WeChatConnectMPAppID = strings.TrimSpace(firstNonEmpty(req.WeChatConnectMPAppID, req.WeChatConnectAppID, previousSettings.WeChatConnectMPAppID, previousSettings.WeChatConnectAppID))
+		req.WeChatConnectMobileAppID = strings.TrimSpace(firstNonEmpty(req.WeChatConnectMobileAppID, req.WeChatConnectAppID, previousSettings.WeChatConnectMobileAppID, previousSettings.WeChatConnectAppID))
+
+		if req.WeChatConnectOpenAppSecret == "" {
+			req.WeChatConnectOpenAppSecret = strings.TrimSpace(firstNonEmpty(previousSettings.WeChatConnectOpenAppSecret, previousSettings.WeChatConnectAppSecret, req.WeChatConnectAppSecret))
+		}
+		if req.WeChatConnectMPAppSecret == "" {
+			req.WeChatConnectMPAppSecret = strings.TrimSpace(firstNonEmpty(previousSettings.WeChatConnectMPAppSecret, previousSettings.WeChatConnectAppSecret, req.WeChatConnectAppSecret))
+		}
+		if req.WeChatConnectMobileAppSecret == "" {
+			req.WeChatConnectMobileAppSecret = strings.TrimSpace(firstNonEmpty(previousSettings.WeChatConnectMobileAppSecret, previousSettings.WeChatConnectAppSecret, req.WeChatConnectAppSecret))
+		}
+		if req.WeChatConnectAppSecret == "" {
+			req.WeChatConnectAppSecret = strings.TrimSpace(firstNonEmpty(req.WeChatConnectOpenAppSecret, req.WeChatConnectMPAppSecret, req.WeChatConnectMobileAppSecret, previousSettings.WeChatConnectAppSecret))
+		}
+
+		if req.WeChatConnectOpenEnabled {
+			if req.WeChatConnectOpenAppID == "" {
+				response.BadRequest(c, "WeChat PC App ID is required when enabled")
+				return
+			}
+			if req.WeChatConnectOpenAppSecret == "" {
+				response.BadRequest(c, "WeChat PC App Secret is required when enabled")
+				return
+			}
+		}
+		if req.WeChatConnectMPEnabled {
+			if req.WeChatConnectMPAppID == "" {
+				response.BadRequest(c, "WeChat Official Account App ID is required when enabled")
+				return
+			}
+			if req.WeChatConnectMPAppSecret == "" {
+				response.BadRequest(c, "WeChat Official Account App Secret is required when enabled")
+				return
+			}
+		}
+		if req.WeChatConnectMobileEnabled {
+			if req.WeChatConnectMobileAppID == "" {
+				response.BadRequest(c, "WeChat Mobile App ID is required when enabled")
+				return
+			}
+			if req.WeChatConnectMobileAppSecret == "" {
+				response.BadRequest(c, "WeChat Mobile App Secret is required when enabled")
+				return
+			}
+		}
+
+		if req.WeChatConnectScopes == "" {
+			if req.WeChatConnectMPEnabled {
+				req.WeChatConnectScopes = service.DefaultWeChatConnectScopesForMode("mp")
+			} else {
+				req.WeChatConnectScopes = service.DefaultWeChatConnectScopesForMode(req.WeChatConnectMode)
+			}
+		}
+		if req.WeChatConnectOpenEnabled || req.WeChatConnectMPEnabled {
+			if req.WeChatConnectRedirectURL == "" {
+				response.BadRequest(c, "WeChat Redirect URL is required when web oauth is enabled")
+				return
+			}
+			if err := config.ValidateAbsoluteHTTPURL(req.WeChatConnectRedirectURL); err != nil {
+				response.BadRequest(c, "WeChat Redirect URL must be an absolute http(s) URL")
+				return
+			}
+			if req.WeChatConnectFrontendRedirectURL == "" {
+				req.WeChatConnectFrontendRedirectURL = "/auth/wechat/callback"
+			}
+			if err := config.ValidateFrontendRedirectURL(req.WeChatConnectFrontendRedirectURL); err != nil {
+				response.BadRequest(c, "WeChat Frontend Redirect URL is invalid")
+				return
+			}
+		}
+	}
+
+	// Generic OIDC 参数验证
+	oidcUsePKCE, oidcValidateIDToken, err := h.settingService.OIDCSecurityWriteDefaults(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if req.OIDCConnectEnabled {
+		req.OIDCConnectProviderName = strings.TrimSpace(req.OIDCConnectProviderName)
+		req.OIDCConnectClientID = strings.TrimSpace(req.OIDCConnectClientID)
+		req.OIDCConnectClientSecret = strings.TrimSpace(req.OIDCConnectClientSecret)
+		req.OIDCConnectIssuerURL = strings.TrimSpace(req.OIDCConnectIssuerURL)
+		req.OIDCConnectDiscoveryURL = strings.TrimSpace(req.OIDCConnectDiscoveryURL)
+		req.OIDCConnectAuthorizeURL = strings.TrimSpace(req.OIDCConnectAuthorizeURL)
+		req.OIDCConnectTokenURL = strings.TrimSpace(req.OIDCConnectTokenURL)
+		req.OIDCConnectUserInfoURL = strings.TrimSpace(req.OIDCConnectUserInfoURL)
+		req.OIDCConnectJWKSURL = strings.TrimSpace(req.OIDCConnectJWKSURL)
+		req.OIDCConnectScopes = strings.TrimSpace(req.OIDCConnectScopes)
+		req.OIDCConnectRedirectURL = strings.TrimSpace(req.OIDCConnectRedirectURL)
+		req.OIDCConnectFrontendRedirectURL = strings.TrimSpace(req.OIDCConnectFrontendRedirectURL)
+		req.OIDCConnectTokenAuthMethod = strings.ToLower(strings.TrimSpace(req.OIDCConnectTokenAuthMethod))
+		req.OIDCConnectAllowedSigningAlgs = strings.TrimSpace(req.OIDCConnectAllowedSigningAlgs)
+		req.OIDCConnectUserInfoEmailPath = strings.TrimSpace(req.OIDCConnectUserInfoEmailPath)
+		req.OIDCConnectUserInfoIDPath = strings.TrimSpace(req.OIDCConnectUserInfoIDPath)
+		req.OIDCConnectUserInfoUsernamePath = strings.TrimSpace(req.OIDCConnectUserInfoUsernamePath)
+		req.OIDCConnectProviderName = strings.TrimSpace(firstNonEmpty(req.OIDCConnectProviderName, previousSettings.OIDCConnectProviderName, "OIDC"))
+		req.OIDCConnectClientID = strings.TrimSpace(firstNonEmpty(req.OIDCConnectClientID, previousSettings.OIDCConnectClientID))
+		req.OIDCConnectIssuerURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectIssuerURL, previousSettings.OIDCConnectIssuerURL))
+		req.OIDCConnectDiscoveryURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectDiscoveryURL, previousSettings.OIDCConnectDiscoveryURL))
+		req.OIDCConnectAuthorizeURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectAuthorizeURL, previousSettings.OIDCConnectAuthorizeURL))
+		req.OIDCConnectTokenURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectTokenURL, previousSettings.OIDCConnectTokenURL))
+		req.OIDCConnectUserInfoURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectUserInfoURL, previousSettings.OIDCConnectUserInfoURL))
+		req.OIDCConnectJWKSURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectJWKSURL, previousSettings.OIDCConnectJWKSURL))
+		req.OIDCConnectScopes = strings.TrimSpace(firstNonEmpty(req.OIDCConnectScopes, previousSettings.OIDCConnectScopes, "openid email profile"))
+		req.OIDCConnectRedirectURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectRedirectURL, previousSettings.OIDCConnectRedirectURL))
+		req.OIDCConnectFrontendRedirectURL = strings.TrimSpace(firstNonEmpty(req.OIDCConnectFrontendRedirectURL, previousSettings.OIDCConnectFrontendRedirectURL, "/auth/oidc/callback"))
+		req.OIDCConnectTokenAuthMethod = strings.ToLower(strings.TrimSpace(firstNonEmpty(req.OIDCConnectTokenAuthMethod, previousSettings.OIDCConnectTokenAuthMethod, "client_secret_post")))
+		req.OIDCConnectAllowedSigningAlgs = strings.TrimSpace(firstNonEmpty(req.OIDCConnectAllowedSigningAlgs, previousSettings.OIDCConnectAllowedSigningAlgs, "RS256,ES256,PS256"))
+		req.OIDCConnectUserInfoEmailPath = strings.TrimSpace(firstNonEmpty(req.OIDCConnectUserInfoEmailPath, previousSettings.OIDCConnectUserInfoEmailPath))
+		req.OIDCConnectUserInfoIDPath = strings.TrimSpace(firstNonEmpty(req.OIDCConnectUserInfoIDPath, previousSettings.OIDCConnectUserInfoIDPath))
+		req.OIDCConnectUserInfoUsernamePath = strings.TrimSpace(firstNonEmpty(req.OIDCConnectUserInfoUsernamePath, previousSettings.OIDCConnectUserInfoUsernamePath))
+		if req.OIDCConnectUsePKCE != nil {
+			oidcUsePKCE = *req.OIDCConnectUsePKCE
+		}
+		if req.OIDCConnectValidateIDToken != nil {
+			oidcValidateIDToken = *req.OIDCConnectValidateIDToken
+		}
+		if req.OIDCConnectClockSkewSeconds == 0 {
+			req.OIDCConnectClockSkewSeconds = previousSettings.OIDCConnectClockSkewSeconds
+			if req.OIDCConnectClockSkewSeconds == 0 {
+				req.OIDCConnectClockSkewSeconds = 120
+			}
+		}
+
+		if req.OIDCConnectClientID == "" {
+			response.BadRequest(c, "OIDC Client ID is required when enabled")
+			return
+		}
+		if req.OIDCConnectIssuerURL == "" {
+			response.BadRequest(c, "OIDC Issuer URL is required when enabled")
+			return
+		}
+		if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectIssuerURL); err != nil {
+			response.BadRequest(c, "OIDC Issuer URL must be an absolute http(s) URL")
+			return
+		}
+		if req.OIDCConnectDiscoveryURL != "" {
+			if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectDiscoveryURL); err != nil {
+				response.BadRequest(c, "OIDC Discovery URL must be an absolute http(s) URL")
+				return
+			}
+		}
+		if req.OIDCConnectAuthorizeURL != "" {
+			if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectAuthorizeURL); err != nil {
+				response.BadRequest(c, "OIDC Authorize URL must be an absolute http(s) URL")
+				return
+			}
+		}
+		if req.OIDCConnectTokenURL != "" {
+			if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectTokenURL); err != nil {
+				response.BadRequest(c, "OIDC Token URL must be an absolute http(s) URL")
+				return
+			}
+		}
+		if req.OIDCConnectUserInfoURL != "" {
+			if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectUserInfoURL); err != nil {
+				response.BadRequest(c, "OIDC UserInfo URL must be an absolute http(s) URL")
+				return
+			}
+		}
+		if req.OIDCConnectRedirectURL == "" {
+			response.BadRequest(c, "OIDC Redirect URL is required when enabled")
+			return
+		}
+		if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectRedirectURL); err != nil {
+			response.BadRequest(c, "OIDC Redirect URL must be an absolute http(s) URL")
+			return
+		}
+		if req.OIDCConnectFrontendRedirectURL == "" {
+			response.BadRequest(c, "OIDC Frontend Redirect URL is required when enabled")
+			return
+		}
+		if err := config.ValidateFrontendRedirectURL(req.OIDCConnectFrontendRedirectURL); err != nil {
+			response.BadRequest(c, "OIDC Frontend Redirect URL is invalid")
+			return
+		}
+		if !scopesContainOpenID(req.OIDCConnectScopes) {
+			response.BadRequest(c, "OIDC scopes must contain openid")
+			return
+		}
+		switch req.OIDCConnectTokenAuthMethod {
+		case "", "client_secret_post", "client_secret_basic", "none":
+		default:
+			response.BadRequest(c, "OIDC Token Auth Method must be one of client_secret_post/client_secret_basic/none")
+			return
+		}
+		if req.OIDCConnectClockSkewSeconds < 0 || req.OIDCConnectClockSkewSeconds > 600 {
+			response.BadRequest(c, "OIDC clock skew seconds must be between 0 and 600")
+			return
+		}
+		if oidcValidateIDToken && req.OIDCConnectAllowedSigningAlgs == "" {
+			response.BadRequest(c, "OIDC Allowed Signing Algs is required when validate_id_token=true")
+			return
+		}
+		if req.OIDCConnectJWKSURL != "" {
+			if err := config.ValidateAbsoluteHTTPURL(req.OIDCConnectJWKSURL); err != nil {
+				response.BadRequest(c, "OIDC JWKS URL must be an absolute http(s) URL")
+				return
+			}
+		}
+		if req.OIDCConnectTokenAuthMethod == "" || req.OIDCConnectTokenAuthMethod == "client_secret_post" || req.OIDCConnectTokenAuthMethod == "client_secret_basic" {
+			if req.OIDCConnectClientSecret == "" {
+				if previousSettings.OIDCConnectClientSecret == "" {
+					response.BadRequest(c, "OIDC Client Secret is required when enabled")
+					return
+				}
+				req.OIDCConnectClientSecret = previousSettings.OIDCConnectClientSecret
+			}
+		}
+	}
+
 	// “购买订阅”页面配置验证
 	purchaseEnabled := previousSettings.PurchaseSubscriptionEnabled
 	if req.PurchaseSubscriptionEnabled != nil {
@@ -286,6 +655,22 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			v = 3600
 		}
 		req.OpsMetricsIntervalSeconds = &v
+	}
+
+	// 验证最高版本号格式（空字符串=禁用，或合法 semver）
+	if req.MaxClaudeCodeVersion != "" {
+		if !semverPattern.MatchString(req.MaxClaudeCodeVersion) {
+			response.Error(c, http.StatusBadRequest, "max_claude_code_version must be empty or a valid semver (e.g. 3.0.0)")
+			return
+		}
+	}
+
+	// 交叉验证：如果同时设置了最低和最高版本号，最高版本号必须 >= 最低版本号
+	if req.MinClaudeCodeVersion != "" && req.MaxClaudeCodeVersion != "" {
+		if service.CompareVersions(req.MaxClaudeCodeVersion, req.MinClaudeCodeVersion) < 0 {
+			response.Error(c, http.StatusBadRequest, "max_claude_code_version must be greater than or equal to min_claude_code_version")
+			return
+		}
 	}
 
 	settings := &service.SystemSettings{
@@ -352,14 +737,182 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.OpsMetricsIntervalSeconds
 		}(),
+		EnableFingerprintUnification: func() bool {
+			if req.EnableFingerprintUnification != nil {
+				return *req.EnableFingerprintUnification
+			}
+			return previousSettings.EnableFingerprintUnification
+		}(),
+		EnableMetadataPassthrough: func() bool {
+			if req.EnableMetadataPassthrough != nil {
+				return *req.EnableMetadataPassthrough
+			}
+			return previousSettings.EnableMetadataPassthrough
+		}(),
+		EnableCCHSigning: func() bool {
+			if req.EnableCCHSigning != nil {
+				return *req.EnableCCHSigning
+			}
+			return previousSettings.EnableCCHSigning
+		}(),
+		PaymentVisibleMethodAlipaySource: func() string {
+			if req.PaymentVisibleMethodAlipaySource != nil {
+				return strings.TrimSpace(*req.PaymentVisibleMethodAlipaySource)
+			}
+			return previousSettings.PaymentVisibleMethodAlipaySource
+		}(),
+		PaymentVisibleMethodWxpaySource: func() string {
+			if req.PaymentVisibleMethodWxpaySource != nil {
+				return strings.TrimSpace(*req.PaymentVisibleMethodWxpaySource)
+			}
+			return previousSettings.PaymentVisibleMethodWxpaySource
+		}(),
+		PaymentVisibleMethodAlipayEnabled: func() bool {
+			if req.PaymentVisibleMethodAlipayEnabled != nil {
+				return *req.PaymentVisibleMethodAlipayEnabled
+			}
+			return previousSettings.PaymentVisibleMethodAlipayEnabled
+		}(),
+		PaymentVisibleMethodWxpayEnabled: func() bool {
+			if req.PaymentVisibleMethodWxpayEnabled != nil {
+				return *req.PaymentVisibleMethodWxpayEnabled
+			}
+			return previousSettings.PaymentVisibleMethodWxpayEnabled
+		}(),
+		OpenAIAdvancedSchedulerEnabled: func() bool {
+			if req.OpenAIAdvancedSchedulerEnabled != nil {
+				return *req.OpenAIAdvancedSchedulerEnabled
+			}
+			return previousSettings.OpenAIAdvancedSchedulerEnabled
+		}(),
+		BalanceLowNotifyEnabled: func() bool {
+			if req.BalanceLowNotifyEnabled != nil {
+				return *req.BalanceLowNotifyEnabled
+			}
+			return previousSettings.BalanceLowNotifyEnabled
+		}(),
+		BalanceLowNotifyThreshold: func() float64 {
+			if req.BalanceLowNotifyThreshold != nil {
+				return *req.BalanceLowNotifyThreshold
+			}
+			return previousSettings.BalanceLowNotifyThreshold
+		}(),
+		BalanceLowNotifyRechargeURL: func() string {
+			if req.BalanceLowNotifyRechargeURL != nil {
+				return *req.BalanceLowNotifyRechargeURL
+			}
+			return previousSettings.BalanceLowNotifyRechargeURL
+		}(),
+		AccountQuotaNotifyEnabled: func() bool {
+			if req.AccountQuotaNotifyEnabled != nil {
+				return *req.AccountQuotaNotifyEnabled
+			}
+			return previousSettings.AccountQuotaNotifyEnabled
+		}(),
+		AccountQuotaNotifyEmails: func() []service.NotifyEmailEntry {
+			if req.AccountQuotaNotifyEmails != nil {
+				return dto.NotifyEmailEntriesToService(*req.AccountQuotaNotifyEmails)
+			}
+			return previousSettings.AccountQuotaNotifyEmails
+		}(),
+		ChannelMonitorEnabled: func() bool {
+			if req.ChannelMonitorEnabled != nil {
+				return *req.ChannelMonitorEnabled
+			}
+			return previousSettings.ChannelMonitorEnabled
+		}(),
+		ChannelMonitorDefaultIntervalSeconds: func() int {
+			if req.ChannelMonitorDefaultIntervalSeconds != nil {
+				return *req.ChannelMonitorDefaultIntervalSeconds
+			}
+			return previousSettings.ChannelMonitorDefaultIntervalSeconds
+		}(),
+		AvailableChannelsEnabled: func() bool {
+			if req.AvailableChannelsEnabled != nil {
+				return *req.AvailableChannelsEnabled
+			}
+			return previousSettings.AvailableChannelsEnabled
+		}(),
+		AffiliateEnabled: func() bool {
+			if req.AffiliateEnabled != nil {
+				return *req.AffiliateEnabled
+			}
+			return previousSettings.AffiliateEnabled
+		}(),
 	}
 
-	if err := h.settingService.UpdateSettings(c.Request.Context(), settings); err != nil {
+	authSourceDefaults := &service.AuthSourceDefaultSettings{
+		Email: service.ProviderDefaultGrantSettings{
+			Balance:          float64ValueOrDefault(req.AuthSourceDefaultEmailBalance, previousAuthSourceDefaults.Email.Balance),
+			Concurrency:      intValueOrDefault(req.AuthSourceDefaultEmailConcurrency, previousAuthSourceDefaults.Email.Concurrency),
+			Subscriptions:    defaultSubscriptionsValueOrDefault(req.AuthSourceDefaultEmailSubscriptions, previousAuthSourceDefaults.Email.Subscriptions),
+			GrantOnSignup:    boolValueOrDefault(req.AuthSourceDefaultEmailGrantOnSignup, previousAuthSourceDefaults.Email.GrantOnSignup),
+			GrantOnFirstBind: boolValueOrDefault(req.AuthSourceDefaultEmailGrantOnFirstBind, previousAuthSourceDefaults.Email.GrantOnFirstBind),
+		},
+		LinuxDo: service.ProviderDefaultGrantSettings{
+			Balance:          float64ValueOrDefault(req.AuthSourceDefaultLinuxDoBalance, previousAuthSourceDefaults.LinuxDo.Balance),
+			Concurrency:      intValueOrDefault(req.AuthSourceDefaultLinuxDoConcurrency, previousAuthSourceDefaults.LinuxDo.Concurrency),
+			Subscriptions:    defaultSubscriptionsValueOrDefault(req.AuthSourceDefaultLinuxDoSubscriptions, previousAuthSourceDefaults.LinuxDo.Subscriptions),
+			GrantOnSignup:    boolValueOrDefault(req.AuthSourceDefaultLinuxDoGrantOnSignup, previousAuthSourceDefaults.LinuxDo.GrantOnSignup),
+			GrantOnFirstBind: boolValueOrDefault(req.AuthSourceDefaultLinuxDoGrantOnFirstBind, previousAuthSourceDefaults.LinuxDo.GrantOnFirstBind),
+		},
+		OIDC: service.ProviderDefaultGrantSettings{
+			Balance:          float64ValueOrDefault(req.AuthSourceDefaultOIDCBalance, previousAuthSourceDefaults.OIDC.Balance),
+			Concurrency:      intValueOrDefault(req.AuthSourceDefaultOIDCConcurrency, previousAuthSourceDefaults.OIDC.Concurrency),
+			Subscriptions:    defaultSubscriptionsValueOrDefault(req.AuthSourceDefaultOIDCSubscriptions, previousAuthSourceDefaults.OIDC.Subscriptions),
+			GrantOnSignup:    boolValueOrDefault(req.AuthSourceDefaultOIDCGrantOnSignup, previousAuthSourceDefaults.OIDC.GrantOnSignup),
+			GrantOnFirstBind: boolValueOrDefault(req.AuthSourceDefaultOIDCGrantOnFirstBind, previousAuthSourceDefaults.OIDC.GrantOnFirstBind),
+		},
+		WeChat: service.ProviderDefaultGrantSettings{
+			Balance:          float64ValueOrDefault(req.AuthSourceDefaultWeChatBalance, previousAuthSourceDefaults.WeChat.Balance),
+			Concurrency:      intValueOrDefault(req.AuthSourceDefaultWeChatConcurrency, previousAuthSourceDefaults.WeChat.Concurrency),
+			Subscriptions:    defaultSubscriptionsValueOrDefault(req.AuthSourceDefaultWeChatSubscriptions, previousAuthSourceDefaults.WeChat.Subscriptions),
+			GrantOnSignup:    boolValueOrDefault(req.AuthSourceDefaultWeChatGrantOnSignup, previousAuthSourceDefaults.WeChat.GrantOnSignup),
+			GrantOnFirstBind: boolValueOrDefault(req.AuthSourceDefaultWeChatGrantOnFirstBind, previousAuthSourceDefaults.WeChat.GrantOnFirstBind),
+		},
+		ForceEmailOnThirdPartySignup: boolValueOrDefault(req.ForceEmailOnThirdPartySignup, previousAuthSourceDefaults.ForceEmailOnThirdPartySignup),
+	}
+	if err := h.settingService.UpdateSettingsWithAuthSourceDefaults(c.Request.Context(), settings, authSourceDefaults); err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 
-	h.auditSettingsUpdate(c, previousSettings, settings, req)
+	// Update payment configuration (integrated into system settings).
+	// Skip if no payment fields were provided (prevents accidental wipe).
+	if h.paymentConfigService != nil && hasPaymentFields(req) {
+		paymentReq := service.UpdatePaymentConfigRequest{
+			Enabled:                   req.PaymentEnabled,
+			MinAmount:                 req.PaymentMinAmount,
+			MaxAmount:                 req.PaymentMaxAmount,
+			DailyLimit:                req.PaymentDailyLimit,
+			OrderTimeoutMin:           req.PaymentOrderTimeoutMin,
+			MaxPendingOrders:          req.PaymentMaxPendingOrders,
+			EnabledTypes:              req.PaymentEnabledTypes,
+			BalanceDisabled:           req.PaymentBalanceDisabled,
+			BalanceRechargeMultiplier: req.PaymentBalanceRechargeMultiplier,
+			RechargeFeeRate:           req.PaymentRechargeFeeRate,
+			LoadBalanceStrategy:       req.PaymentLoadBalanceStrat,
+			ProductNamePrefix:         req.PaymentProductNamePrefix,
+			ProductNameSuffix:         req.PaymentProductNameSuffix,
+			HelpImageURL:              req.PaymentHelpImageURL,
+			HelpText:                  req.PaymentHelpText,
+			CancelRateLimitEnabled:    req.PaymentCancelRateLimitEnabled,
+			CancelRateLimitMax:        req.PaymentCancelRateLimitMax,
+			CancelRateLimitWindow:     req.PaymentCancelRateLimitWindow,
+			CancelRateLimitUnit:       req.PaymentCancelRateLimitUnit,
+			CancelRateLimitMode:       req.PaymentCancelRateLimitMode,
+		}
+		if err := h.paymentConfigService.UpdatePaymentConfig(c.Request.Context(), paymentReq); err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		// Refresh in-memory provider registry so config changes take effect immediately
+		if h.paymentService != nil {
+			h.paymentService.RefreshProviders(c.Request.Context())
+		}
+	}
+
+	h.auditSettingsUpdate(c, previousSettings, settings, previousAuthSourceDefaults, authSourceDefaults, req)
 
 	// 重新获取设置返回
 	updatedSettings, err := h.settingService.GetAllSettings(c.Request.Context())
@@ -416,27 +969,41 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 	})
 }
 
-func (h *SettingHandler) auditSettingsUpdate(c *gin.Context, before *service.SystemSettings, after *service.SystemSettings, req UpdateSettingsRequest) {
+// hasPaymentFields returns true if any payment-related field was explicitly provided.
+func hasPaymentFields(req UpdateSettingsRequest) bool {
+	return req.PaymentEnabled != nil || req.PaymentMinAmount != nil ||
+		req.PaymentMaxAmount != nil || req.PaymentDailyLimit != nil ||
+		req.PaymentOrderTimeoutMin != nil || req.PaymentMaxPendingOrders != nil ||
+		req.PaymentEnabledTypes != nil || req.PaymentBalanceDisabled != nil ||
+		req.PaymentBalanceRechargeMultiplier != nil || req.PaymentRechargeFeeRate != nil ||
+		req.PaymentLoadBalanceStrat != nil || req.PaymentProductNamePrefix != nil ||
+		req.PaymentProductNameSuffix != nil || req.PaymentHelpImageURL != nil ||
+		req.PaymentHelpText != nil || req.PaymentCancelRateLimitEnabled != nil ||
+		req.PaymentCancelRateLimitMax != nil || req.PaymentCancelRateLimitWindow != nil ||
+		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil
+}
+
+func (h *SettingHandler) auditSettingsUpdate(c *gin.Context, before *service.SystemSettings, after *service.SystemSettings, beforeAuthSourceDefaults *service.AuthSourceDefaultSettings, afterAuthSourceDefaults *service.AuthSourceDefaultSettings, req UpdateSettingsRequest) {
 	if before == nil || after == nil {
 		return
 	}
 
-	changed := diffSettings(before, after, req)
+	changed := diffSettings(before, after, beforeAuthSourceDefaults, afterAuthSourceDefaults, req)
 	if len(changed) == 0 {
 		return
 	}
 
 	subject, _ := middleware.GetAuthSubjectFromContext(c)
 	role, _ := middleware.GetUserRoleFromContext(c)
-	log.Printf("AUDIT: settings updated at=%s user_id=%d role=%s changed=%v",
-		time.Now().UTC().Format(time.RFC3339),
-		subject.UserID,
-		role,
-		changed,
+	slog.Info("settings updated",
+		"audit", true,
+		"user_id", subject.UserID,
+		"role", role,
+		"changed", changed,
 	)
 }
 
-func diffSettings(before *service.SystemSettings, after *service.SystemSettings, req UpdateSettingsRequest) []string {
+func diffSettings(before *service.SystemSettings, after *service.SystemSettings, beforeAuthSourceDefaults *service.AuthSourceDefaultSettings, afterAuthSourceDefaults *service.AuthSourceDefaultSettings, req UpdateSettingsRequest) []string {
 	changed := make([]string, 0, 20)
 	if before.RegistrationEnabled != after.RegistrationEnabled {
 		changed = append(changed, "registration_enabled")
@@ -491,6 +1058,120 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	}
 	if before.LinuxDoConnectRedirectURL != after.LinuxDoConnectRedirectURL {
 		changed = append(changed, "linuxdo_connect_redirect_url")
+	}
+	if before.WeChatConnectEnabled != after.WeChatConnectEnabled {
+		changed = append(changed, "wechat_connect_enabled")
+	}
+	if before.WeChatConnectAppID != after.WeChatConnectAppID {
+		changed = append(changed, "wechat_connect_app_id")
+	}
+	if req.WeChatConnectAppSecret != "" {
+		changed = append(changed, "wechat_connect_app_secret")
+	}
+	if before.WeChatConnectOpenAppID != after.WeChatConnectOpenAppID {
+		changed = append(changed, "wechat_connect_open_app_id")
+	}
+	if req.WeChatConnectOpenAppSecret != "" {
+		changed = append(changed, "wechat_connect_open_app_secret")
+	}
+	if before.WeChatConnectMPAppID != after.WeChatConnectMPAppID {
+		changed = append(changed, "wechat_connect_mp_app_id")
+	}
+	if req.WeChatConnectMPAppSecret != "" {
+		changed = append(changed, "wechat_connect_mp_app_secret")
+	}
+	if before.WeChatConnectMobileAppID != after.WeChatConnectMobileAppID {
+		changed = append(changed, "wechat_connect_mobile_app_id")
+	}
+	if req.WeChatConnectMobileAppSecret != "" {
+		changed = append(changed, "wechat_connect_mobile_app_secret")
+	}
+	if before.WeChatConnectOpenEnabled != after.WeChatConnectOpenEnabled {
+		changed = append(changed, "wechat_connect_open_enabled")
+	}
+	if before.WeChatConnectMPEnabled != after.WeChatConnectMPEnabled {
+		changed = append(changed, "wechat_connect_mp_enabled")
+	}
+	if before.WeChatConnectMobileEnabled != after.WeChatConnectMobileEnabled {
+		changed = append(changed, "wechat_connect_mobile_enabled")
+	}
+	if before.WeChatConnectMode != after.WeChatConnectMode {
+		changed = append(changed, "wechat_connect_mode")
+	}
+	if before.WeChatConnectScopes != after.WeChatConnectScopes {
+		changed = append(changed, "wechat_connect_scopes")
+	}
+	if before.WeChatConnectRedirectURL != after.WeChatConnectRedirectURL {
+		changed = append(changed, "wechat_connect_redirect_url")
+	}
+	if before.WeChatConnectFrontendRedirectURL != after.WeChatConnectFrontendRedirectURL {
+		changed = append(changed, "wechat_connect_frontend_redirect_url")
+	}
+	if before.OIDCConnectEnabled != after.OIDCConnectEnabled {
+		changed = append(changed, "oidc_connect_enabled")
+	}
+	if before.OIDCConnectProviderName != after.OIDCConnectProviderName {
+		changed = append(changed, "oidc_connect_provider_name")
+	}
+	if before.OIDCConnectClientID != after.OIDCConnectClientID {
+		changed = append(changed, "oidc_connect_client_id")
+	}
+	if req.OIDCConnectClientSecret != "" {
+		changed = append(changed, "oidc_connect_client_secret")
+	}
+	if before.OIDCConnectIssuerURL != after.OIDCConnectIssuerURL {
+		changed = append(changed, "oidc_connect_issuer_url")
+	}
+	if before.OIDCConnectDiscoveryURL != after.OIDCConnectDiscoveryURL {
+		changed = append(changed, "oidc_connect_discovery_url")
+	}
+	if before.OIDCConnectAuthorizeURL != after.OIDCConnectAuthorizeURL {
+		changed = append(changed, "oidc_connect_authorize_url")
+	}
+	if before.OIDCConnectTokenURL != after.OIDCConnectTokenURL {
+		changed = append(changed, "oidc_connect_token_url")
+	}
+	if before.OIDCConnectUserInfoURL != after.OIDCConnectUserInfoURL {
+		changed = append(changed, "oidc_connect_userinfo_url")
+	}
+	if before.OIDCConnectJWKSURL != after.OIDCConnectJWKSURL {
+		changed = append(changed, "oidc_connect_jwks_url")
+	}
+	if before.OIDCConnectScopes != after.OIDCConnectScopes {
+		changed = append(changed, "oidc_connect_scopes")
+	}
+	if before.OIDCConnectRedirectURL != after.OIDCConnectRedirectURL {
+		changed = append(changed, "oidc_connect_redirect_url")
+	}
+	if before.OIDCConnectFrontendRedirectURL != after.OIDCConnectFrontendRedirectURL {
+		changed = append(changed, "oidc_connect_frontend_redirect_url")
+	}
+	if before.OIDCConnectTokenAuthMethod != after.OIDCConnectTokenAuthMethod {
+		changed = append(changed, "oidc_connect_token_auth_method")
+	}
+	if before.OIDCConnectUsePKCE != after.OIDCConnectUsePKCE {
+		changed = append(changed, "oidc_connect_use_pkce")
+	}
+	if before.OIDCConnectValidateIDToken != after.OIDCConnectValidateIDToken {
+		changed = append(changed, "oidc_connect_validate_id_token")
+	}
+	if before.OIDCConnectAllowedSigningAlgs != after.OIDCConnectAllowedSigningAlgs {
+		changed = append(changed, "oidc_connect_allowed_signing_algs")
+	}
+	if before.OIDCConnectClockSkewSeconds != after.OIDCConnectClockSkewSeconds {
+		changed = append(changed, "oidc_connect_clock_skew_seconds")
+	}
+	if before.OIDCConnectRequireEmailVerified != after.OIDCConnectRequireEmailVerified {
+		changed = append(changed, "oidc_connect_require_email_verified")
+	}
+	if before.OIDCConnectUserInfoEmailPath != after.OIDCConnectUserInfoEmailPath {
+		changed = append(changed, "oidc_connect_userinfo_email_path")
+	}
+	if before.OIDCConnectUserInfoIDPath != after.OIDCConnectUserInfoIDPath {
+		changed = append(changed, "oidc_connect_userinfo_id_path")
+	}
+	if before.OIDCConnectUserInfoUsernamePath != after.OIDCConnectUserInfoUsernamePath {
+		changed = append(changed, "oidc_connect_userinfo_username_path")
 	}
 	if before.SiteName != after.SiteName {
 		changed = append(changed, "site_name")
@@ -560,7 +1241,7 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 
 // TestSMTPRequest 测试SMTP连接请求
 type TestSMTPRequest struct {
-	SMTPHost     string `json:"smtp_host" binding:"required"`
+	SMTPHost     string `json:"smtp_host"`
 	SMTPPort     int    `json:"smtp_port"`
 	SMTPUsername string `json:"smtp_username"`
 	SMTPPassword string `json:"smtp_password"`
@@ -576,17 +1257,34 @@ func (h *SettingHandler) TestSMTPConnection(c *gin.Context) {
 		return
 	}
 
-	if req.SMTPPort <= 0 {
-		req.SMTPPort = 587
+	req.SMTPHost = strings.TrimSpace(req.SMTPHost)
+	req.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
+
+	var savedConfig *service.SMTPConfig
+	if cfg, err := h.emailService.GetSMTPConfig(c.Request.Context()); err == nil && cfg != nil {
+		savedConfig = cfg
 	}
 
-	// 如果未提供密码，从数据库获取已保存的密码
-	password := req.SMTPPassword
-	if password == "" {
-		savedConfig, err := h.emailService.GetSMTPConfig(c.Request.Context())
-		if err == nil && savedConfig != nil {
-			password = savedConfig.Password
+	if req.SMTPHost == "" && savedConfig != nil {
+		req.SMTPHost = savedConfig.Host
+	}
+	if req.SMTPPort <= 0 {
+		if savedConfig != nil && savedConfig.Port > 0 {
+			req.SMTPPort = savedConfig.Port
+		} else {
+			req.SMTPPort = 587
 		}
+	}
+	if req.SMTPUsername == "" && savedConfig != nil {
+		req.SMTPUsername = savedConfig.Username
+	}
+	password := strings.TrimSpace(req.SMTPPassword)
+	if password == "" && savedConfig != nil {
+		password = savedConfig.Password
+	}
+	if req.SMTPHost == "" {
+		response.BadRequest(c, "SMTP host is required")
+		return
 	}
 
 	config := &service.SMTPConfig{
@@ -609,7 +1307,7 @@ func (h *SettingHandler) TestSMTPConnection(c *gin.Context) {
 // SendTestEmailRequest 发送测试邮件请求
 type SendTestEmailRequest struct {
 	Email        string `json:"email" binding:"required,email"`
-	SMTPHost     string `json:"smtp_host" binding:"required"`
+	SMTPHost     string `json:"smtp_host"`
 	SMTPPort     int    `json:"smtp_port"`
 	SMTPUsername string `json:"smtp_username"`
 	SMTPPassword string `json:"smtp_password"`
@@ -627,17 +1325,42 @@ func (h *SettingHandler) SendTestEmail(c *gin.Context) {
 		return
 	}
 
-	if req.SMTPPort <= 0 {
-		req.SMTPPort = 587
+	req.SMTPHost = strings.TrimSpace(req.SMTPHost)
+	req.SMTPUsername = strings.TrimSpace(req.SMTPUsername)
+	req.SMTPFrom = strings.TrimSpace(req.SMTPFrom)
+	req.SMTPFromName = strings.TrimSpace(req.SMTPFromName)
+
+	var savedConfig *service.SMTPConfig
+	if cfg, err := h.emailService.GetSMTPConfig(c.Request.Context()); err == nil && cfg != nil {
+		savedConfig = cfg
 	}
 
-	// 如果未提供密码，从数据库获取已保存的密码
-	password := req.SMTPPassword
-	if password == "" {
-		savedConfig, err := h.emailService.GetSMTPConfig(c.Request.Context())
-		if err == nil && savedConfig != nil {
-			password = savedConfig.Password
+	if req.SMTPHost == "" && savedConfig != nil {
+		req.SMTPHost = savedConfig.Host
+	}
+	if req.SMTPPort <= 0 {
+		if savedConfig != nil && savedConfig.Port > 0 {
+			req.SMTPPort = savedConfig.Port
+		} else {
+			req.SMTPPort = 587
 		}
+	}
+	if req.SMTPUsername == "" && savedConfig != nil {
+		req.SMTPUsername = savedConfig.Username
+	}
+	password := strings.TrimSpace(req.SMTPPassword)
+	if password == "" && savedConfig != nil {
+		password = savedConfig.Password
+	}
+	if req.SMTPFrom == "" && savedConfig != nil {
+		req.SMTPFrom = savedConfig.From
+	}
+	if req.SMTPFromName == "" && savedConfig != nil {
+		req.SMTPFromName = savedConfig.FromName
+	}
+	if req.SMTPHost == "" {
+		response.BadRequest(c, "SMTP host is required")
+		return
 	}
 
 	config := &service.SMTPConfig{
@@ -832,4 +1555,81 @@ func (h *SettingHandler) UpdateStreamTimeoutSettings(c *gin.Context) {
 		ThresholdCount:         updatedSettings.ThresholdCount,
 		ThresholdWindowMinutes: updatedSettings.ThresholdWindowMinutes,
 	})
+}
+
+// GetWebSearchEmulationConfig 获取 Web Search 模拟配置
+// GET /api/v1/admin/settings/web-search-emulation
+func (h *SettingHandler) GetWebSearchEmulationConfig(c *gin.Context) {
+	cfg, err := h.settingService.GetWebSearchEmulationConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, service.PopulateWebSearchUsage(c.Request.Context(), cfg))
+}
+
+// UpdateWebSearchEmulationConfig 更新 Web Search 模拟配置
+// PUT /api/v1/admin/settings/web-search-emulation
+func (h *SettingHandler) UpdateWebSearchEmulationConfig(c *gin.Context) {
+	var cfg service.WebSearchEmulationConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	if err := h.settingService.SaveWebSearchEmulationConfig(c.Request.Context(), &cfg); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	// Re-read (with sanitized api keys) to return current state
+	updated, err := h.settingService.GetWebSearchEmulationConfig(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, service.PopulateWebSearchUsage(c.Request.Context(), updated))
+}
+
+// ResetWebSearchUsage 重置指定 provider 的配额用量
+// POST /api/v1/admin/settings/web-search-emulation/reset-usage
+func (h *SettingHandler) ResetWebSearchUsage(c *gin.Context) {
+	var req struct {
+		ProviderType string `json:"provider_type"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if req.ProviderType == "" {
+		response.BadRequest(c, "provider_type is required")
+		return
+	}
+	if err := service.ResetWebSearchUsage(c.Request.Context(), req.ProviderType); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, nil)
+}
+
+// TestWebSearchEmulation 测试 Web Search 搜索
+// POST /api/v1/admin/settings/web-search-emulation/test
+func (h *SettingHandler) TestWebSearchEmulation(c *gin.Context) {
+	var req struct {
+		Query string `json:"query"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if strings.TrimSpace(req.Query) == "" {
+		req.Query = "搜索今年世界大事件"
+	}
+
+	result, err := service.TestWebSearch(c.Request.Context(), req.Query)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
 }

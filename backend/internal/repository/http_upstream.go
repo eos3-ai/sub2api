@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"compress/flate"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +14,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/andybalholm/brotli"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
@@ -148,6 +152,9 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		return nil, err
 	}
 
+	// 如果上游返回了压缩内容，解压后再交给业务层
+	decompressResponseBody(resp)
+
 	// 包装响应体，在关闭时自动减少计数并更新时间戳
 	// 这确保了流式响应（如 SSE）在完全读取前不会被淘汰
 	resp.Body = wrapTrackedBody(resp.Body, func() {
@@ -159,7 +166,6 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 }
 
 // DoWithTLS 执行带 TLS 指纹伪装的 HTTP 请求
-// 根据 enableTLSFingerprint 参数决定是否使用 TLS 指纹
 //
 // 参数:
 //   - req: HTTP 请求对象
@@ -183,7 +189,6 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
 
-	// TLS 指纹已启用，记录调试日志
 	targetHost := ""
 	if req != nil && req.URL != nil {
 		targetHost = req.URL.Host
@@ -192,43 +197,28 @@ func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, acco
 	if proxyURL != "" {
 		proxyInfo = proxyURL
 	}
-	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo)
+	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo, "profile", profile.Name)
 
 	if err := s.validateRequestHost(req); err != nil {
 		return nil, err
 	}
 
-	// 获取 TLS 指纹 Profile
-	registry := tlsfingerprint.GlobalRegistry()
-	profile := registry.GetProfileByAccountID(accountID)
-	if profile == nil {
-		// 如果获取不到 profile，回退到普通请求
-		slog.Debug("tls_fingerprint_no_profile", "account_id", accountID, "fallback", "standard_request")
-		return s.Do(req, proxyURL, accountID, accountConcurrency)
-	}
-
-	slog.Debug("tls_fingerprint_using_profile", "account_id", accountID, "profile", profile.Name, "grease", profile.EnableGREASE)
-
-	// 获取或创建带 TLS 指纹的客户端
 	entry, err := s.acquireClientWithTLS(proxyURL, accountID, accountConcurrency, profile)
 	if err != nil {
 		slog.Debug("tls_fingerprint_acquire_client_failed", "account_id", accountID, "error", err)
 		return nil, err
 	}
 
-	// 执行请求
 	resp, err := entry.client.Do(req)
 	if err != nil {
-		// 请求失败，立即减少计数
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
 		slog.Debug("tls_fingerprint_request_failed", "account_id", accountID, "error", err)
 		return nil, err
 	}
 
-	slog.Debug("tls_fingerprint_request_success", "account_id", accountID, "status", resp.StatusCode)
+	decompressResponseBody(resp)
 
-	// 包装响应体，在关闭时自动减少计数并更新时间戳
 	resp.Body = wrapTrackedBody(resp.Body, func() {
 		atomic.AddInt64(&entry.inFlight, -1)
 		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
@@ -893,4 +883,57 @@ func wrapTrackedBody(body io.ReadCloser, onClose func()) io.ReadCloser {
 		return body
 	}
 	return &trackedBody{ReadCloser: body, onClose: onClose}
+}
+
+// decompressResponseBody 根据 Content-Encoding 解压响应体。
+// 当请求显式设置了 accept-encoding 时，Go 的 Transport 不会自动解压，需要手动处理。
+// 解压成功后会删除 Content-Encoding 和 Content-Length header（长度已不准确）。
+func decompressResponseBody(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	ce := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding")))
+	if ce == "" {
+		return
+	}
+
+	var reader io.Reader
+	switch ce {
+	case "gzip":
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return // 解压失败，保持原样
+		}
+		reader = gr
+	case "br":
+		reader = brotli.NewReader(resp.Body)
+	case "deflate":
+		reader = flate.NewReader(resp.Body)
+	default:
+		return
+	}
+
+	originalBody := resp.Body
+	resp.Body = &decompressedBody{reader: reader, closer: originalBody}
+	resp.Header.Del("Content-Encoding")
+	resp.Header.Del("Content-Length") // 解压后长度不确定
+	resp.ContentLength = -1
+}
+
+// decompressedBody 组合解压 reader 和原始 body 的 close。
+type decompressedBody struct {
+	reader io.Reader
+	closer io.Closer
+}
+
+func (d *decompressedBody) Read(p []byte) (int, error) {
+	return d.reader.Read(p)
+}
+
+func (d *decompressedBody) Close() error {
+	// 如果 reader 本身也是 Closer（如 gzip.Reader），先关闭它
+	if rc, ok := d.reader.(io.Closer); ok {
+		_ = rc.Close()
+	}
+	return d.closer.Close()
 }

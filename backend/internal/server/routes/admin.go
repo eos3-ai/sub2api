@@ -36,8 +36,6 @@ func RegisterAdminRoutes(
 
 		// OpenAI OAuth
 		registerOpenAIOAuthRoutes(admin, h)
-		// Sora OAuth（实现复用 OpenAI OAuth 服务，入口独立）
-		registerSoraOAuthRoutes(admin, h)
 
 		// Gemini OAuth
 		registerGeminiOAuthRoutes(admin, h)
@@ -194,6 +192,7 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		users.GET("", h.Admin.User.List)
 		users.GET("/export", h.Admin.User.Export)
 		users.GET("/:id", h.Admin.User.GetByID)
+		users.POST("/:id/auth-identities", h.Admin.User.BindAuthIdentity)
 		users.POST("", h.Admin.User.Create)
 		users.PUT("/:id", h.Admin.User.Update)
 		users.DELETE("/:id", h.Admin.User.Delete)
@@ -201,6 +200,8 @@ func registerUserManagementRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		users.GET("/:id/api-keys", h.Admin.User.GetUserAPIKeys)
 		users.GET("/:id/usage", h.Admin.User.GetUserUsage)
 		users.GET("/:id/balance-history", h.Admin.User.GetBalanceHistory)
+		users.POST("/:id/replace-group", h.Admin.User.ReplaceGroup)
+		users.GET("/:id/rpm-status", h.Admin.User.GetUserRPMStatus)
 
 		// User attribute values
 		users.GET("/:id/attributes", h.Admin.UserAttribute.GetUserAttributes)
@@ -237,6 +238,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/:id/test", h.Admin.Account.Test)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
+		accounts.POST("/:id/set-privacy", h.Admin.Account.SetPrivacy)
 		accounts.POST("/:id/refresh-tier", h.Admin.Account.RefreshTier)
 		accounts.GET("/:id/stats", h.Admin.Account.GetStats)
 		accounts.POST("/:id/clear-error", h.Admin.Account.ClearError)
@@ -301,19 +303,6 @@ func registerOpenAIOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		openai.POST("/refresh-token", h.Admin.OpenAIOAuth.RefreshToken)
 		openai.POST("/accounts/:id/refresh", h.Admin.OpenAIOAuth.RefreshAccountToken)
 		openai.POST("/create-from-oauth", h.Admin.OpenAIOAuth.CreateAccountFromOAuth)
-	}
-}
-
-func registerSoraOAuthRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
-	sora := admin.Group("/sora")
-	{
-		sora.POST("/generate-auth-url", h.Admin.OpenAIOAuth.GenerateAuthURL)
-		sora.POST("/exchange-code", h.Admin.OpenAIOAuth.ExchangeCode)
-		sora.POST("/refresh-token", h.Admin.OpenAIOAuth.RefreshToken)
-		sora.POST("/st2at", h.Admin.OpenAIOAuth.ExchangeSoraSessionToken)
-		sora.POST("/rt2at", h.Admin.OpenAIOAuth.RefreshToken)
-		sora.POST("/accounts/:id/refresh", h.Admin.OpenAIOAuth.RefreshAccountToken)
-		sora.POST("/create-from-oauth", h.Admin.OpenAIOAuth.CreateAccountFromOAuth)
 	}
 }
 
@@ -493,5 +482,67 @@ func registerErrorPassthroughRoutes(admin *gin.RouterGroup, h *handler.Handlers)
 		rules.POST("", h.Admin.ErrorPassthrough.Create)
 		rules.PUT("/:id", h.Admin.ErrorPassthrough.Update)
 		rules.DELETE("/:id", h.Admin.ErrorPassthrough.Delete)
+	}
+}
+
+func registerTLSFingerprintProfileRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	profiles := admin.Group("/tls-fingerprint-profiles")
+	{
+		profiles.GET("", h.Admin.TLSFingerprintProfile.List)
+		profiles.GET("/:id", h.Admin.TLSFingerprintProfile.GetByID)
+		profiles.POST("", h.Admin.TLSFingerprintProfile.Create)
+		profiles.PUT("/:id", h.Admin.TLSFingerprintProfile.Update)
+		profiles.DELETE("/:id", h.Admin.TLSFingerprintProfile.Delete)
+	}
+}
+
+func registerChannelRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	channels := admin.Group("/channels")
+	{
+		channels.GET("", h.Admin.Channel.List)
+		channels.GET("/model-pricing", h.Admin.Channel.GetModelDefaultPricing)
+		channels.GET("/:id", h.Admin.Channel.GetByID)
+		channels.POST("", h.Admin.Channel.Create)
+		channels.PUT("/:id", h.Admin.Channel.Update)
+		channels.DELETE("/:id", h.Admin.Channel.Delete)
+	}
+}
+
+func registerChannelMonitorRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	monitors := admin.Group("/channel-monitors")
+	{
+		monitors.GET("", h.Admin.ChannelMonitor.List)
+		monitors.POST("", h.Admin.ChannelMonitor.Create)
+		monitors.GET("/:id", h.Admin.ChannelMonitor.Get)
+		monitors.PUT("/:id", h.Admin.ChannelMonitor.Update)
+		monitors.DELETE("/:id", h.Admin.ChannelMonitor.Delete)
+		monitors.POST("/:id/run", h.Admin.ChannelMonitor.Run)
+		monitors.GET("/:id/history", h.Admin.ChannelMonitor.History)
+	}
+
+	templates := admin.Group("/channel-monitor-templates")
+	{
+		templates.GET("", h.Admin.ChannelMonitorTemplate.List)
+		templates.POST("", h.Admin.ChannelMonitorTemplate.Create)
+		templates.GET("/:id", h.Admin.ChannelMonitorTemplate.Get)
+		templates.PUT("/:id", h.Admin.ChannelMonitorTemplate.Update)
+		templates.DELETE("/:id", h.Admin.ChannelMonitorTemplate.Delete)
+		templates.GET("/:id/monitors", h.Admin.ChannelMonitorTemplate.AssociatedMonitors)
+		templates.POST("/:id/apply", h.Admin.ChannelMonitorTemplate.Apply)
+	}
+}
+
+// registerAffiliateRoutes 注册邀请返利的管理端路由（专属用户配置）
+func registerAffiliateRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	affiliates := admin.Group("/affiliates")
+	{
+		users := affiliates.Group("/users")
+		{
+			users.GET("", h.Admin.Affiliate.ListUsers)
+			users.GET("/lookup", h.Admin.Affiliate.LookupUsers)
+			users.POST("/batch-rate", h.Admin.Affiliate.BatchSetRate)
+			users.PUT("/:user_id", h.Admin.Affiliate.UpdateUserSettings)
+			users.DELETE("/:user_id", h.Admin.Affiliate.ClearUserSettings)
+		}
 	}
 }

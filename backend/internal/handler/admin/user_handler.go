@@ -42,14 +42,14 @@ func NewUserHandler(adminService service.AdminService, concurrencyService *servi
 
 // CreateUserRequest represents admin create user request
 type CreateUserRequest struct {
-	Email                 string  `json:"email" binding:"required,email"`
-	Password              string  `json:"password" binding:"required,min=6"`
-	Username              string  `json:"username"`
-	Notes                 string  `json:"notes"`
-	Balance               float64 `json:"balance"`
-	Concurrency           int     `json:"concurrency"`
-	AllowedGroups         []int64 `json:"allowed_groups"`
-	SoraStorageQuotaBytes int64   `json:"sora_storage_quota_bytes"`
+	Email         string  `json:"email" binding:"required,email"`
+	Password      string  `json:"password" binding:"required,min=6"`
+	Username      string  `json:"username"`
+	Notes         string  `json:"notes"`
+	Balance       float64 `json:"balance"`
+	Concurrency   int     `json:"concurrency"`
+	RPMLimit      int     `json:"rpm_limit"`
+	AllowedGroups []int64 `json:"allowed_groups"`
 }
 
 // UpdateUserRequest represents admin update user request
@@ -62,12 +62,12 @@ type UpdateUserRequest struct {
 	Role          string   `json:"role" binding:"omitempty,oneof=admin sales user"`
 	Balance       *float64 `json:"balance"`
 	Concurrency   *int     `json:"concurrency"`
+	RPMLimit      *int     `json:"rpm_limit"`
 	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
 	AllowedGroups *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
-	GroupRates            map[int64]*float64 `json:"group_rates"`
-	SoraStorageQuotaBytes *int64             `json:"sora_storage_quota_bytes"`
+	GroupRates map[int64]*float64 `json:"group_rates"`
 }
 
 // UpdateBalanceRequest represents balance update request
@@ -77,6 +77,22 @@ type UpdateBalanceRequest struct {
 	Notes     string  `json:"notes"`
 }
 
+type BindUserAuthIdentityRequest struct {
+	ProviderType    string                              `json:"provider_type"`
+	ProviderKey     string                              `json:"provider_key"`
+	ProviderSubject string                              `json:"provider_subject"`
+	Issuer          *string                             `json:"issuer"`
+	Metadata        map[string]any                      `json:"metadata"`
+	Channel         *BindUserAuthIdentityChannelRequest `json:"channel"`
+}
+
+type BindUserAuthIdentityChannelRequest struct {
+	Channel        string         `json:"channel"`
+	ChannelAppID   string         `json:"channel_app_id"`
+	ChannelSubject string         `json:"channel_subject"`
+	Metadata       map[string]any `json:"metadata"`
+}
+
 // List handles listing all users with pagination
 // GET /api/v1/admin/users
 // Query params:
@@ -84,6 +100,7 @@ type UpdateBalanceRequest struct {
 //   - role: filter by user role
 //   - search: search in email, username
 //   - attr[{id}]: filter by custom attribute value, e.g. attr[1]=company
+//   - group_name: fuzzy filter by allowed group name
 func (h *UserHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
 
@@ -98,14 +115,17 @@ func (h *UserHandler) List(c *gin.Context) {
 		Status:     c.Query("status"),
 		Role:       c.Query("role"),
 		Search:     search,
+		GroupName:  strings.TrimSpace(c.Query("group_name")),
 		Attributes: parseAttributeFilters(c),
 	}
+	sortBy := c.DefaultQuery("sort_by", "created_at")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
 	if raw, ok := c.GetQuery("include_subscriptions"); ok {
 		includeSubscriptions := parseBoolQueryWithDefault(raw, true)
 		filters.IncludeSubscriptions = &includeSubscriptions
 	}
 
-	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters)
+	users, total, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -249,6 +269,45 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	response.Success(c, dto.UserFromServiceAdmin(user))
 }
 
+// BindAuthIdentity manually binds a canonical auth identity to a user.
+// POST /api/v1/admin/users/:id/auth-identities
+func (h *UserHandler) BindAuthIdentity(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	var req BindUserAuthIdentityRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	input := service.AdminBindAuthIdentityInput{
+		ProviderType:    req.ProviderType,
+		ProviderKey:     req.ProviderKey,
+		ProviderSubject: req.ProviderSubject,
+		Issuer:          req.Issuer,
+		Metadata:        req.Metadata,
+	}
+	if req.Channel != nil {
+		input.Channel = &service.AdminBindAuthIdentityChannelInput{
+			Channel:        req.Channel.Channel,
+			ChannelAppID:   req.Channel.ChannelAppID,
+			ChannelSubject: req.Channel.ChannelSubject,
+			Metadata:       req.Channel.Metadata,
+		}
+	}
+
+	result, err := h.adminService.BindUserAuthIdentity(c.Request.Context(), userID, input)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
+}
+
 // Create handles creating a new user
 // POST /api/v1/admin/users
 func (h *UserHandler) Create(c *gin.Context) {
@@ -259,14 +318,14 @@ func (h *UserHandler) Create(c *gin.Context) {
 	}
 
 	user, err := h.adminService.CreateUser(c.Request.Context(), &service.CreateUserInput{
-		Email:                 req.Email,
-		Password:              req.Password,
-		Username:              req.Username,
-		Notes:                 req.Notes,
-		Balance:               req.Balance,
-		Concurrency:           req.Concurrency,
-		AllowedGroups:         req.AllowedGroups,
-		SoraStorageQuotaBytes: req.SoraStorageQuotaBytes,
+		Email:         req.Email,
+		Password:      req.Password,
+		Username:      req.Username,
+		Notes:         req.Notes,
+		Balance:       req.Balance,
+		Concurrency:   req.Concurrency,
+		RPMLimit:      req.RPMLimit,
+		AllowedGroups: req.AllowedGroups,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -389,8 +448,10 @@ func (h *UserHandler) GetUserAPIKeys(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
+	sortBy := c.DefaultQuery("sort_by", "created_at")
+	sortOrder := c.DefaultQuery("sort_order", "desc")
 
-	keys, total, err := h.adminService.GetUserAPIKeys(c.Request.Context(), userID, page, pageSize)
+	keys, total, err := h.adminService.GetUserAPIKeys(c.Request.Context(), userID, page, pageSize, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -488,4 +549,54 @@ func (h *UserHandler) GetBalanceHistory(c *gin.Context) {
 		"pages":           pages,
 		"total_recharged": totalRecharged,
 	})
+}
+
+// ReplaceGroupRequest represents the request to replace a user's exclusive group
+type ReplaceGroupRequest struct {
+	OldGroupID int64 `json:"old_group_id" binding:"required,gt=0"`
+	NewGroupID int64 `json:"new_group_id" binding:"required,gt=0"`
+}
+
+// ReplaceGroup handles replacing a user's exclusive group
+// POST /api/v1/admin/users/:id/replace-group
+func (h *UserHandler) ReplaceGroup(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	var req ReplaceGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	result, err := h.adminService.ReplaceUserGroup(c.Request.Context(), userID, req.OldGroupID, req.NewGroupID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"migrated_keys": result.MigratedKeys,
+	})
+}
+
+// GetUserRPMStatus 返回指定用户当前分钟的 RPM 用量
+// GET /api/v1/admin/users/:id/rpm-status
+func (h *UserHandler) GetUserRPMStatus(c *gin.Context) {
+	userID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid user ID")
+		return
+	}
+
+	status, err := h.adminService.GetUserRPMStatus(c.Request.Context(), userID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, status)
 }

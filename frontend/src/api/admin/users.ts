@@ -6,6 +6,44 @@
 import { apiClient } from '../client'
 import type { AdminUser, UpdateUserRequest, PaginatedResponse, ApiKey } from '@/types'
 
+export interface AdminBindAuthIdentityChannelRequest {
+  channel: string
+  channel_app_id: string
+  channel_subject: string
+  metadata?: Record<string, unknown> | null
+}
+
+export interface AdminBindAuthIdentityRequest {
+  provider_type: string
+  provider_key: string
+  provider_subject: string
+  issuer?: string | null
+  metadata?: Record<string, unknown> | null
+  channel?: AdminBindAuthIdentityChannelRequest
+}
+
+export interface AdminBoundAuthIdentityChannel {
+  channel: string
+  channel_app_id: string
+  channel_subject: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminBoundAuthIdentity {
+  user_id: number
+  provider_type: string
+  provider_key: string
+  provider_subject: string
+  verified_at?: string | null
+  issuer?: string | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+  channel?: AdminBoundAuthIdentityChannel | null
+}
+
 /**
  * List all users with pagination
  * @param page - Page number (default: 1)
@@ -21,8 +59,11 @@ export async function list(
     status?: 'active' | 'disabled'
     role?: 'admin' | 'sales' | 'user'
     search?: string
+    group_name?: string         // fuzzy filter by allowed group name
     attributes?: Record<number, string>  // attributeId -> value
     include_subscriptions?: boolean
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
   },
   options?: {
     signal?: AbortSignal
@@ -35,7 +76,10 @@ export async function list(
     status: filters?.status,
     role: filters?.role,
     search: filters?.search,
-    include_subscriptions: filters?.include_subscriptions
+    group_name: filters?.group_name,
+    include_subscriptions: filters?.include_subscriptions,
+    sort_by: filters?.sort_by,
+    sort_order: filters?.sort_order
   }
 
   // Add attribute filters as attr[id]=value
@@ -250,6 +294,36 @@ export async function getUserBalanceHistory(
   return data
 }
 
+/**
+ * Replace user's exclusive group
+ * @param userId - User ID
+ * @param oldGroupId - Current group ID to replace
+ * @param newGroupId - New group ID to replace with
+ * @returns Number of migrated keys
+ */
+export async function replaceGroup(
+  userId: number,
+  oldGroupId: number,
+  newGroupId: number
+): Promise<{ migrated_keys: number }> {
+  const { data } = await apiClient.post<{ migrated_keys: number }>(
+    `/admin/users/${userId}/replace-group`,
+    { old_group_id: oldGroupId, new_group_id: newGroupId }
+  )
+  return data
+}
+
+export async function bindUserAuthIdentity(
+  userId: number,
+  input: AdminBindAuthIdentityRequest
+): Promise<AdminBoundAuthIdentity> {
+  const { data } = await apiClient.post<AdminBoundAuthIdentity>(
+    `/admin/users/${userId}/auth-identities`,
+    input
+  )
+  return data
+}
+
 export const usersAPI = {
   list,
   exportRecords,
@@ -262,7 +336,9 @@ export const usersAPI = {
   toggleStatus,
   getUserApiKeys,
   getUserUsageStats,
-  getUserBalanceHistory
+  getUserBalanceHistory,
+  replaceGroup,
+  bindUserAuthIdentity
 }
 
 export default usersAPI

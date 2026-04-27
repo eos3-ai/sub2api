@@ -22,11 +22,6 @@ func RegisterGatewayRoutes(
 	cfg *config.Config,
 ) {
 	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
-	soraMaxBodySize := cfg.Gateway.SoraMaxBodySize
-	if soraMaxBodySize <= 0 {
-		soraMaxBodySize = cfg.Gateway.MaxBodySize
-	}
-	soraBodyLimit := middleware.RequestBodyLimit(soraMaxBodySize)
 	clientRequestID := middleware.ClientRequestID()
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 
@@ -41,9 +36,21 @@ func RegisterGatewayRoutes(
 		gateway.POST("/messages/count_tokens", h.Gateway.CountTokens)
 		gateway.GET("/models", h.Gateway.Models)
 		gateway.GET("/usage", h.Gateway.Usage)
-		// OpenAI Responses API
-		gateway.POST("/responses", h.OpenAIGateway.Responses)
-		gateway.POST("/responses/*subpath", h.OpenAIGateway.Responses)
+		// OpenAI Responses API: auto-route based on group platform
+		gateway.POST("/responses", func(c *gin.Context) {
+			if getGroupPlatform(c) == service.PlatformOpenAI {
+				h.OpenAIGateway.Responses(c)
+				return
+			}
+			h.Gateway.Responses(c)
+		})
+		gateway.POST("/responses/*subpath", func(c *gin.Context) {
+			if getGroupPlatform(c) == service.PlatformOpenAI {
+				h.OpenAIGateway.Responses(c)
+				return
+			}
+			h.Gateway.Responses(c)
+		})
 		gateway.GET("/responses", h.OpenAIGateway.ResponsesWebSocket)
 		// 明确阻止旧协议入口：OpenAI 仅支持 Responses API，避免客户端误解为会自动路由到其它平台。
 		gateway.POST("/chat/completions", func(c *gin.Context) {
