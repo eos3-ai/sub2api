@@ -122,6 +122,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	// Password reset requires email verification to be enabled
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	passwordResetEnabled := emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true"
+	paymentEnabled := s.cfg != nil && s.cfg.Payment.Enabled
 
 	return &PublicSettings{
 		RegistrationEnabled:         settings[SettingKeyRegistrationEnabled] == "true",
@@ -140,6 +141,7 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		DocURL:                      settings[SettingKeyDocURL],
 		HomeContent:                 settings[SettingKeyHomeContent],
 		HideCcsImportButton:         settings[SettingKeyHideCcsImportButton] == "true",
+		PaymentEnabled:              paymentEnabled,
 		PurchaseSubscriptionEnabled: settings[SettingKeyPurchaseSubscriptionEnabled] == "true",
 		PurchaseSubscriptionURL:     strings.TrimSpace(settings[SettingKeyPurchaseSubscriptionURL]),
 		ClaudeOfficialURL:           os.Getenv("CLAUDE_OFFICIAL_URL"),
@@ -323,6 +325,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		DocURL                      string `json:"doc_url,omitempty"`
 		HomeContent                 string `json:"home_content,omitempty"`
 		HideCcsImportButton         bool   `json:"hide_ccs_import_button"`
+		PaymentEnabled              bool   `json:"payment_enabled"`
 		PurchaseSubscriptionEnabled bool   `json:"purchase_subscription_enabled"`
 		PurchaseSubscriptionURL     string `json:"purchase_subscription_url,omitempty"`
 		ClaudeOfficialURL           string `json:"claude_official_url,omitempty"`
@@ -349,6 +352,7 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		DocURL:                      settings.DocURL,
 		HomeContent:                 settings.HomeContent,
 		HideCcsImportButton:         settings.HideCcsImportButton,
+		PaymentEnabled:              settings.PaymentEnabled,
 		PurchaseSubscriptionEnabled: settings.PurchaseSubscriptionEnabled,
 		PurchaseSubscriptionURL:     settings.PurchaseSubscriptionURL,
 		ClaudeOfficialURL:           settings.ClaudeOfficialURL,

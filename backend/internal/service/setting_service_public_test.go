@@ -151,3 +151,21 @@ func TestSettingService_GetPublicSettings_FallsBackToConfigForWeChatOAuthCapabil
 	require.False(t, settings.WeChatOAuthMPEnabled)
 	require.False(t, settings.WeChatOAuthMobileEnabled)
 }
+
+func TestSettingService_GetPublicSettings_ExposesPaymentEnabledFromConfig(t *testing.T) {
+	repo := &settingPublicRepoStub{values: map[string]string{}}
+
+	svcEnabled := NewSettingService(repo, &config.Config{
+		Payment: config.PaymentConfig{Enabled: true},
+	})
+	settingsEnabled, err := svcEnabled.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, settingsEnabled.PaymentEnabled)
+
+	svcDisabled := NewSettingService(repo, &config.Config{
+		Payment: config.PaymentConfig{Enabled: false},
+	})
+	settingsDisabled, err := svcDisabled.GetPublicSettings(context.Background())
+	require.NoError(t, err)
+	require.False(t, settingsDisabled.PaymentEnabled)
+}
