@@ -448,7 +448,7 @@ export default {
     resultPendingHint: '订单仍在处理中，可点击刷新获取最新状态。',
     useRedeemCode: '使用兑换码',
     currentBalance: '当前余额',
-    tip: '若在线支付暂未启用，请联系管理员开通。',
+    tip: '在线支付暂未启用。',
     contact: '联系方式',
     plans: '充值套餐',
     onlineRecharge: '在线充值',

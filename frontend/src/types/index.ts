@@ -171,7 +171,6 @@ export interface PublicSettings {
   payment_enabled: boolean
   purchase_subscription_enabled: boolean
   purchase_subscription_url: string
-  payment_enabled: boolean
   table_default_page_size: number
   table_page_size_options: number[]
   custom_menu_items: CustomMenuItem[]
