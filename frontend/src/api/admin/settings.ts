@@ -345,11 +345,14 @@ export interface SystemSettings {
   doc_url: string;
   home_content: string;
   hide_ccs_import_button: boolean;
+  purchase_subscription_enabled: boolean;
+  purchase_subscription_url: string;
   table_default_page_size: number;
   table_page_size_options: number[];
   backend_mode_enabled: boolean;
   custom_menu_items: CustomMenuItem[];
   custom_endpoints: CustomEndpoint[];
+  sora_client_enabled: boolean;
   // SMTP settings
   smtp_host: string;
   smtp_port: number;
@@ -532,11 +535,14 @@ export interface UpdateSettingsRequest {
   doc_url?: string;
   home_content?: string;
   hide_ccs_import_button?: boolean;
+  purchase_subscription_enabled?: boolean;
+  purchase_subscription_url?: string;
   table_default_page_size?: number;
   table_page_size_options?: number[];
   backend_mode_enabled?: boolean;
   custom_menu_items?: CustomMenuItem[];
   custom_endpoints?: CustomEndpoint[];
+  sora_client_enabled?: boolean;
   smtp_host?: string;
   smtp_port?: number;
   smtp_username?: string;

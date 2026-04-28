@@ -24,6 +24,8 @@ import (
 
 const usageLogSelectColumns = "id, user_id, api_key_id, account_id, request_id, model, requested_model, upstream_model, group_id, subscription_id, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, cache_creation_5m_tokens, cache_creation_1h_tokens, image_output_tokens, image_output_cost, input_cost, output_cost, cache_creation_cost, cache_read_cost, total_cost, actual_cost, rate_multiplier, account_rate_multiplier, billing_type, request_type, stream, openai_ws_mode, duration_ms, first_token_ms, user_agent, ip_address, image_count, image_size, service_tier, reasoning_effort, inbound_endpoint, upstream_endpoint, cache_ttl_overridden, channel_id, model_mapping_chain, billing_tier, billing_mode, account_stats_cost, created_at"
 
+const rawUsageLogModelColumn = "model"
+
 // dateFormatWhitelist 将 granularity 参数映射为 PostgreSQL TO_CHAR 格式字符串，防止外部输入直接拼入 SQL
 var dateFormatWhitelist = map[string]string{
 	"hour":  "YYYY-MM-DD HH24:00",
@@ -174,18 +176,21 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 			account_stats_cost,
 			created_at
 		) VALUES (
-			$1, $2, $3, $4, $5,
-			$6, $7, $8,
-			$9, $10, $11, $12,
-			$13, $14,
-			$15, $16, $17, $18, $19, $20,
-			$21, $22, $23, $24, $25, $26, $27, $28,
-			$29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39
+			$1, $2, $3, $4, $5, $6, $7,
+			$8, $9,
+			$10, $11, $12, $13,
+			$14, $15, $16, $17,
+			$18, $19, $20, $21, $22, $23,
+			$24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46
 		)
 		ON CONFLICT (request_id, api_key_id) DO NOTHING
 		RETURNING id, created_at
 	`
 
+	requestedModel := strings.TrimSpace(log.RequestedModel)
+	if requestedModel == "" {
+		requestedModel = strings.TrimSpace(log.Model)
+	}
 	upstreamModel := nullString(log.UpstreamModel)
 	groupID := nullInt64(log.GroupID)
 	subscriptionID := nullInt64(log.SubscriptionID)
@@ -198,6 +203,10 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 	reasoningEffort := nullString(log.ReasoningEffort)
 	inboundEndpoint := nullString(log.InboundEndpoint)
 	upstreamEndpoint := nullString(log.UpstreamEndpoint)
+	channelID := nullInt64(log.ChannelID)
+	modelMappingChain := nullString(log.ModelMappingChain)
+	billingTier := nullString(log.BillingTier)
+	billingMode := nullString(log.BillingMode)
 
 	var requestIDArg any
 	if requestID != "" {
@@ -210,6 +219,7 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 		log.AccountID,
 		requestIDArg,
 		log.Model,
+		nullString(&requestedModel),
 		upstreamModel,
 		groupID,
 		subscriptionID,
@@ -219,6 +229,8 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 		log.CacheReadTokens,
 		log.CacheCreation5mTokens,
 		log.CacheCreation1hTokens,
+		log.ImageOutputTokens,
+		log.ImageOutputCost,
 		log.InputCost,
 		log.OutputCost,
 		log.CacheCreationCost,
@@ -237,12 +249,16 @@ func (r *usageLogRepository) Create(ctx context.Context, log *service.UsageLog) 
 		ipAddress,
 		log.ImageCount,
 		imageSize,
-		mediaType,
 		serviceTier,
 		reasoningEffort,
 		inboundEndpoint,
 		upstreamEndpoint,
 		log.CacheTTLOverridden,
+		channelID,
+		modelMappingChain,
+		billingTier,
+		billingMode,
+		log.AccountStatsCost,
 		createdAt,
 	}
 	if err := scanSingleRow(ctx, sqlq, query, args, &log.ID, &log.CreatedAt); err != nil {
@@ -2364,6 +2380,26 @@ func (r *usageLogRepository) listUsageLogsWithPagination(ctx context.Context, wh
 		return nil, nil, err
 	}
 	return logs, paginationResultFromTotal(total, params), nil
+}
+
+func usageLogOrderBy(params pagination.PaginationParams) string {
+	sortBy := strings.ToLower(strings.TrimSpace(params.SortBy))
+	sortOrder := strings.ToUpper(params.NormalizedSortOrder(pagination.SortOrderDesc))
+
+	var column string
+	switch sortBy {
+	case "model":
+		column = "COALESCE(NULLIF(TRIM(requested_model), ''), model)"
+	case "created_at":
+		column = "created_at"
+	default:
+		column = "id"
+	}
+
+	if column == "id" {
+		return fmt.Sprintf("id %s", sortOrder)
+	}
+	return fmt.Sprintf("%s %s, id %s", column, sortOrder, sortOrder)
 }
 
 func (r *usageLogRepository) queryUsageLogs(ctx context.Context, query string, args ...any) (logs []service.UsageLog, err error) {

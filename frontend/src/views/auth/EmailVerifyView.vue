@@ -154,14 +154,11 @@ import Icon from '@/components/icons/Icon.vue'
 import TurnstileWidget from '@/components/TurnstileWidget.vue'
 import { useAuthStore, useAppStore } from '@/stores'
 import {
-  persistOAuthTokenContext,
   getPublicSettings,
-  isOAuthLoginCompletion,
   type PendingOAuthSendVerifyCodeResponse,
   sendPendingOAuthVerifyCode,
   sendVerifyCode,
 } from '@/api/auth'
-import { apiClient } from '@/api/client'
 import { buildAuthErrorMessage } from '@/utils/authError'
 import {
   isRegistrationEmailSuffixAllowed,
@@ -170,7 +167,6 @@ import {
 import {
   clearAllAffiliateReferralCodes,
   loadAffiliateReferralCode,
-  oauthAffiliatePayload
 } from '@/utils/oauthAffiliate'
 
 const { t, locale } = useI18n()
@@ -197,15 +193,6 @@ type PendingAuthSessionSummary = {
   token: string
   token_field: PendingAuthTokenField
   provider: string
-  redirect?: string
-}
-type PendingOAuthCreateAccountResponse = {
-  auth_result?: string
-  access_token: string
-  refresh_token?: string
-  expires_in?: number
-  token_type?: string
-  provider?: string
   redirect?: string
 }
 
@@ -373,10 +360,6 @@ function resolvePendingOAuthCallbackRoute(provider: string): string {
     default:
       return '/auth/callback'
   }
-}
-
-function isPendingOAuthSessionResponse(data: PendingOAuthCreateAccountResponse): boolean {
-  return data.auth_result === 'pending_session'
 }
 
 function getPendingOAuthSendCodeSessionResponse(

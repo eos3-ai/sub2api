@@ -4,23 +4,16 @@
       data-testid="profile-overview-hero"
       class="card overflow-hidden border border-primary-100/80 bg-gradient-to-br from-primary-50 via-white to-amber-50/70 dark:border-primary-900/40 dark:from-primary-950/40 dark:via-dark-900 dark:to-dark-950"
     >
-      <div class="flex items-center gap-4">
-        <!-- Avatar -->
-        <div
-          class="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-2xl font-bold text-white shadow-lg shadow-primary-500/20"
-        >
-          {{ user?.email?.charAt(0).toUpperCase() || 'U' }}
-        </div>
-        <div class="min-w-0 flex-1">
-          <h2 class="truncate text-lg font-semibold text-gray-900 dark:text-white">
-            {{ user?.email }}
-          </h2>
-          <div class="mt-1 flex items-center gap-2">
-            <span :class="['badge', user?.role === 'admin' || user?.role === 'sales' ? 'badge-primary' : 'badge-gray']">
-              {{ user?.role === 'admin' ? t('profile.administrator') : user?.role === 'sales' ? t('profile.operator') : t('profile.user') }}
-            </span>
-            <span
-              :class="['badge', user?.status === 'active' ? 'badge-success' : 'badge-danger']"
+      <div class="px-6 py-6 md:px-8">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div
+            class="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-primary-500 to-primary-600 text-2xl font-bold text-white shadow-lg shadow-primary-500/20"
+          >
+            <img
+              v-if="avatarUrl"
+              :src="avatarUrl"
+              :alt="displayName"
+              class="h-full w-full object-cover"
             >
             <span v-else>{{ avatarInitial }}</span>
           </div>

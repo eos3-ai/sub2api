@@ -7,10 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
+	"math"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -33,10 +36,13 @@ type SettingRepository interface {
 
 // SettingService 系统设置服务
 type SettingService struct {
-	settingRepo SettingRepository
-	cfg         *config.Config
-	onUpdate    func() // Callback when settings are updated (for cache invalidation)
-	version     string // Application version
+	settingRepo             SettingRepository
+	defaultSubGroupReader   DefaultSubscriptionGroupReader
+	cfg                     *config.Config
+	proxyRepo               ProxyRepository
+	webSearchManagerBuilder WebSearchManagerBuilder
+	onUpdate                func() // Callback when settings are updated (for cache invalidation)
+	version                 string // Application version
 }
 
 // NewSettingService 创建系统设置服务实例
@@ -106,6 +112,12 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		oidcProviderName = "OIDC"
 	}
 	weChatEnabled, weChatOpenEnabled, weChatMPEnabled, weChatMobileEnabled := s.weChatOAuthCapabilitiesFromSettings(settings)
+	_ = oidcEnabled
+	_ = oidcProviderName
+	_ = weChatEnabled
+	_ = weChatOpenEnabled
+	_ = weChatMPEnabled
+	_ = weChatMobileEnabled
 
 	// Password reset requires email verification to be enabled
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
@@ -516,17 +528,17 @@ func (s *SettingService) UpdateSettings(ctx context.Context, settings *SystemSet
 	}
 
 	err := s.settingRepo.SetMultiple(ctx, updates)
-	if err == nil && s.onUpdate != nil {
-		s.onUpdate() // Invalidate cache after settings update
+	if err != nil {
+		return err
 	}
 
-	updates := make(map[string]string, 21)
-	writeProviderDefaultGrantUpdates(updates, emailAuthSourceDefaultKeys, settings.Email)
-	writeProviderDefaultGrantUpdates(updates, linuxDoAuthSourceDefaultKeys, settings.LinuxDo)
-	writeProviderDefaultGrantUpdates(updates, oidcAuthSourceDefaultKeys, settings.OIDC)
-	writeProviderDefaultGrantUpdates(updates, weChatAuthSourceDefaultKeys, settings.WeChat)
-	updates[SettingKeyForceEmailOnThirdPartySignup] = strconv.FormatBool(settings.ForceEmailOnThirdPartySignup)
-	return updates, nil
+	if refreshed, refreshErr := s.GetAllSettings(ctx); refreshErr == nil {
+		s.refreshCachedSettings(refreshed)
+	}
+	if s.onUpdate != nil {
+		s.onUpdate() // Invalidate cache after settings update
+	}
+	return nil
 }
 
 func (s *SettingService) refreshCachedSettings(settings *SystemSettings) {
@@ -820,6 +832,8 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 			oidcValidateIDTokenDefault = s.cfg.OIDC.ValidateIDToken
 		}
 	}
+	_ = oidcUsePKCEDefault
+	_ = oidcValidateIDTokenDefault
 
 	// 初始化默认设置
 	defaults := map[string]string{
@@ -1592,52 +1606,6 @@ func (s *SettingService) SetBetaPolicySettings(ctx context.Context, settings *Be
 		return fmt.Errorf("marshal beta policy settings: %w", err)
 	}
 	return s.settingRepo.Set(ctx, SettingKeyBetaPolicySettings, string(data))
-}
-
-// GetSoraS3Settings 获取 Sora S3 存储配置。
-func (s *SettingService) GetSoraS3Settings(ctx context.Context) (*SoraS3Settings, error) {
-	keys := []string{
-		SettingKeySoraS3Enabled,
-		SettingKeySoraS3Endpoint,
-		SettingKeySoraS3Region,
-		SettingKeySoraS3Bucket,
-		SettingKeySoraS3AccessKeyID,
-		SettingKeySoraS3SecretAccessKey,
-		SettingKeySoraS3Prefix,
-		SettingKeySoraS3ForcePathStyle,
-		SettingKeySoraS3CDNURL,
-		SettingKeySoraDefaultStorageQuotaBytes,
-	}
-	settings, err := s.settingRepo.GetMultiple(ctx, keys)
-	if err != nil {
-		return nil, fmt.Errorf("get sora s3 settings: %w", err)
-	}
-
-	cfg := &SoraS3Settings{
-		Enabled:        settings[SettingKeySoraS3Enabled] == "true",
-		Endpoint:       strings.TrimSpace(settings[SettingKeySoraS3Endpoint]),
-		Region:         strings.TrimSpace(settings[SettingKeySoraS3Region]),
-		Bucket:         strings.TrimSpace(settings[SettingKeySoraS3Bucket]),
-		AccessKeyID:    strings.TrimSpace(settings[SettingKeySoraS3AccessKeyID]),
-		Prefix:         strings.TrimSpace(settings[SettingKeySoraS3Prefix]),
-		ForcePathStyle: settings[SettingKeySoraS3ForcePathStyle] == "true",
-		CDNURL:         strings.TrimSpace(settings[SettingKeySoraS3CDNURL]),
-	}
-
-	if secret := strings.TrimSpace(settings[SettingKeySoraS3SecretAccessKey]); secret != "" {
-		cfg.SecretAccessKey = secret
-		cfg.SecretAccessKeyConfigured = true
-	}
-	if cfg.Region == "" {
-		cfg.Region = "auto"
-	}
-	if rawQuota := strings.TrimSpace(settings[SettingKeySoraDefaultStorageQuotaBytes]); rawQuota != "" {
-		if v, parseErr := strconv.ParseInt(rawQuota, 10, 64); parseErr == nil && v >= 0 {
-			cfg.DefaultStorageQuotaBytes = v
-		}
-	}
-
-	return cfg, nil
 }
 
 // GetStreamTimeoutSettings 获取流超时处理配置

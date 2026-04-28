@@ -2657,7 +2657,7 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		var usage *OpenAIUsage
 		var firstTokenMs *int
 		if reqStream {
-			streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, mappedModel, true)
+			streamResult, err := s.handleStreamingResponse(ctx, resp, c, account, startTime, originalModel, upstreamModel, true)
 			if err != nil {
 				if streamResult != nil && !streamResult.wroteClientBytes && isRetryableOpenAIStreamError(err) {
 					logger.LegacyPrintf(

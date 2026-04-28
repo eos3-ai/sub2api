@@ -105,11 +105,6 @@ type httpUpstreamService struct {
 // 返回:
 //   - service.HTTPUpstream 接口实现
 func NewHTTPUpstream(cfg *config.Config) service.HTTPUpstream {
-	// Initialize the global TLS fingerprint registry once from config, so custom profiles
-	// are available before any upstream requests attempt to use TLS fingerprinting.
-	if cfg != nil {
-		_ = tlsfingerprint.InitGlobalRegistry(&cfg.Gateway.TLSFingerprint)
-	}
 	return &httpUpstreamService{
 		cfg:     cfg,
 		clients: make(map[string]*upstreamClientEntry),
@@ -167,25 +162,13 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 
 // DoWithTLS 执行带 TLS 指纹伪装的 HTTP 请求
 //
-// 参数:
-//   - req: HTTP 请求对象
-//   - proxyURL: 代理地址，空字符串表示直连
-//   - accountID: 账户 ID，用于账户级隔离和 TLS 指纹模板选择
-//   - accountConcurrency: 账户并发限制，用于动态调整连接池大小
-//   - enableTLSFingerprint: 是否启用 TLS 指纹伪装
-//
-// TLS 指纹说明:
-//   - 当 enableTLSFingerprint=true 时，使用 utls 库模拟 Claude CLI 的 TLS 指纹
-//   - 指纹模板根据 accountID % len(profiles) 自动选择
-//   - 支持直连、HTTP/HTTPS 代理、SOCKS5 代理三种场景
-func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, enableTLSFingerprint bool) (*http.Response, error) {
-	// Global gate: disable TLS fingerprinting when explicitly turned off in config.
-	if enableTLSFingerprint && s.cfg != nil && !s.cfg.Gateway.TLSFingerprint.Enabled {
-		enableTLSFingerprint = false
+// profile 为 nil 时不启用 TLS 指纹，行为与 Do 方法相同。
+// profile 非 nil 时使用指定的 Profile 进行 TLS 指纹伪装。
+func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	if profile == nil {
+		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
-
-	// 如果未启用 TLS 指纹，直接使用标准请求路径
-	if !enableTLSFingerprint {
+	if s.cfg != nil && !s.cfg.Gateway.TLSFingerprint.Enabled {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
 

@@ -247,8 +247,6 @@ var (
 	DefaultDefaultValidityDays int
 	// DefaultUserPurchaseVisible holds the default value on creation for the "user_purchase_visible" field.
 	DefaultUserPurchaseVisible bool
-	// DefaultSoraStorageQuotaBytes holds the default value on creation for the "sora_storage_quota_bytes" field.
-	DefaultSoraStorageQuotaBytes int64
 	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
 	DefaultClaudeCodeOnly bool
 	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.

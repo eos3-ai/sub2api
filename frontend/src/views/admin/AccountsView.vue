@@ -881,6 +881,7 @@ const openMenu = (a: Account, e: MouseEvent) => {
   menu.show = true
 }
 const toggleSel = (id: number) => { const i = selIds.value.indexOf(id); if(i === -1) selIds.value.push(id); else selIds.value.splice(i, 1) }
+const isSelected = (id: number) => selIds.value.includes(id)
 const allVisibleSelected = computed(() => {
   if (accounts.value.length === 0) return false
   return accounts.value.every(account => selIds.value.includes(account.id))
@@ -897,6 +898,13 @@ const toggleSelectAllVisible = (event: Event) => {
   selIds.value = selIds.value.filter(id => !visibleIds.has(id))
 }
 const selectPage = () => { selIds.value = [...new Set([...selIds.value, ...accounts.value.map(a => a.id)])] }
+const handleSort = (key: string, order: 'asc' | 'desc') => {
+  if (!ACCOUNT_SORTABLE_KEYS.has(key)) return
+  sortState.sort_by = key
+  sortState.sort_order = order
+  localStorage.setItem(ACCOUNT_SORT_STORAGE_KEY, JSON.stringify({ key, order }))
+  reload()
+}
 const handleBulkDelete = async () => { if(!confirm(t('common.confirm'))) return; try { await Promise.all(selIds.value.map(id => adminAPI.accounts.delete(id))); selIds.value = []; reload() } catch (error) { console.error('Failed to bulk delete accounts:', error) } }
 const updateSchedulableInList = (accountIds: number[], schedulable: boolean) => {
   if (accountIds.length === 0) return

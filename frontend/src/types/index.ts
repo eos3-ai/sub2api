@@ -67,6 +67,7 @@ export interface User {
   id: number
   username: string
   email: string
+  avatar_url?: string | null
   role: 'admin' | 'sales' | 'user' // User role for authorization
   balance: number // User balance for API usage
   concurrency: number // Allowed concurrent requests
@@ -76,6 +77,14 @@ export interface User {
   balance_notify_enabled: boolean
   balance_notify_threshold: number | null
   balance_notify_extra_emails: NotifyEmailEntry[]
+  email_bound?: boolean
+  auth_bindings?: Record<string, UserAuthBindingStatus>
+  identity_bindings?: Record<string, UserAuthBindingStatus>
+  profile_sources?: Record<string, string | UserProfileSourceContext | null>
+  avatar_source?: string | UserProfileSourceContext | null
+  display_name_source?: string | UserProfileSourceContext | null
+  username_source?: string | UserProfileSourceContext | null
+  nickname_source?: string | UserProfileSourceContext | null
   subscriptions?: UserSubscription[] // User's active subscriptions
   last_active_at?: string | null
   created_at: string
@@ -90,6 +99,8 @@ export interface AdminUser extends User {
   group_rates?: Record<number, number>
   // 当前并发数（仅管理员列表接口返回）
   current_concurrency?: number
+  sora_storage_quota_bytes?: number
+  sora_storage_used_bytes?: number
 }
 
 export interface LoginRequest {
@@ -157,10 +168,13 @@ export interface PublicSettings {
   doc_url: string
   home_content: string
   hide_ccs_import_button: boolean
+  purchase_subscription_enabled: boolean
+  purchase_subscription_url: string
   payment_enabled: boolean
   table_default_page_size: number
   table_page_size_options: number[]
   custom_menu_items: CustomMenuItem[]
+  custom_endpoints: CustomEndpoint[]
   claude_official_url?: string
   codex_official_url?: string
   gemini_official_url?: string
@@ -171,6 +185,7 @@ export interface PublicSettings {
   wechat_oauth_mobile_enabled?: boolean
   oidc_oauth_enabled: boolean
   oidc_oauth_provider_name: string
+  sora_client_enabled: boolean
   backend_mode_enabled: boolean
   baidu_tongji_id?: string
   baidu_ocpc_landing_new_type?: number
@@ -265,6 +280,28 @@ export interface ReferralInvite {
   reward_issued_at?: string | null
   reward_amount_usd: number
   created_at: string
+}
+
+export interface UserAffiliateInvitee {
+  user_id: number
+  email: string
+  username: string
+  total_rebate: number
+  created_at: string
+}
+
+export interface UserAffiliateDetail {
+  aff_code: string
+  aff_count: number
+  aff_quota: number
+  aff_history_quota: number
+  aff_frozen_quota: number
+  effective_rebate_rate_percent: number
+  invitees: UserAffiliateInvitee[]
+}
+
+export interface AffiliateTransferResponse {
+  transferred_quota: number
 }
 
 // ==================== Subscription Types ====================
@@ -504,7 +541,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'sora'
 
 export type SubscriptionType = 'standard' | 'subscription'
 
@@ -535,6 +572,11 @@ export interface Group {
   image_price_1k: number | null
   image_price_2k: number | null
   image_price_4k: number | null
+  sora_image_price_360: number | null
+  sora_image_price_540: number | null
+  sora_video_price_per_request: number | null
+  sora_video_price_per_request_hd: number | null
+  sora_storage_quota_bytes: number
   // Claude Code 客户端限制
   claude_code_only: boolean
   fallback_group_id: number | null
@@ -571,6 +613,8 @@ export interface AdminGroup extends Group {
 
   // 分组排序
   sort_order: number
+
+  simulate_claude_max_enabled?: boolean
 }
 
 export interface ApiKey {
@@ -647,10 +691,16 @@ export interface CreateGroupRequest {
   image_price_1k?: number | null
   image_price_2k?: number | null
   image_price_4k?: number | null
+  sora_image_price_360?: number | null
+  sora_image_price_540?: number | null
+  sora_video_price_per_request?: number | null
+  sora_video_price_per_request_hd?: number | null
+  sora_storage_quota_bytes?: number
   claude_code_only?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   mcp_xml_inject?: boolean
+  simulate_claude_max_enabled?: boolean
   supported_model_scopes?: string[]
   require_oauth_only?: boolean
   require_privacy_set?: boolean
@@ -675,10 +725,16 @@ export interface UpdateGroupRequest {
   image_price_1k?: number | null
   image_price_2k?: number | null
   image_price_4k?: number | null
+  sora_image_price_360?: number | null
+  sora_image_price_540?: number | null
+  sora_video_price_per_request?: number | null
+  sora_video_price_per_request_hd?: number | null
+  sora_storage_quota_bytes?: number
   claude_code_only?: boolean
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   mcp_xml_inject?: boolean
+  simulate_claude_max_enabled?: boolean
   supported_model_scopes?: string[]
   require_oauth_only?: boolean
   require_privacy_set?: boolean
@@ -687,7 +743,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'sora'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'

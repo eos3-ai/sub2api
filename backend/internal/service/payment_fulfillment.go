@@ -263,6 +263,19 @@ func resolveRedeemAction(existing *RedeemCode, lookupErr error) redeemAction {
 }
 
 func (s *PaymentService) doBalance(ctx context.Context, o *dbent.PaymentOrder) error {
+	if s == nil || o == nil {
+		return fmt.Errorf("payment service or order is nil")
+	}
+	if s.redeemService == nil {
+		if err := s.applyBalanceFallback(ctx, o); err != nil {
+			return fmt.Errorf("credit balance directly: %w", err)
+		}
+		if err := s.applyAffiliateRebateForOrder(ctx, o); err != nil {
+			return err
+		}
+		return s.markCompleted(ctx, o, "RECHARGE_SUCCESS")
+	}
+
 	// Idempotency: check if redeem code already exists (from a previous partial run)
 	existing, lookupErr := s.redeemService.GetByCode(ctx, o.RechargeCode)
 	action := resolveRedeemAction(existing, lookupErr)

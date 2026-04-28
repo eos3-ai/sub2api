@@ -98,6 +98,24 @@ func TestParseWebSearchConfigJSON_BackwardCompatibility(t *testing.T) {
 	require.Equal(t, int64(1000), *cfg.Providers[0].QuotaLimit)
 }
 
+func TestGetWebSearchEmulationConfig_DefaultsWhenSettingMissing(t *testing.T) {
+	webSearchEmulationCache.Store((*cachedWebSearchEmulationConfig)(nil))
+	webSearchEmulationSF.Forget(sfKeyWebSearchConfig)
+	defer func() {
+		webSearchEmulationCache.Store((*cachedWebSearchEmulationConfig)(nil))
+		webSearchEmulationSF.Forget(sfKeyWebSearchConfig)
+	}()
+
+	repo := &errSettingRepo{readErr: ErrSettingNotFound}
+	svc := NewSettingService(repo, nil)
+
+	cfg, err := svc.GetWebSearchEmulationConfig(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, cfg)
+	require.False(t, cfg.Enabled)
+	require.Empty(t, cfg.Providers)
+}
+
 // --- SanitizeWebSearchConfig ---
 
 func TestSanitizeWebSearchConfig_MaskAPIKey(t *testing.T) {

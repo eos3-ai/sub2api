@@ -11,34 +11,8 @@
         </p>
       </div>
 
-      <div v-if="linuxdoOAuthEnabled || wechatOAuthEnabled || oidcOAuthEnabled" class="space-y-4">
-        <LinuxDoOAuthSection
-          v-if="linuxdoOAuthEnabled"
-          :disabled="isLoading"
-          :aff-code="formData.aff_code"
-          :show-divider="false"
-        />
-        <WechatOAuthSection
-          v-if="wechatOAuthEnabled"
-          :disabled="isLoading"
-          :aff-code="formData.aff_code"
-          :show-divider="false"
-        />
-        <OidcOAuthSection
-          v-if="oidcOAuthEnabled"
-          :disabled="isLoading"
-          :provider-name="oidcOAuthProviderName"
-          :aff-code="formData.aff_code"
-          :show-divider="false"
-        />
-        <div class="flex items-center gap-3">
-          <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-          <span class="text-xs text-gray-500 dark:text-dark-400">
-            {{ t('auth.oauthOrContinue') }}
-          </span>
-          <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
-        </div>
-      </div>
+      <!-- LinuxDo Connect OAuth 登录 -->
+      <LinuxDoOAuthSection v-if="linuxdoOAuthEnabled" :disabled="isLoading" />
 
       <!-- Registration Disabled Message -->
       <div
@@ -79,6 +53,9 @@
               :placeholder="t('auth.emailPlaceholder')"
             />
           </div>
+          <p v-if="errors.email" class="input-error-text">
+            {{ errors.email }}
+          </p>
         </div>
 
         <!-- Password Input -->
@@ -110,7 +87,10 @@
               <Icon v-else name="eye" size="md" />
             </button>
           </div>
-          <p class="input-hint">
+          <p v-if="errors.password" class="input-error-text">
+            {{ errors.password }}
+          </p>
+          <p v-else class="input-hint">
             {{ t('auth.passwordHint') }}
           </p>
         </div>
@@ -159,6 +139,12 @@
                 {{ t('auth.invitationCodeValid') }}
               </span>
             </div>
+            <p v-else-if="invitationValidation.invalid" class="input-error-text">
+              {{ invitationValidation.message }}
+            </p>
+            <p v-else-if="errors.invitation_code" class="input-error-text">
+              {{ errors.invitation_code }}
+            </p>
           </transition>
         </div>
 
@@ -190,7 +176,27 @@
             @expire="onTurnstileExpire"
             @error="onTurnstileError"
           />
+          <p v-if="errors.turnstile" class="input-error-text mt-2 text-center">
+            {{ errors.turnstile }}
+          </p>
         </div>
+
+        <!-- Error Message -->
+        <transition name="fade">
+          <div
+            v-if="errorMessage"
+            class="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800/50 dark:bg-red-900/20"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0">
+                <Icon name="exclamationCircle" size="md" class="text-red-500" />
+              </div>
+              <p class="text-sm text-red-700 dark:text-red-400">
+                {{ errorMessage }}
+              </p>
+            </div>
+          </div>
+        </transition>
 
         <!-- Submit Button -->
         <button
@@ -312,8 +318,7 @@ const formData = reactive({
   password: '',
   invite_code: '',
   promo_code: '',
-  invitation_code: '',
-  aff_code: ''
+  invitation_code: ''
 })
 
 const errors = reactive({
@@ -323,35 +328,9 @@ const errors = reactive({
   invitation_code: ''
 })
 
-const validationToastMessage = computed(() =>
-  errors.email ||
-  errors.password ||
-  (invitationValidation.invalid ? invitationValidation.message : '') ||
-  errors.invitation_code ||
-  (promoValidation.invalid ? promoValidation.message : '') ||
-  errors.turnstile ||
-  ''
-)
-
-watch(validationToastMessage, (value, previousValue) => {
-  if (value && value !== previousValue) {
-    appStore.showError(value)
-  }
-})
-
-function syncAffiliateReferralCode(): string {
-  const code = resolveAffiliateReferralCode(route.query.aff, route.query.aff_code)
-  if (code) {
-    formData.aff_code = code
-  }
-  return code
-}
-
 // ==================== Lifecycle ====================
 
 onMounted(async () => {
-  syncAffiliateReferralCode()
-
   try {
     const settings = await getPublicSettings()
     registrationEnabled.value = settings.registration_enabled
@@ -378,7 +357,6 @@ onMounted(async () => {
         await validatePromoCodeDebounced(promoParam)
       }
     }
-    syncAffiliateReferralCode()
   } catch (error) {
     console.error('Failed to load public settings:', error)
   } finally {
@@ -387,13 +365,6 @@ onMounted(async () => {
   trackRegisterPageView()
   reportOcpcEvent(ocpcLandingNewType.value)
 })
-
-watch(
-  () => [route.query.aff, route.query.aff_code],
-  () => {
-    syncAffiliateReferralCode()
-  }
-)
 
 onUnmounted(() => {
   if (promoValidateTimeout) {
@@ -638,11 +609,6 @@ async function handleRegister(): Promise<void> {
   trackRegisterSubmit()
 
   try {
-    const affCode = formData.aff_code.trim() || loadAffiliateReferralCode()
-    if (affCode) {
-      formData.aff_code = affCode
-    }
-
     // If email verification is enabled, redirect to verification page
     if (emailVerifyEnabled.value) {
       // Store registration data in sessionStorage
@@ -654,8 +620,7 @@ async function handleRegister(): Promise<void> {
           invite_code: formData.invite_code,
           turnstile_token: turnstileToken.value,
           promo_code: formData.promo_code || undefined,
-          invitation_code: formData.invitation_code || undefined,
-          ...(affCode ? { aff_code: affCode } : {})
+          invitation_code: formData.invitation_code || undefined
         })
       )
 
@@ -671,10 +636,8 @@ async function handleRegister(): Promise<void> {
       invite_code: formData.invite_code || undefined,
       turnstile_token: turnstileEnabled.value ? turnstileToken.value : undefined,
       promo_code: formData.promo_code || undefined,
-      invitation_code: formData.invitation_code || undefined,
-      ...(affCode ? { aff_code: affCode } : {})
+      invitation_code: formData.invitation_code || undefined
     })
-    clearAffiliateReferralCode()
 
     // Show success toast
     appStore.showSuccess(t('auth.accountCreatedSuccess', { siteName: siteName.value }))

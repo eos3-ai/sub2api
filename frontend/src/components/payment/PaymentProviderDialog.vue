@@ -295,7 +295,7 @@ const emit = defineEmits<{
   }]
 }>()
 
-const { t } = useI18n()
+const { t, te, locale } = useI18n()
 
 interface PaymentGuideItem {
   title: string
@@ -308,6 +308,62 @@ interface PaymentGuide {
   summary: string
   items: PaymentGuideItem[]
   note?: string
+}
+
+const PAYMENT_FIELD_LABELS: Record<string, { zh: string; en: string }> = {
+  pid: { zh: '商户 PID', en: 'PID' },
+  pkey: { zh: '商户密钥', en: 'PKey' },
+  appId: { zh: '应用 ID', en: 'App ID' },
+  mpAppId: { zh: '公众号 App ID', en: 'MP App ID' },
+  apiBase: { zh: 'API 基础地址', en: 'API Base URL' },
+  cid: { zh: '支付渠道 ID', en: 'Channel ID' },
+  cidAlipay: { zh: '支付宝渠道 ID', en: 'Alipay Channel ID' },
+  cidWxpay: { zh: '微信渠道 ID', en: 'WeChat Channel ID' },
+  privateKey: { zh: '私钥', en: 'Private Key' },
+  publicKey: { zh: '公钥', en: 'Public Key' },
+  alipayPublicKey: { zh: '支付宝公钥', en: 'Alipay Public Key' },
+  mchId: { zh: '商户号', en: 'Merchant ID' },
+  apiV3Key: { zh: 'API v3 密钥', en: 'API v3 Key' },
+  certSerial: { zh: '证书序列号', en: 'Certificate Serial' },
+  publicKeyId: { zh: '公钥 ID', en: 'Public Key ID' },
+  h5AppName: { zh: 'H5 应用名称', en: 'H5 App Name' },
+  h5AppUrl: { zh: 'H5 应用地址', en: 'H5 App URL' },
+  secretKey: { zh: '密钥', en: 'Secret Key' },
+  publishableKey: { zh: '公开密钥', en: 'Publishable Key' },
+  webhookSecret: { zh: 'Webhook 密钥', en: 'Webhook Secret' },
+  notifyUrl: { zh: '异步通知地址', en: 'Notify URL' },
+  returnUrl: { zh: '同步跳转地址', en: 'Return URL' },
+}
+
+function humanizePaymentFieldKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\bapi\b/gi, 'API')
+    .replace(/\bid\b/gi, 'ID')
+    .replace(/\burl\b/gi, 'URL')
+    .replace(/\bpid\b/gi, 'PID')
+    .replace(/\bpkey\b/gi, 'PKey')
+    .replace(/\bv3\b/gi, 'v3')
+}
+
+function resolvePaymentFieldLabel(key: string, explicitLabel?: string): string {
+  if (explicitLabel?.trim()) {
+    return explicitLabel.trim()
+  }
+
+  const i18nKey = `admin.settings.payment.field_${key}`
+  if (te(i18nKey)) {
+    return t(i18nKey)
+  }
+
+  const fallback = PAYMENT_FIELD_LABELS[key]
+  if (fallback) {
+    return locale.value.startsWith('zh') ? fallback.zh : fallback.en
+  }
+
+  return humanizePaymentFieldKey(key)
 }
 
 // --- Form state ---
@@ -357,7 +413,7 @@ const resolvedFields = computed(() => {
   const fields = PROVIDER_CONFIG_FIELDS[form.provider_key] || []
   return fields.map(f => ({
     ...f,
-    label: f.label || t(`admin.settings.payment.field_${f.key}`),
+    label: resolvePaymentFieldLabel(f.key, f.label),
   }))
 })
 
@@ -521,7 +577,7 @@ function handleSave() {
     if (props.editing && f.sensitive) continue
     const val = (config[f.key] || '').trim()
     if (!val) {
-      const label = f.label || t(`admin.settings.payment.field_${f.key}`)
+      const label = resolvePaymentFieldLabel(f.key, f.label)
       emitValidationError(t('admin.settings.payment.validationFieldRequired', { field: label }))
       return
     }

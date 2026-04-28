@@ -51,10 +51,10 @@ type dingtalkBotRequest struct {
 	Text           dingtalkBotText     `json:"text"`
 	Markdown       dingtalkBotMarkdown `json:"markdown"`
 	AtUsers        []dingtalkAtUser    `json:"atUsers"`
-	SenderNick     string             `json:"senderNick"`
-	SenderID       string             `json:"senderId"`
-	SenderStaffID  string             `json:"senderStaffId"`
-	ConversationID string             `json:"conversationId"`
+	SenderNick     string              `json:"senderNick"`
+	SenderID       string              `json:"senderId"`
+	SenderStaffID  string              `json:"senderStaffId"`
+	ConversationID string              `json:"conversationId"`
 }
 
 type dingtalkBotText struct {
@@ -406,15 +406,6 @@ func parseCommaSeparated(value string) []string {
 		out = append(out, part)
 	}
 	return out
-}
-
-func containsString(list []string, target string) bool {
-	for _, item := range list {
-		if item == target {
-			return true
-		}
-	}
-	return false
 }
 
 func formatDingtalkUserDisplay(user *service.User) string {

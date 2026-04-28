@@ -9,10 +9,12 @@ import (
 	"log"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/payment"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 )
@@ -34,6 +36,8 @@ type CreatePaymentOrderRequest struct {
 
 // PaymentService 支付核心服务
 type PaymentService struct {
+	providerMu          sync.Mutex
+	providersLoaded     bool
 	cfg                 *config.PaymentConfig
 	orderRepo           PaymentOrderRepository
 	groupRepo           GroupRepository
@@ -44,6 +48,14 @@ type PaymentService struct {
 	referralService     *ReferralService
 	dingtalkService     *DingtalkService
 	subscriptionService *SubscriptionService
+	subscriptionSvc     *SubscriptionService
+	registry            *payment.Registry
+	loadBalancer        payment.LoadBalancer
+	configService       *PaymentConfigService
+	userRepo            UserRepository
+	redeemService       *RedeemService
+	resumeService       *PaymentResumeService
+	affiliateService    *AffiliateService
 	entClient           *dbent.Client
 }
 
@@ -75,6 +87,9 @@ func NewPaymentService(
 		referralService:     referralService,
 		dingtalkService:     dingtalkService,
 		subscriptionService: subscriptionService,
+		subscriptionSvc:     subscriptionService,
+		registry:            payment.NewRegistry(),
+		resumeService:       NewPaymentResumeService(nil),
 		entClient:           entClient,
 	}
 }
@@ -249,7 +264,7 @@ func (s *PaymentService) MarkOrderFailed(ctx context.Context, orderNo string, re
 			return order, nil, nil
 		}
 
-		now := timePtr(time.Now())
+		now := legacyTimePtr(time.Now())
 		order.Status = PaymentStatusFailed
 		order.CallbackAt = now
 		if reason != "" {
@@ -285,7 +300,7 @@ func (s *PaymentService) MarkOrderCancelled(ctx context.Context, orderNo string,
 			return order, nil, nil
 		}
 
-		now := timePtr(time.Now())
+		now := legacyTimePtr(time.Now())
 		order.Status = PaymentStatusCancelled
 		order.CallbackAt = now
 		if reason != "" {
@@ -426,7 +441,7 @@ func (s *PaymentService) MarkOrderPaid(ctx context.Context, orderNo, tradeNo str
 		}
 
 		order.Status = PaymentStatusPaid
-		now := timePtr(time.Now())
+		now := legacyTimePtr(time.Now())
 		order.PaidAt = now
 		order.TradeNo = &tradeNo
 		order.CallbackData = callbackData
@@ -625,7 +640,7 @@ func (s *PaymentService) createActivityRechargeOrder(ctx context.Context, userID
 		Provider:      "activity",
 		PaymentMethod: "admin",
 		Status:        PaymentStatusPaid,
-		PaidAt:        timePtr(now),
+		PaidAt:        legacyTimePtr(now),
 		ExpireAt:      now,
 	}
 	if err := s.orderRepo.Create(ctx, order); err != nil {
@@ -663,7 +678,7 @@ func (s *PaymentService) generateOrderNo() string {
 	return prefix + now.Format("20060102150405") + fmt.Sprintf("%09d", now.Nanosecond()) + fmt.Sprintf("%06d", random)
 }
 
-func timePtr(t time.Time) *time.Time {
+func legacyTimePtr(t time.Time) *time.Time {
 	return &t
 }
 

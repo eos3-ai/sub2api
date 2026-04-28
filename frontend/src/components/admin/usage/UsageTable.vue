@@ -370,13 +370,22 @@ interface Props {
   data: AdminUsageLog[]
   loading?: boolean
   columns?: Column[]
+  serverSideSort?: boolean
+  defaultSortKey?: string
+  defaultSortOrder?: 'asc' | 'desc'
 }
 
 withDefaults(defineProps<Props>(), {
   loading: false,
-  columns: () => []
+  columns: () => [],
+  serverSideSort: false,
+  defaultSortKey: '',
+  defaultSortOrder: 'desc',
 })
-defineEmits(['userClick'])
+defineEmits<{
+  (e: 'userClick', userId: number, email?: string): void
+  (e: 'sort', key: string, order: 'asc' | 'desc'): void
+}>()
 const { t } = useI18n()
 
 // Tooltip state - cost

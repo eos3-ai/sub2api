@@ -56,6 +56,18 @@ func (r *paymentOrderRepository) Create(ctx context.Context, order *service.Paym
 	if bizType == "" {
 		bizType = service.PaymentBizTypeOnlineRecharge
 	}
+	orderType := "balance"
+	if bizType == service.PaymentBizTypeSubscriptionPurchase {
+		orderType = "subscription"
+	}
+	paymentTradeNo := ""
+	if order.TradeNo != nil {
+		paymentTradeNo = strings.TrimSpace(*order.TradeNo)
+	}
+	paymentType := strings.ToLower(strings.TrimSpace(order.Channel))
+	if paymentType == "" {
+		paymentType = strings.ToLower(strings.TrimSpace(order.Provider))
+	}
 
 	err := scanSingleRow(
 		ctx,
@@ -68,9 +80,11 @@ INSERT INTO payment_orders (
   status, paid_at, expire_at,
   promotion_tier, promotion_used,
   callback_data, callback_at,
-  client_ip, user_agent
+  client_ip, user_agent,
+  user_email, user_name, amount, pay_amount, fee_rate, recharge_code,
+  payment_type, payment_trade_no, pay_url, order_type, subscription_group_id, subscription_days, expires_at, src_host
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40)
 RETURNING id, created_at, updated_at
 `,
 		[]any{
@@ -100,6 +114,20 @@ RETURNING id, created_at, updated_at
 			callbackAt,
 			nullIfEmpty(order.ClientIP),
 			nullIfEmpty(order.UserAgent),
+			"",
+			order.Username,
+			order.AmountCNY,
+			order.AmountCNY,
+			0,
+			order.OrderNo,
+			paymentType,
+			paymentTradeNo,
+			nullIfEmpty(order.PaymentURL),
+			orderType,
+			bizGroupID,
+			bizValidityDays,
+			order.ExpireAt,
+			"",
 		},
 		&order.ID,
 		&order.CreatedAt,
@@ -157,6 +185,18 @@ func (r *paymentOrderRepository) Update(ctx context.Context, order *service.Paym
 	if bizType == "" {
 		bizType = service.PaymentBizTypeOnlineRecharge
 	}
+	orderType := "balance"
+	if bizType == service.PaymentBizTypeSubscriptionPurchase {
+		orderType = "subscription"
+	}
+	paymentTradeNo := ""
+	if order.TradeNo != nil {
+		paymentTradeNo = strings.TrimSpace(*order.TradeNo)
+	}
+	paymentType := strings.ToLower(strings.TrimSpace(order.Channel))
+	if paymentType == "" {
+		paymentType = strings.ToLower(strings.TrimSpace(order.Provider))
+	}
 
 	err := scanSingleRow(
 		ctx,
@@ -187,6 +227,17 @@ SET trade_no=$2,
     callback_at=$23,
     client_ip=$24,
     user_agent=$25,
+    user_name=$26,
+    amount=$27,
+    pay_amount=$28,
+    recharge_code=$29,
+    payment_type=$30,
+    payment_trade_no=$31,
+    pay_url=$32,
+    order_type=$33,
+    subscription_group_id=$34,
+    subscription_days=$35,
+    expires_at=$36,
     updated_at=NOW()
 WHERE order_no=$1
 RETURNING updated_at
@@ -217,6 +268,17 @@ RETURNING updated_at
 			callbackAt,
 			nullIfEmpty(order.ClientIP),
 			nullIfEmpty(order.UserAgent),
+			order.Username,
+			order.AmountCNY,
+			order.AmountCNY,
+			order.OrderNo,
+			paymentType,
+			paymentTradeNo,
+			nullIfEmpty(order.PaymentURL),
+			orderType,
+			bizGroupID,
+			bizValidityDays,
+			order.ExpireAt,
 		},
 		&order.UpdatedAt,
 	)

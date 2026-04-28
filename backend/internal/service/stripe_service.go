@@ -161,7 +161,7 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 		}
 		log.Printf("[Stripe Webhook] PaymentIntent details: id=%s, amount=%d, currency=%s, status=%s",
 			pi.ID, pi.Amount, pi.Currency, pi.Status)
-		info.OrderNo = firstNonEmpty(
+		info.OrderNo = stripeFirstNonEmpty(
 			pi.Metadata["order_no"],
 			pi.Metadata["orderId"],
 			pi.Metadata["order_id"],
@@ -183,7 +183,7 @@ func (s *StripeService) VerifyWebhook(ctx context.Context, payload []byte, signa
 	}
 }
 
-func firstNonEmpty(values ...string) string {
+func stripeFirstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if strings.TrimSpace(v) != "" {
 			return strings.TrimSpace(v)

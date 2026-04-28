@@ -79,6 +79,7 @@ type Config struct {
 	RateLimit               RateLimitConfig               `mapstructure:"rate_limit"`
 	Pricing                 PricingConfig                 `mapstructure:"pricing"`
 	Gateway                 GatewayConfig                 `mapstructure:"gateway"`
+	Sora                    SoraConfig                    `mapstructure:"sora"`
 	APIKeyAuth              APIKeyAuthCacheConfig         `mapstructure:"api_key_auth_cache"`
 	SubscriptionCache       SubscriptionCacheConfig       `mapstructure:"subscription_cache"`
 	SubscriptionMaintenance SubscriptionMaintenanceConfig `mapstructure:"subscription_maintenance"`
@@ -97,6 +98,39 @@ type Config struct {
 	Gemini                  GeminiConfig                  `mapstructure:"gemini"`
 	Update                  UpdateConfig                  `mapstructure:"update"`
 	Idempotency             IdempotencyConfig             `mapstructure:"idempotency"`
+}
+
+// SoraConfig groups Sora-specific client and media storage settings.
+// Zero values intentionally keep the feature disabled to preserve current branch behavior.
+type SoraConfig struct {
+	Client  SoraClientConfig  `mapstructure:"client"`
+	Storage SoraStorageConfig `mapstructure:"storage"`
+}
+
+type SoraClientConfig struct {
+	BaseURL                string `mapstructure:"base_url"`
+	PollIntervalSeconds    int    `mapstructure:"poll_interval_seconds"`
+	MaxPollAttempts        int    `mapstructure:"max_poll_attempts"`
+	UseOpenAITokenProvider bool   `mapstructure:"use_openai_token_provider"`
+	DisableTLSFingerprint  bool   `mapstructure:"disable_tls_fingerprint"`
+	Debug                  bool   `mapstructure:"debug"`
+}
+
+type SoraStorageConfig struct {
+	Type                   string                   `mapstructure:"type"`
+	LocalPath              string                   `mapstructure:"local_path"`
+	MaxConcurrentDownloads int                      `mapstructure:"max_concurrent_downloads"`
+	DownloadTimeoutSeconds int                      `mapstructure:"download_timeout_seconds"`
+	MaxDownloadBytes       int64                    `mapstructure:"max_download_bytes"`
+	FallbackToUpstream     bool                     `mapstructure:"fallback_to_upstream"`
+	Debug                  bool                     `mapstructure:"debug"`
+	Cleanup                SoraStorageCleanupConfig `mapstructure:"cleanup"`
+}
+
+type SoraStorageCleanupConfig struct {
+	Enabled       bool   `mapstructure:"enabled"`
+	Schedule      string `mapstructure:"schedule"`
+	RetentionDays int    `mapstructure:"retention_days"`
 }
 
 type LogConfig struct {
@@ -607,6 +641,20 @@ type GatewayConfig struct {
 	// ForceCodexCLI: 强制将 OpenAI `/v1/responses` 请求按 Codex CLI 处理。
 	// 用于网关未透传/改写 User-Agent 时的兼容兜底（默认关闭，避免影响其他客户端）。
 	ForceCodexCLI bool `mapstructure:"force_codex_cli"`
+	// SoraStreamMode controls whether Sora requests should be forced into stream/non-stream mode.
+	SoraStreamMode string `mapstructure:"sora_stream_mode"`
+	// SoraRequestTimeoutSeconds bounds non-stream Sora task/polling requests. <=0 disables the override.
+	SoraRequestTimeoutSeconds int `mapstructure:"sora_request_timeout_seconds"`
+	// SoraStreamTimeoutSeconds bounds stream Sora task/polling requests. <=0 disables the override.
+	SoraStreamTimeoutSeconds int `mapstructure:"sora_stream_timeout_seconds"`
+	// SoraMediaSigningKey enables signed Sora media URLs when paired with a positive TTL.
+	SoraMediaSigningKey string `mapstructure:"sora_media_signing_key"`
+	// SoraMediaSignedURLTTLSeconds is the signed media URL TTL in seconds.
+	SoraMediaSignedURLTTLSeconds int `mapstructure:"sora_media_signed_url_ttl_seconds"`
+	// SoraMediaRequireAPIKey forces API-key auth for unsigned local media proxy routes.
+	SoraMediaRequireAPIKey bool `mapstructure:"sora_media_require_api_key"`
+	// SoraModelFilters controls Sora model list visibility.
+	SoraModelFilters SoraModelFiltersConfig `mapstructure:"sora_model_filters"`
 	// ForcedCodexInstructionsTemplateFile: 服务端强制附加到 Codex 顶层 instructions 的模板文件路径。
 	// 模板渲染后会直接覆盖最终 instructions；若需要保留客户端 system 转换结果，请在模板中显式引用 {{ .ExistingInstructions }}。
 	ForcedCodexInstructionsTemplateFile string `mapstructure:"forced_codex_instructions_template_file"`

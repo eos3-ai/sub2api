@@ -108,24 +108,12 @@ func RegisterGatewayRoutes(
 		antigravityV1Beta.POST("/models/*modelAction", h.Gateway.GeminiV1BetaModels)
 	}
 
-	// Sora 专用路由（强制使用 sora 平台）
-	soraV1 := r.Group("/sora/v1")
-	soraV1.Use(soraBodyLimit)
-	soraV1.Use(clientRequestID)
-	soraV1.Use(opsErrorLogger)
-	soraV1.Use(middleware.ForcePlatform(service.PlatformSora))
-	soraV1.Use(gin.HandlerFunc(apiKeyAuth))
-	{
-		soraV1.POST("/chat/completions", h.SoraGateway.ChatCompletions)
-		soraV1.GET("/models", h.Gateway.Models)
-	}
+}
 
-	// Sora 媒体代理（可选 API Key 验证）
-	if cfg.Gateway.SoraMediaRequireAPIKey {
-		r.GET("/sora/media/*filepath", gin.HandlerFunc(apiKeyAuth), h.SoraGateway.MediaProxy)
-	} else {
-		r.GET("/sora/media/*filepath", h.SoraGateway.MediaProxy)
+func getGroupPlatform(c *gin.Context) string {
+	apiKey, ok := middleware.GetAPIKeyFromContext(c)
+	if !ok || apiKey.Group == nil {
+		return ""
 	}
-	// Sora 媒体代理（签名 URL，无需 API Key）
-	r.GET("/sora/media-signed/*filepath", h.SoraGateway.MediaProxySigned)
+	return apiKey.Group.Platform
 }

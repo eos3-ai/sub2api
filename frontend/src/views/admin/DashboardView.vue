@@ -267,7 +267,7 @@
                   @change="onDateRangeChange"
                 />
               </div>
-              <button @click="loadDashboardStats" :disabled="chartsLoading" class="btn btn-secondary">
+              <button @click="loadDashboardData()" :disabled="chartsLoading" class="btn btn-secondary">
                 {{ t('common.refresh') }}
               </button>
               <div class="ml-auto flex items-center gap-2">
@@ -278,7 +278,7 @@
                   <Select
                     v-model="granularity"
                     :options="granularityOptions"
-                    @change="loadChartData"
+                    @change="loadDashboardData()"
                   />
                 </div>
               </div>
@@ -385,14 +385,109 @@ const formatLocalDate = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+const createDefaultDashboardStats = (): DashboardStats => ({
+  total_users: 0,
+  today_new_users: 0,
+  active_users: 0,
+  hourly_active_users: 0,
+  stats_updated_at: '',
+  stats_stale: false,
+  total_api_keys: 0,
+  active_api_keys: 0,
+  total_accounts: 0,
+  normal_accounts: 0,
+  error_accounts: 0,
+  ratelimit_accounts: 0,
+  overload_accounts: 0,
+  total_requests: 0,
+  total_input_tokens: 0,
+  total_output_tokens: 0,
+  total_cache_creation_tokens: 0,
+  total_cache_read_tokens: 0,
+  total_tokens: 0,
+  total_cost: 0,
+  total_actual_cost: 0,
+  total_account_cost: 0,
+  today_requests: 0,
+  today_input_tokens: 0,
+  today_output_tokens: 0,
+  today_cache_creation_tokens: 0,
+  today_cache_read_tokens: 0,
+  today_tokens: 0,
+  today_cost: 0,
+  today_actual_cost: 0,
+  today_account_cost: 0,
+  average_duration_ms: 0,
+  uptime: 0,
+  rpm: 0,
+  tpm: 0
+})
+
+const toSafeNumber = (value: unknown): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+  return 0
+}
+
+const normalizeDashboardStats = (payload?: Partial<DashboardStats> | null): DashboardStats => {
+  const base = createDefaultDashboardStats()
+  if (!payload) {
+    return base
+  }
+
+  return {
+    ...base,
+    ...payload,
+    total_users: toSafeNumber(payload.total_users),
+    today_new_users: toSafeNumber(payload.today_new_users),
+    active_users: toSafeNumber(payload.active_users),
+    hourly_active_users: toSafeNumber(payload.hourly_active_users),
+    total_api_keys: toSafeNumber(payload.total_api_keys),
+    active_api_keys: toSafeNumber(payload.active_api_keys),
+    total_accounts: toSafeNumber(payload.total_accounts),
+    normal_accounts: toSafeNumber(payload.normal_accounts),
+    error_accounts: toSafeNumber(payload.error_accounts),
+    ratelimit_accounts: toSafeNumber(payload.ratelimit_accounts),
+    overload_accounts: toSafeNumber(payload.overload_accounts),
+    total_requests: toSafeNumber(payload.total_requests),
+    total_input_tokens: toSafeNumber(payload.total_input_tokens),
+    total_output_tokens: toSafeNumber(payload.total_output_tokens),
+    total_cache_creation_tokens: toSafeNumber(payload.total_cache_creation_tokens),
+    total_cache_read_tokens: toSafeNumber(payload.total_cache_read_tokens),
+    total_tokens: toSafeNumber(payload.total_tokens),
+    total_cost: toSafeNumber(payload.total_cost),
+    total_actual_cost: toSafeNumber(payload.total_actual_cost),
+    total_account_cost: toSafeNumber(payload.total_account_cost),
+    today_requests: toSafeNumber(payload.today_requests),
+    today_input_tokens: toSafeNumber(payload.today_input_tokens),
+    today_output_tokens: toSafeNumber(payload.today_output_tokens),
+    today_cache_creation_tokens: toSafeNumber(payload.today_cache_creation_tokens),
+    today_cache_read_tokens: toSafeNumber(payload.today_cache_read_tokens),
+    today_tokens: toSafeNumber(payload.today_tokens),
+    today_cost: toSafeNumber(payload.today_cost),
+    today_actual_cost: toSafeNumber(payload.today_actual_cost),
+    today_account_cost: toSafeNumber(payload.today_account_cost),
+    average_duration_ms: toSafeNumber(payload.average_duration_ms),
+    uptime: toSafeNumber(payload.uptime),
+    rpm: toSafeNumber(payload.rpm),
+    tpm: toSafeNumber(payload.tpm)
+  }
+}
+
 // Initialize date range immediately
 const now = new Date()
-const weekAgo = new Date(now)
-weekAgo.setDate(weekAgo.getDate() - 6)
+const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
 // Date range
-const granularity = ref<'day' | 'hour'>('day')
-const startDate = ref(formatLocalDate(weekAgo))
+const granularity = ref<'day' | 'hour'>('hour')
+const startDate = ref(formatLocalDate(yesterday))
 const endDate = ref(formatLocalDate(now))
 
 // Granularity options for Select component
@@ -597,15 +692,16 @@ const formatNumber = (value: number): string => {
   return value.toLocaleString()
 }
 
-const formatCost = (value: number): string => {
-  if (value >= 1000) {
-    return (value / 1000).toFixed(2) + 'K'
-  } else if (value >= 1) {
-    return value.toFixed(2)
-  } else if (value >= 0.01) {
-    return value.toFixed(3)
+const formatCost = (value: number | undefined | null): string => {
+  const safeValue = toSafeNumber(value)
+  if (safeValue >= 1000) {
+    return (safeValue / 1000).toFixed(2) + 'K'
+  } else if (safeValue >= 1) {
+    return safeValue.toFixed(2)
+  } else if (safeValue >= 0.01) {
+    return safeValue.toFixed(3)
   }
-  return value.toFixed(4)
+  return safeValue.toFixed(4)
 }
 
 const formatDuration = (ms: number): string => {
@@ -633,57 +729,55 @@ const onDateRangeChange = (range: {
     granularity.value = 'day'
   }
 
-  loadChartData()
+  loadDashboardData()
 }
+
+const buildDashboardParams = () => ({
+  start_date: startDate.value,
+  end_date: endDate.value,
+  granularity: granularity.value,
+  include_group_stats: false,
+  include_users_trend: true,
+  users_trend_limit: 12
+})
 
 // Load data
-const loadDashboardStats = async () => {
-  loading.value = true
-  try {
-    stats.value = await adminAPI.dashboard.getStats()
-  } catch (error) {
-    appStore.showError(t('admin.dashboard.failedToLoad'))
-    console.error('Error loading dashboard stats:', error)
-  } finally {
-    loading.value = false
+const loadDashboardData = async (pageLevel = false) => {
+  if (pageLevel) {
+    loading.value = true
+  } else {
+    chartsLoading.value = true
   }
-}
 
-const loadChartData = async () => {
-  chartsLoading.value = true
   try {
-    const params = {
-      start_date: startDate.value,
-      end_date: endDate.value,
-      granularity: granularity.value
-    }
-
-    const [trendResponse, modelResponse, userResponse] = await Promise.all([
-      adminAPI.dashboard.getUsageTrend(params),
-      adminAPI.dashboard.getModelStats({ start_date: startDate.value, end_date: endDate.value }),
-      adminAPI.dashboard.getUserUsageTrend({ ...params, limit: 12 })
+    const params = buildDashboardParams()
+    const [snapshotResponse, activeUsersResponse] = await Promise.all([
+      adminAPI.dashboard.getSnapshotV2(params),
+      adminAPI.dashboard.getActiveUsersTrend(params).catch((error) => {
+        console.error('Error loading active users trend:', error)
+        return { trend: [], start_date: params.start_date, end_date: params.end_date, granularity: params.granularity }
+      })
     ])
 
-    trendData.value = trendResponse.trend || []
-    modelStats.value = modelResponse.models || []
-    userTrend.value = userResponse.trend || []
-
-    try {
-      const activeUsersResponse = await adminAPI.dashboard.getActiveUsersTrend(params)
-      activeUsersTrend.value = activeUsersResponse.trend || []
-    } catch (e) {
-      console.error('Error loading active users trend:', e)
-    }
+    stats.value = normalizeDashboardStats(snapshotResponse.stats)
+    trendData.value = snapshotResponse.trend || []
+    modelStats.value = snapshotResponse.models || []
+    userTrend.value = snapshotResponse.users_trend || []
+    activeUsersTrend.value = activeUsersResponse.trend || []
   } catch (error) {
-    console.error('Error loading chart data:', error)
+    appStore.showError(t('admin.dashboard.failedToLoad'))
+    console.error('Error loading dashboard data:', error)
   } finally {
-    chartsLoading.value = false
+    if (pageLevel) {
+      loading.value = false
+    } else {
+      chartsLoading.value = false
+    }
   }
 }
 
 onMounted(() => {
-  loadDashboardStats()
-  loadChartData()
+  loadDashboardData(true)
 })
 </script>
 

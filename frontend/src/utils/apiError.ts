@@ -48,6 +48,43 @@ export function extractApiErrorMetadata(err: unknown): Record<string, unknown> |
 type TranslateFn = (key: string, params?: Record<string, unknown>) => string
 type TranslateWithExistsFn = TranslateFn & { te?: (key: string) => boolean }
 
+const paymentFieldFallbackLabels: Record<string, string> = {
+  pid: 'PID',
+  pkey: 'PKey',
+  appId: 'App ID',
+  apiBase: 'API Base URL',
+  cidAlipay: 'Alipay Channel ID',
+  cidWxpay: 'WeChat Channel ID',
+  privateKey: 'Private Key',
+  publicKey: 'Public Key',
+  mchId: 'Merchant ID',
+  apiV3Key: 'API v3 Key',
+  certSerial: 'Certificate Serial',
+  publicKeyId: 'Public Key ID',
+  secretKey: 'Secret Key',
+  publishableKey: 'Publishable Key',
+  webhookSecret: 'Webhook Secret',
+  notifyUrl: 'Notify URL',
+  returnUrl: 'Return URL',
+}
+
+function humanizePaymentFieldKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .replace(/\bapi\b/gi, 'API')
+    .replace(/\bid\b/gi, 'ID')
+    .replace(/\burl\b/gi, 'URL')
+    .replace(/\bpid\b/gi, 'PID')
+    .replace(/\bpkey\b/gi, 'PKey')
+    .replace(/\bv3\b/gi, 'v3')
+}
+
+function fallbackPaymentFieldLabel(key: string): string {
+  return paymentFieldFallbackLabels[key] || humanizePaymentFieldKey(key)
+}
+
 /**
  * Translate a value via i18n if a matching key exists, otherwise return the original.
  * Example: "certSerial" → t('admin.settings.payment.field_certSerial') → "证书序列号".
@@ -68,12 +105,12 @@ function tryTranslate(t: TranslateFn, key: string, fallback: string): string {
 function localizeMetadata(metadata: Record<string, unknown>, t: TranslateFn): Record<string, unknown> {
   const out: Record<string, unknown> = { ...metadata }
   if (typeof out.key === 'string') {
-    out.key = tryTranslate(t, `admin.settings.payment.field_${out.key}`, out.key)
+    out.key = tryTranslate(t, `admin.settings.payment.field_${out.key}`, fallbackPaymentFieldLabel(out.key))
   }
   if (typeof out.keys === 'string') {
     out.keys = out.keys
       .split('/')
-      .map(k => tryTranslate(t, `admin.settings.payment.field_${k}`, k))
+      .map(k => tryTranslate(t, `admin.settings.payment.field_${k}`, fallbackPaymentFieldLabel(k)))
       .join(' / ')
   }
   return out

@@ -55,16 +55,16 @@ type CreateUserRequest struct {
 // UpdateUserRequest represents admin update user request
 // 使用指针类型来区分"未提供"和"设置为0"
 type UpdateUserRequest struct {
-	Email         string   `json:"email" binding:"omitempty,email"`
-	Password      string   `json:"password" binding:"omitempty,min=6"`
-	Username      *string  `json:"username"`
-	Notes         *string  `json:"notes"`
-	Role          string   `json:"role" binding:"omitempty,oneof=admin sales user"`
-	Balance       *float64 `json:"balance"`
-	Concurrency   *int     `json:"concurrency"`
-	RPMLimit      *int     `json:"rpm_limit"`
-	Status        string   `json:"status" binding:"omitempty,oneof=active disabled"`
-	AllowedGroups *[]int64 `json:"allowed_groups"`
+	Email                 string   `json:"email" binding:"omitempty,email"`
+	Password              string   `json:"password" binding:"omitempty,min=6"`
+	Username              *string  `json:"username"`
+	Notes                 *string  `json:"notes"`
+	Role                  string   `json:"role" binding:"omitempty,oneof=admin operator user"`
+	Balance               *float64 `json:"balance"`
+	Concurrency           *int     `json:"concurrency"`
+	RPMLimit              *int     `json:"rpm_limit"`
+	Status                string   `json:"status" binding:"omitempty,oneof=active disabled"`
+	AllowedGroups         *[]int64 `json:"allowed_groups"`
 	// GroupRates 用户专属分组倍率配置
 	// map[groupID]*rate，nil 表示删除该分组的专属倍率
 	GroupRates map[int64]*float64 `json:"group_rates"`
@@ -202,7 +202,7 @@ func (h *UserHandler) Export(c *gin.Context) {
 	all := make([]service.User, 0, pageSize)
 	var total int64
 	for {
-		items, totalCount, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters)
+		items, totalCount, err := h.adminService.ListUsers(c.Request.Context(), page, pageSize, filters, "created_at", "desc")
 		if err != nil {
 			response.ErrorFrom(c, err)
 			return
@@ -362,7 +362,6 @@ func (h *UserHandler) Update(c *gin.Context) {
 		Status:                req.Status,
 		AllowedGroups:         req.AllowedGroups,
 		GroupRates:            req.GroupRates,
-		SoraStorageQuotaBytes: req.SoraStorageQuotaBytes,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -448,10 +447,7 @@ func (h *UserHandler) GetUserAPIKeys(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-	sortBy := c.DefaultQuery("sort_by", "created_at")
-	sortOrder := c.DefaultQuery("sort_order", "desc")
-
-	keys, total, err := h.adminService.GetUserAPIKeys(c.Request.Context(), userID, page, pageSize, sortBy, sortOrder)
+	keys, total, err := h.adminService.GetUserAPIKeys(c.Request.Context(), userID, page, pageSize)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

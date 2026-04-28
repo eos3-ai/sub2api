@@ -93,6 +93,7 @@ const form = reactive({
   notes: '',
   role: 'user' as 'admin' | 'sales' | 'user',
   concurrency: 1,
+  rpm_limit: 0,
   sora_storage_quota_gb: 0,
   customAttributes: {} as UserAttributeValuesMap
 })
@@ -106,6 +107,7 @@ watch(() => props.user, (u) => {
       notes: u.notes || '',
       role: (u.role || 'user') as 'admin' | 'sales' | 'user',
       concurrency: u.concurrency,
+      rpm_limit: u.rpm_limit || 0,
       sora_storage_quota_gb: Number(((u.sora_storage_quota_bytes || 0) / (1024 * 1024 * 1024)).toFixed(2)),
       customAttributes: {}
     })
@@ -141,6 +143,7 @@ const handleUpdateUser = async () => {
       notes: form.notes,
       role: form.role,
       concurrency: form.concurrency,
+      rpm_limit: form.rpm_limit,
       sora_storage_quota_bytes: Math.round((form.sora_storage_quota_gb || 0) * 1024 * 1024 * 1024)
     }
     if (form.password.trim()) data.password = form.password.trim()

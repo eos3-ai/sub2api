@@ -55,6 +55,9 @@ func RegisterAdminRoutes(
 		// 系统设置
 		registerSettingsRoutes(admin, h)
 
+		// 备份管理
+		registerBackupRoutes(admin, h)
+
 		// 运维监控（Ops）
 		registerOpsRoutes(admin, h)
 
@@ -72,6 +75,7 @@ func RegisterAdminRoutes(
 
 		// 充值记录（支付订单）
 		registerPaymentOrderRoutes(admin, h)
+		registerPaymentRoutes(admin, h)
 
 		// 开票管理
 		registerInvoiceRoutes(admin, h)
@@ -176,11 +180,15 @@ func registerDashboardRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		dashboard.GET("/stats", h.Admin.Dashboard.GetStats)
 		dashboard.GET("/realtime", h.Admin.Dashboard.GetRealtimeMetrics)
+		dashboard.GET("/snapshot-v2", h.Admin.Dashboard.GetSnapshotV2)
 		dashboard.GET("/trend", h.Admin.Dashboard.GetUsageTrend)
 		dashboard.GET("/models", h.Admin.Dashboard.GetModelStats)
+		dashboard.GET("/groups", h.Admin.Dashboard.GetGroupStats)
+		dashboard.GET("/user-breakdown", h.Admin.Dashboard.GetUserBreakdown)
 		dashboard.GET("/api-keys-trend", h.Admin.Dashboard.GetAPIKeyUsageTrend)
 		dashboard.GET("/users-trend", h.Admin.Dashboard.GetUserUsageTrend)
 		dashboard.GET("/active-users-trend", h.Admin.Dashboard.GetActiveUsersTrend)
+		dashboard.GET("/users-ranking", h.Admin.Dashboard.GetUserSpendingRanking)
 		dashboard.POST("/users-usage", h.Admin.Dashboard.GetBatchUsersUsage)
 		dashboard.POST("/api-keys-usage", h.Admin.Dashboard.GetBatchAPIKeysUsage)
 	}
@@ -385,9 +393,23 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		adminSettings.GET("/admin-api-key-read-only", h.Admin.Setting.GetAdminAPIKeyReadOnly)
 		adminSettings.POST("/admin-api-key-read-only/regenerate", h.Admin.Setting.RegenerateAdminAPIKeyReadOnly)
 		adminSettings.DELETE("/admin-api-key-read-only", h.Admin.Setting.DeleteAdminAPIKeyReadOnly)
+		// 529 过载冷却配置
+		adminSettings.GET("/overload-cooldown", h.Admin.Setting.GetOverloadCooldownSettings)
+		adminSettings.PUT("/overload-cooldown", h.Admin.Setting.UpdateOverloadCooldownSettings)
 		// 流超时处理配置
 		adminSettings.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
 		adminSettings.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)
+		// 请求整流器配置
+		adminSettings.GET("/rectifier", h.Admin.Setting.GetRectifierSettings)
+		adminSettings.PUT("/rectifier", h.Admin.Setting.UpdateRectifierSettings)
+		// Beta 策略配置
+		adminSettings.GET("/beta-policy", h.Admin.Setting.GetBetaPolicySettings)
+		adminSettings.PUT("/beta-policy", h.Admin.Setting.UpdateBetaPolicySettings)
+		// Web Search 模拟配置
+		adminSettings.GET("/web-search-emulation", h.Admin.Setting.GetWebSearchEmulationConfig)
+		adminSettings.PUT("/web-search-emulation", h.Admin.Setting.UpdateWebSearchEmulationConfig)
+		adminSettings.POST("/web-search-emulation/reset-usage", h.Admin.Setting.ResetWebSearchUsage)
+		adminSettings.POST("/web-search-emulation/test", h.Admin.Setting.TestWebSearchEmulation)
 	}
 }
 
@@ -446,6 +468,28 @@ func registerUserAttributeRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	}
 }
 
+func registerBackupRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h == nil || h.Admin == nil || h.Admin.Backup == nil {
+		return
+	}
+	backups := admin.Group("/backups")
+	{
+		backups.GET("/s3-config", h.Admin.Backup.GetS3Config)
+		backups.PUT("/s3-config", h.Admin.Backup.UpdateS3Config)
+		backups.POST("/s3-config/test", h.Admin.Backup.TestS3Connection)
+
+		backups.GET("/schedule", h.Admin.Backup.GetSchedule)
+		backups.PUT("/schedule", h.Admin.Backup.UpdateSchedule)
+
+		backups.POST("", h.Admin.Backup.CreateBackup)
+		backups.GET("", h.Admin.Backup.ListBackups)
+		backups.GET("/:id", h.Admin.Backup.GetBackup)
+		backups.DELETE("/:id", h.Admin.Backup.DeleteBackup)
+		backups.GET("/:id/download-url", h.Admin.Backup.GetDownloadURL)
+		backups.POST("/:id/restore", h.Admin.Backup.RestoreBackup)
+	}
+}
+
 func registerPaymentOrderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	if h == nil || h.Admin == nil || h.Admin.PaymentOrders == nil {
 		return
@@ -455,6 +499,29 @@ func registerPaymentOrderRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		payment.GET("/orders", h.Admin.PaymentOrders.List)
 		payment.GET("/orders/summary", h.Admin.PaymentOrders.Summary)
 		payment.GET("/orders/export", h.Admin.PaymentOrders.Export)
+	}
+}
+
+func registerPaymentRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	if h == nil || h.Admin == nil || h.Admin.Payment == nil {
+		return
+	}
+	payment := admin.Group("/payment")
+	{
+		payment.GET("/dashboard", h.Admin.Payment.GetDashboard)
+
+		payment.GET("/config", h.Admin.Payment.GetConfig)
+		payment.PUT("/config", h.Admin.Payment.UpdateConfig)
+
+		payment.GET("/plans", h.Admin.Payment.ListPlans)
+		payment.POST("/plans", h.Admin.Payment.CreatePlan)
+		payment.PUT("/plans/:id", h.Admin.Payment.UpdatePlan)
+		payment.DELETE("/plans/:id", h.Admin.Payment.DeletePlan)
+
+		payment.GET("/providers", h.Admin.Payment.ListProviders)
+		payment.POST("/providers", h.Admin.Payment.CreateProvider)
+		payment.PUT("/providers/:id", h.Admin.Payment.UpdateProvider)
+		payment.DELETE("/providers/:id", h.Admin.Payment.DeleteProvider)
 	}
 }
 

@@ -636,10 +636,6 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultUserPurchaseVisible
 		_c.mutation.SetUserPurchaseVisible(v)
 	}
-	if _, ok := _c.mutation.SoraStorageQuotaBytes(); !ok {
-		v := group.DefaultSoraStorageQuotaBytes
-		_c.mutation.SetSoraStorageQuotaBytes(v)
-	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		v := group.DefaultClaudeCodeOnly
 		_c.mutation.SetClaudeCodeOnly(v)
@@ -738,9 +734,6 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.UserPurchaseVisible(); !ok {
 		return &ValidationError{Name: "user_purchase_visible", err: errors.New(`ent: missing required field "Group.user_purchase_visible"`)}
-	}
-	if _, ok := _c.mutation.SoraStorageQuotaBytes(); !ok {
-		return &ValidationError{Name: "sora_storage_quota_bytes", err: errors.New(`ent: missing required field "Group.sora_storage_quota_bytes"`)}
 	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}

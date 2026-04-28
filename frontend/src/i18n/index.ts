@@ -16,13 +16,26 @@ function isLocaleCode(value: string): value is LocaleCode {
   return value === 'en' || value === 'zh'
 }
 
+function readStoredLocale(): string | null {
+  try {
+    if (typeof localStorage?.getItem === 'function') {
+      return localStorage.getItem(LOCALE_KEY)
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 function getDefaultLocale(): LocaleCode {
-  const saved = localStorage.getItem(LOCALE_KEY)
+  const saved = readStoredLocale()
   if (saved && isLocaleCode(saved)) {
     return saved
   }
 
-  const browserLang = navigator.language.toLowerCase()
+  const browserLang = typeof navigator?.language === 'string'
+    ? navigator.language.toLowerCase()
+    : ''
   if (browserLang.startsWith('zh')) {
     return 'zh'
   }
@@ -66,7 +79,9 @@ export async function setLocale(locale: string): Promise<void> {
 
   await loadLocaleMessages(locale)
   i18n.global.locale.value = locale
-  localStorage.setItem(LOCALE_KEY, locale)
+  if (typeof localStorage?.setItem === 'function') {
+    localStorage.setItem(LOCALE_KEY, locale)
+  }
   document.documentElement.setAttribute('lang', locale)
 
   // 同步更新浏览器页签标题，使其跟随语言切换

@@ -12,6 +12,7 @@ import (
 	"math/big"
 	"mime"
 	"mime/quotedprintable"
+	"net"
 	"net/smtp"
 	"net/url"
 	"strconv"
@@ -75,6 +76,8 @@ const (
 	verifyCodeTTL         = 15 * time.Minute
 	verifyCodeCooldown    = 1 * time.Minute
 	maxVerifyCodeAttempts = 5
+	smtpDialTimeout       = 10 * time.Second
+	smtpIOTimeout         = 20 * time.Second
 
 	// Password reset token settings
 	passwordResetTokenTTL = 30 * time.Minute

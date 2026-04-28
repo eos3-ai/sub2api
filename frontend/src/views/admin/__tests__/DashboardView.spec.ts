@@ -4,8 +4,9 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { DashboardStats } from '@/types'
 import DashboardView from '../DashboardView.vue'
 
-const { getSnapshotV2, getUserUsageTrend, getUserSpendingRanking } = vi.hoisted(() => ({
+const { getSnapshotV2, getActiveUsersTrend, getUserUsageTrend, getUserSpendingRanking } = vi.hoisted(() => ({
   getSnapshotV2: vi.fn(),
+  getActiveUsersTrend: vi.fn(),
   getUserUsageTrend: vi.fn(),
   getUserSpendingRanking: vi.fn()
 }))
@@ -14,6 +15,7 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     dashboard: {
       getSnapshotV2,
+      getActiveUsersTrend,
       getUserUsageTrend,
       getUserSpendingRanking
     }
@@ -71,6 +73,7 @@ const createDashboardStats = (): DashboardStats => ({
   total_tokens: 0,
   total_cost: 0,
   total_actual_cost: 0,
+  total_account_cost: 0,
   today_requests: 0,
   today_input_tokens: 0,
   today_output_tokens: 0,
@@ -79,6 +82,7 @@ const createDashboardStats = (): DashboardStats => ({
   today_tokens: 0,
   today_cost: 0,
   today_actual_cost: 0,
+  today_account_cost: 0,
   average_duration_ms: 0,
   uptime: 0,
   rpm: 0,
@@ -88,6 +92,7 @@ const createDashboardStats = (): DashboardStats => ({
 describe('admin DashboardView', () => {
   beforeEach(() => {
     getSnapshotV2.mockReset()
+    getActiveUsersTrend.mockReset()
     getUserUsageTrend.mockReset()
     getUserSpendingRanking.mockReset()
 
@@ -97,6 +102,12 @@ describe('admin DashboardView', () => {
       models: []
     })
     getUserUsageTrend.mockResolvedValue({
+      trend: [],
+      start_date: '',
+      end_date: '',
+      granularity: 'hour'
+    })
+    getActiveUsersTrend.mockResolvedValue({
       trend: [],
       start_date: '',
       end_date: '',

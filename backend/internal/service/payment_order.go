@@ -20,7 +20,7 @@ import (
 
 // --- Order Creation ---
 
-func (s *PaymentService) CreateOrder(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
+func (s *PaymentService) CreateOrderV119(ctx context.Context, req CreateOrderRequest) (*CreateOrderResponse, error) {
 	if req.OrderType == "" {
 		req.OrderType = payment.OrderTypeBalance
 	}

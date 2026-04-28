@@ -7,6 +7,14 @@
 
 import { apiClient } from './client'
 import type { PaginatedResponse } from '@/types'
+import type {
+  CheckoutInfoResponse,
+  CreateOrderRequest,
+  CreateOrderResult,
+  PaymentConfig,
+  PaymentOrder as CheckoutPaymentOrder,
+  SubscriptionPlan,
+} from '@/types/payment'
 
 export type PaymentChannel = 'zpay' | 'stripe' | 'admin' | 'activity'
 export type PaymentPayMethod = 'alipay' | 'wechat'
@@ -110,13 +118,93 @@ export async function cancelPaymentOrder(orderNo: string): Promise<{ message: st
   return data
 }
 
+// Compatibility wrappers for the richer payment UI introduced on the tag side.
+async function getConfig(): Promise<{ data: PaymentConfig }> {
+  const { data } = await apiClient.get<PaymentConfig>('/payment/checkout-info')
+  return { data }
+}
+
+async function getCheckoutInfo(): Promise<{ data: CheckoutInfoResponse }> {
+  const { data } = await apiClient.get<CheckoutInfoResponse>('/payment/checkout-info')
+  return { data }
+}
+
+async function getPlans(): Promise<{ data: SubscriptionPlan[] }> {
+  const { data } = await apiClient.get<SubscriptionPlan[]>('/payment/subscription-plans')
+  return { data }
+}
+
+async function createOrder(payload: CreateOrderRequest): Promise<{ data: CreateOrderResult }> {
+  const { data } = await apiClient.post<CreateOrderResult>('/payment/orders', payload)
+  return { data }
+}
+
+async function getOrder(orderId: number | string): Promise<{ data: CheckoutPaymentOrder }> {
+  const { data } = await apiClient.get<CheckoutPaymentOrder>(`/payment/orders/${orderId}`)
+  return { data }
+}
+
+async function getMyOrders(query?: {
+  page?: number
+  page_size?: number
+  status?: string
+}): Promise<{ data: PaginatedResponse<CheckoutPaymentOrder> }> {
+  const { data } = await apiClient.get<PaginatedResponse<CheckoutPaymentOrder>>('/payment/orders', {
+    params: query,
+  })
+  return { data }
+}
+
+async function cancelOrder(orderId: number | string): Promise<{ data: { message: string } }> {
+  const { data } = await apiClient.post<{ message: string }>(`/payment/orders/${orderId}/cancel`)
+  return { data }
+}
+
+async function requestRefund(
+  orderId: number | string,
+  payload: { reason: string },
+): Promise<{ data: { message: string } }> {
+  const { data } = await apiClient.post<{ message: string }>(`/payment/orders/${orderId}/refund`, payload)
+  return { data }
+}
+
+async function getRefundEligibleProviders(): Promise<{ data: { provider_instance_ids: string[] } }> {
+  const { data } = await apiClient.get<{ provider_instance_ids: string[] }>('/payment/providers/refund-eligible')
+  return { data }
+}
+
+async function verifyOrderPublic(outTradeNo: string): Promise<{ data: CheckoutPaymentOrder }> {
+  const { data } = await apiClient.post<CheckoutPaymentOrder>('/payment/public/orders/verify', {
+    out_trade_no: outTradeNo,
+  })
+  return { data }
+}
+
+async function resolveOrderPublicByResumeToken(resumeToken: string): Promise<{ data: CheckoutPaymentOrder }> {
+  const { data } = await apiClient.post<CheckoutPaymentOrder>('/payment/public/orders/resolve', {
+    resume_token: resumeToken,
+  })
+  return { data }
+}
+
 export const paymentAPI = {
   getPaymentPlans,
   getSubscriptionPlans,
   createPaymentOrder,
   getMyPaymentOrders,
   getPaymentOrder,
-  cancelPaymentOrder
+  cancelPaymentOrder,
+  getConfig,
+  getCheckoutInfo,
+  getPlans,
+  createOrder,
+  getOrder,
+  getMyOrders,
+  cancelOrder,
+  requestRefund,
+  getRefundEligibleProviders,
+  verifyOrderPublic,
+  resolveOrderPublicByResumeToken,
 }
 
 export default paymentAPI

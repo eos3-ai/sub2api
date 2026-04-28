@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/usagestats"
 )
 
@@ -218,6 +219,7 @@ type ClaudeUsageFetchOptions struct {
 	AccessToken string                  // OAuth access token
 	ProxyURL    string                  // 代理 URL（可选）
 	AccountID   int64                   // 账号 ID（用于连接池隔离）
+	EnableTLSFingerprint bool           // 向后兼容：旧调用方传入布尔开关
 	TLSProfile  *tlsfingerprint.Profile // TLS 指纹 Profile（nil 表示不启用）
 	Fingerprint *Fingerprint            // 缓存的指纹信息（User-Agent 等）
 }
@@ -327,6 +329,53 @@ func (s *AccountUsageService) GetUsage(ctx context.Context, accountID int64) (*U
 
 	// API Key账号不支持usage查询
 	return nil, fmt.Errorf("account type %s does not support usage query", account.Type)
+}
+
+// GetPassiveUsage 从 Account.Extra 中的被动采样数据构建 UsageInfo，不调用外部 API。
+// 仅适用于 Anthropic OAuth / SetupToken 账号。
+func (s *AccountUsageService) GetPassiveUsage(ctx context.Context, accountID int64) (*UsageInfo, error) {
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("get account failed: %w", err)
+	}
+
+	if !account.IsAnthropicOAuthOrSetupToken() {
+		return nil, fmt.Errorf("passive usage only supported for Anthropic OAuth/SetupToken accounts")
+	}
+
+	info := s.estimateSetupTokenUsage(account)
+	info.Source = "passive"
+
+	if raw, ok := account.Extra["passive_usage_sampled_at"]; ok {
+		if str, ok := raw.(string); ok {
+			if t, err := time.Parse(time.RFC3339, str); err == nil {
+				info.UpdatedAt = &t
+			}
+		}
+	}
+
+	util7d := parseExtraFloat64(account.Extra["passive_usage_7d_utilization"])
+	reset7dRaw := parseExtraFloat64(account.Extra["passive_usage_7d_reset"])
+	if util7d > 0 || reset7dRaw > 0 {
+		var resetAt *time.Time
+		var remaining int
+		if reset7dRaw > 0 {
+			t := time.Unix(int64(reset7dRaw), 0)
+			resetAt = &t
+			remaining = int(time.Until(t).Seconds())
+			if remaining < 0 {
+				remaining = 0
+			}
+		}
+		info.SevenDay = &UsageProgress{
+			Utilization:      util7d * 100,
+			ResetsAt:         resetAt,
+			RemainingSeconds: remaining,
+		}
+	}
+
+	s.addWindowStats(ctx, account, info)
+	return info, nil
 }
 
 func (s *AccountUsageService) getGeminiUsage(ctx context.Context, account *Account) (*UsageInfo, error) {

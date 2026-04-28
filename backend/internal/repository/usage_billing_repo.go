@@ -11,6 +11,13 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
+const (
+	dailyExpiredExpr      = "COALESCE((extra->>'quota_daily_start')::timestamptz, '1970-01-01'::timestamptz) + '24 hours'::interval <= NOW()"
+	nextDailyResetAtExpr  = "to_char(timezone('UTC', date_trunc('day', NOW()) + '24 hours'::interval), 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
+	weeklyExpiredExpr     = "COALESCE((extra->>'quota_weekly_start')::timestamptz, '1970-01-01'::timestamptz) + '168 hours'::interval <= NOW()"
+	nextWeeklyResetAtExpr = "to_char(timezone('UTC', date_trunc('day', NOW()) + '168 hours'::interval), 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"')"
+)
+
 type usageBillingRepository struct {
 	db *sql.DB
 }
