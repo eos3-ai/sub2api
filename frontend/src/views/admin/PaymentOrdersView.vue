@@ -264,7 +264,7 @@ const columns = computed<Column[]>(() => [
   { key: 'provider', label: t('payment.channel') },
   { key: 'total_usd', label: t('payment.creditsAmount') },
   { key: 'amount_cny', label: t('payment.payAmountCny') },
-  { key: 'status', label: t('payment.status') },
+  { key: 'status', label: t('common.status') },
   { key: 'created_at', label: t('common.createdAt') }
 ])
 

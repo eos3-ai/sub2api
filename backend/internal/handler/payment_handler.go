@@ -17,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type PaymentHandler struct {
@@ -131,6 +132,12 @@ func (h *PaymentHandler) GetSubscriptionPlans(c *gin.Context) {
 // CreateOrder creates an order record using existing PaymentService.
 // POST /api/v1/payment/orders
 func (h *PaymentHandler) CreateOrder(c *gin.Context) {
+	var compatReq createOrderV119Request
+	if err := c.ShouldBindBodyWith(&compatReq, binding.JSON); err == nil && compatReq.looksLikeCompatRequest() {
+		h.handleCreateOrderV119(c, compatReq)
+		return
+	}
+
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
 		response.Unauthorized(c, "User not authenticated")
@@ -138,7 +145,7 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 	}
 
 	var req createPaymentOrderRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindBodyWith(&req, binding.JSON); err != nil {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
@@ -294,6 +301,16 @@ func (h *PaymentHandler) GetMyOrder(c *gin.Context) {
 	orderNo := strings.TrimSpace(c.Param("orderNo"))
 	if orderNo == "" {
 		response.BadRequest(c, "order_no is required")
+		return
+	}
+
+	if orderID, err := strconv.ParseInt(orderNo, 10, 64); err == nil && orderID > 0 {
+		order, err := h.paymentService.GetOrder(c.Request.Context(), orderID, subject.UserID)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		response.Success(c, sanitizePaymentOrderForResponse(order))
 		return
 	}
 

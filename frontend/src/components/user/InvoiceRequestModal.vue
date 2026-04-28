@@ -59,7 +59,7 @@
                       {{ t('payment.creditsAmount') }}
                     </th>
                     <th class="px-4 py-4 text-left text-xs font-semibold text-gray-600 dark:text-dark-300">
-                      {{ t('payment.status') }}
+                      {{ t('common.status') }}
                     </th>
                   </tr>
                 </thead>

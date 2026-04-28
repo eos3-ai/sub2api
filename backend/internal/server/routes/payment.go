@@ -25,6 +25,10 @@ func RegisterPaymentCallbackRoutes(r *gin.Engine, h *handler.Handlers) {
 	r.Any("/payment/return/stripe", h.Payment.PaymentReturn)
 	r.GET("/payment/success", h.Payment.PaymentReturn)
 	r.GET("/payment/cancel", h.Payment.PaymentReturn)
+
+	// Public payment-result compatibility endpoints.
+	r.POST("/api/v1/payment/public/orders/verify", h.Payment.VerifyOrderPublic)
+	r.POST("/api/v1/payment/public/orders/resolve", h.Payment.ResolveOrderPublicByResumeToken)
 }
 
 // RegisterInvoiceWebhookRoutes registers invoice provider callbacks (no auth).

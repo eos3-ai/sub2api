@@ -105,6 +105,8 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		return nil, err
 	}
 	paymentConfigService := service.ProvidePaymentConfigService(client, settingRepository, paymentEncryptionKey)
+	defaultPaymentLoadBalancer := payment.ProvideDefaultLoadBalancer(client, paymentEncryptionKey)
+	paymentService.ConfigureCheckoutCompatibility(paymentConfigService, userRepository, defaultPaymentLoadBalancer)
 	zpayService := service.NewZpayService(configConfig)
 	stripeService := service.NewStripeService(configConfig)
 	paymentHandler := handler.NewPaymentHandler(configConfig, paymentService, zpayService, stripeService)

@@ -354,13 +354,15 @@ function resolvePaymentFieldLabel(key: string, explicitLabel?: string): string {
   }
 
   const i18nKey = `admin.settings.payment.field_${key}`
-  if (te(i18nKey)) {
+  const hasKey = typeof te === 'function' ? te(i18nKey) : t(i18nKey) !== i18nKey
+  if (hasKey) {
     return t(i18nKey)
   }
 
   const fallback = PAYMENT_FIELD_LABELS[key]
   if (fallback) {
-    return locale.value.startsWith('zh') ? fallback.zh : fallback.en
+    const localeCode = typeof locale?.value === 'string' ? locale.value : 'en'
+    return localeCode.startsWith('zh') ? fallback.zh : fallback.en
   }
 
   return humanizePaymentFieldKey(key)

@@ -149,7 +149,7 @@ async function getMyOrders(query?: {
   page_size?: number
   status?: string
 }): Promise<{ data: PaginatedResponse<CheckoutPaymentOrder> }> {
-  const { data } = await apiClient.get<PaginatedResponse<CheckoutPaymentOrder>>('/payment/orders', {
+  const { data } = await apiClient.get<PaginatedResponse<CheckoutPaymentOrder>>('/payment/orders/my', {
     params: query,
   })
   return { data }

@@ -71,9 +71,14 @@ func RegisterUserRoutes(
 		{
 			payment.GET("/plans", h.Payment.GetPlans)
 			payment.GET("/subscription-plans", h.Payment.GetSubscriptionPlans)
+			payment.GET("/checkout-info", h.Payment.GetCheckoutInfo)
 			payment.POST("/orders", h.Payment.CreateOrder)
+			payment.GET("/orders/my", h.Payment.GetMyOrdersCompat)
+			payment.POST("/orders/:orderNo/cancel", h.Payment.CancelOrder)
+			payment.POST("/orders/:orderNo/refund", h.Payment.RequestRefund)
 			payment.GET("/orders", h.Payment.ListMyOrders)
 			payment.GET("/orders/:orderNo", h.Payment.GetMyOrder)
+			payment.GET("/providers/refund-eligible", h.Payment.GetRefundEligibleProviders)
 		}
 
 		// 发票/开票申请
