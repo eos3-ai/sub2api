@@ -17,4 +17,24 @@ describe('usage service tier locale keys', () => {
     expect(en.usage.serviceTierFlex).toBe('Flex')
     expect(en.usage.serviceTierStandard).toBe('Standard')
   })
+
+  it('contains visible admin usage filter labels in zh', () => {
+    expect(zh.usage.ws).toBe('WebSocket')
+    expect(zh.admin.usage.account).toBe('账号')
+    expect(zh.admin.usage.billingMode).toBe('计费模式')
+    expect(zh.admin.usage.allBillingModes).toBe('全部计费模式')
+    expect(zh.admin.usage.billingModeToken).toBe('按 Token')
+    expect(zh.admin.usage.billingModePerRequest).toBe('按次')
+    expect(zh.admin.usage.billingModeImage).toBe('按图片')
+  })
+
+  it('contains visible admin usage filter labels in en', () => {
+    expect(en.usage.ws).toBe('WebSocket')
+    expect(en.admin.usage.account).toBe('Account')
+    expect(en.admin.usage.billingMode).toBe('Billing Mode')
+    expect(en.admin.usage.allBillingModes).toBe('All Billing Modes')
+    expect(en.admin.usage.billingModeToken).toBe('Per Token')
+    expect(en.admin.usage.billingModePerRequest).toBe('Per Request')
+    expect(en.admin.usage.billingModeImage).toBe('Per Image')
+  })
 })
