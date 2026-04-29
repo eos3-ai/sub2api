@@ -10,6 +10,9 @@ const {
   getWebSearchEmulationConfig,
   updateWebSearchEmulationConfig,
   getAdminApiKey,
+  getAdminApiKeyReadOnly,
+  regenerateAdminApiKeyReadOnly,
+  deleteAdminApiKeyReadOnly,
   getOverloadCooldownSettings,
   getStreamTimeoutSettings,
   getRectifierSettings,
@@ -30,6 +33,9 @@ const {
   getWebSearchEmulationConfig: vi.fn(),
   updateWebSearchEmulationConfig: vi.fn(),
   getAdminApiKey: vi.fn(),
+  getAdminApiKeyReadOnly: vi.fn(),
+  regenerateAdminApiKeyReadOnly: vi.fn(),
+  deleteAdminApiKeyReadOnly: vi.fn(),
   getOverloadCooldownSettings: vi.fn(),
   getStreamTimeoutSettings: vi.fn(),
   getRectifierSettings: vi.fn(),
@@ -56,6 +62,9 @@ vi.mock("@/api", () => ({
       getWebSearchEmulationConfig,
       updateWebSearchEmulationConfig,
       getAdminApiKey,
+      getAdminApiKeyReadOnly,
+      regenerateAdminApiKeyReadOnly,
+      deleteAdminApiKeyReadOnly,
       getOverloadCooldownSettings,
       getStreamTimeoutSettings,
       getRectifierSettings,
@@ -452,6 +461,9 @@ describe("admin SettingsView payment visible method controls", () => {
     getWebSearchEmulationConfig.mockReset();
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
+    getAdminApiKeyReadOnly.mockReset();
+    regenerateAdminApiKeyReadOnly.mockReset();
+    deleteAdminApiKeyReadOnly.mockReset();
     getOverloadCooldownSettings.mockReset();
     getStreamTimeoutSettings.mockReset();
     getRectifierSettings.mockReset();
@@ -484,6 +496,16 @@ describe("admin SettingsView payment visible method controls", () => {
     getAdminApiKey.mockResolvedValue({
       exists: false,
       masked_key: "",
+    });
+    getAdminApiKeyReadOnly.mockResolvedValue({
+      exists: false,
+      masked_key: "",
+    });
+    regenerateAdminApiKeyReadOnly.mockResolvedValue({
+      key: "admin-ro-test",
+    });
+    deleteAdminApiKeyReadOnly.mockResolvedValue({
+      message: "Read-only admin API key deleted",
     });
     getOverloadCooldownSettings.mockResolvedValue({
       enabled: true,
@@ -668,6 +690,9 @@ describe("admin SettingsView wechat connect controls", () => {
     getWebSearchEmulationConfig.mockReset();
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
+    getAdminApiKeyReadOnly.mockReset();
+    regenerateAdminApiKeyReadOnly.mockReset();
+    deleteAdminApiKeyReadOnly.mockReset();
     getOverloadCooldownSettings.mockReset();
     getStreamTimeoutSettings.mockReset();
     getRectifierSettings.mockReset();
@@ -703,6 +728,16 @@ describe("admin SettingsView wechat connect controls", () => {
     getAdminApiKey.mockResolvedValue({
       exists: false,
       masked_key: "",
+    });
+    getAdminApiKeyReadOnly.mockResolvedValue({
+      exists: false,
+      masked_key: "",
+    });
+    regenerateAdminApiKeyReadOnly.mockResolvedValue({
+      key: "admin-ro-test",
+    });
+    deleteAdminApiKeyReadOnly.mockResolvedValue({
+      message: "Read-only admin API key deleted",
     });
     getOverloadCooldownSettings.mockResolvedValue({
       enabled: true,
