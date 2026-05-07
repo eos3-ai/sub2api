@@ -60,6 +60,14 @@ type UsageService struct {
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 }
 
+type usageLogExportRepository interface {
+	ExportWithFilters(ctx context.Context, filters usagestats.UsageLogFilters, batchSize int, handle func([]UsageLog) error) error
+}
+
+type usageLogBillingExportRepository interface {
+	ExportBillingSummary(ctx context.Context, filters usagestats.UsageLogFilters) ([]UsageBillingExportRow, error)
+}
+
 // NewUsageService 创建使用统计服务实例
 func NewUsageService(usageRepo UsageLogRepository, userRepo UserRepository, entClient *dbent.Client, authCacheInvalidator APIKeyAuthCacheInvalidator) *UsageService {
 	return &UsageService{
@@ -340,6 +348,31 @@ func (s *UsageService) ListWithFilters(ctx context.Context, params pagination.Pa
 		return nil, nil, fmt.Errorf("list usage logs with filters: %w", err)
 	}
 	return logs, result, nil
+}
+
+// ExportWithFilters streams usage logs in repository-sized batches without repeated COUNT/OFFSET pagination.
+func (s *UsageService) ExportWithFilters(ctx context.Context, filters usagestats.UsageLogFilters, batchSize int, handle func([]UsageLog) error) error {
+	exportRepo, ok := s.usageRepo.(usageLogExportRepository)
+	if !ok {
+		return fmt.Errorf("usage log repository does not support export")
+	}
+	if err := exportRepo.ExportWithFilters(ctx, filters, batchSize, handle); err != nil {
+		return fmt.Errorf("export usage logs with filters: %w", err)
+	}
+	return nil
+}
+
+// ExportBillingSummary returns billing summary rows for CSV export without loading raw usage logs into memory.
+func (s *UsageService) ExportBillingSummary(ctx context.Context, filters usagestats.UsageLogFilters) ([]UsageBillingExportRow, error) {
+	exportRepo, ok := s.usageRepo.(usageLogBillingExportRepository)
+	if !ok {
+		return nil, fmt.Errorf("usage log repository does not support billing export")
+	}
+	rows, err := exportRepo.ExportBillingSummary(ctx, filters)
+	if err != nil {
+		return nil, fmt.Errorf("export billing summary: %w", err)
+	}
+	return rows, nil
 }
 
 // GetGlobalStats returns global usage stats for a time range.

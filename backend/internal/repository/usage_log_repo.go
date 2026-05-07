@@ -1573,6 +1573,134 @@ type UsageLogFilters = usagestats.UsageLogFilters
 
 // ListWithFilters lists usage logs with optional filters (for admin)
 func (r *usageLogRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters UsageLogFilters) ([]service.UsageLog, *pagination.PaginationResult, error) {
+	conditions, args := buildUsageLogFilterConditions(filters)
+	whereClause := buildWhere(conditions)
+	logs, page, err := r.listUsageLogsWithPagination(ctx, whereClause, args, params)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
+		return nil, nil, err
+	}
+	return logs, page, nil
+}
+
+// ExportWithFilters streams admin usage logs in created_at/id keyset order.
+// It intentionally avoids COUNT(*) and OFFSET so long exports do not get slower page by page.
+func (r *usageLogRepository) ExportWithFilters(ctx context.Context, filters UsageLogFilters, batchSize int, handle func([]service.UsageLog) error) error {
+	if handle == nil {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = 1000
+	}
+
+	baseConditions, baseArgs := buildUsageLogFilterConditions(filters)
+	hasCursor := false
+	var cursorCreatedAt time.Time
+	var cursorID int64
+
+	for {
+		conditions := append([]string{}, baseConditions...)
+		args := append([]any{}, baseArgs...)
+		if hasCursor {
+			posCreatedAt := len(args) + 1
+			posID := len(args) + 2
+			conditions = append(conditions, fmt.Sprintf("(created_at < $%d OR (created_at = $%d AND id < $%d))", posCreatedAt, posCreatedAt, posID))
+			args = append(args, cursorCreatedAt, cursorID)
+		}
+
+		whereClause := buildWhere(conditions)
+		limitPos := len(args) + 1
+		queryArgs := append(args, batchSize)
+		query := fmt.Sprintf("SELECT %s FROM usage_logs %s ORDER BY created_at DESC, id DESC LIMIT $%d", usageLogSelectColumns, whereClause, limitPos)
+		logs, err := r.queryUsageLogs(ctx, query, queryArgs...)
+		if err != nil {
+			return err
+		}
+		if len(logs) == 0 {
+			return nil
+		}
+
+		if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
+			return err
+		}
+		if err := handle(logs); err != nil {
+			return err
+		}
+
+		last := logs[len(logs)-1]
+		cursorCreatedAt = last.CreatedAt
+		cursorID = last.ID
+		hasCursor = true
+
+		if len(logs) < batchSize {
+			return nil
+		}
+	}
+}
+
+// ExportBillingSummary aggregates filtered usage logs for user billing CSV export.
+func (r *usageLogRepository) ExportBillingSummary(ctx context.Context, filters UsageLogFilters) (rows []service.UsageBillingExportRow, err error) {
+	conditions, args := buildUsageLogFilterConditions(filters)
+	whereClause := buildWhere(conditions)
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(ak.name, '') AS api_key_name,
+			ul.display_model AS model,
+			COALESCE(SUM(ul.actual_cost), 0) AS billed_cost,
+			COALESCE(SUM(ul.input_tokens + ul.output_tokens + ul.cache_creation_tokens + ul.cache_read_tokens), 0) AS total_tokens,
+			COUNT(*) AS total_requests
+		FROM (
+			SELECT
+				api_key_id,
+				COALESCE(NULLIF(TRIM(requested_model), ''), model) AS display_model,
+				actual_cost,
+				input_tokens,
+				output_tokens,
+				cache_creation_tokens,
+				cache_read_tokens
+			FROM usage_logs
+			%s
+		) ul
+		LEFT JOIN api_keys ak ON ak.id = ul.api_key_id AND ak.deleted_at IS NULL
+		GROUP BY COALESCE(ak.name, ''), ul.display_model
+		ORDER BY billed_cost DESC, api_key_name ASC, model ASC
+	`, whereClause)
+
+	sqlRows, err := r.sql.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if closeErr := sqlRows.Close(); closeErr != nil && err == nil {
+			err = closeErr
+			rows = nil
+		}
+	}()
+
+	rows = make([]service.UsageBillingExportRow, 0)
+	for sqlRows.Next() {
+		var row service.UsageBillingExportRow
+		if err = sqlRows.Scan(
+			&row.APIKeyName,
+			&row.Model,
+			&row.BilledCost,
+			&row.TotalTokens,
+			&row.TotalRequests,
+		); err != nil {
+			return nil, err
+		}
+		rows = append(rows, row)
+	}
+	if err = sqlRows.Err(); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func buildUsageLogFilterConditions(filters UsageLogFilters) ([]string, []any) {
 	conditions := make([]string, 0, 9)
 	args := make([]any, 0, 9)
 
@@ -1611,16 +1739,7 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		args = append(args, *filters.EndTime)
 	}
 
-	whereClause := buildWhere(conditions)
-	logs, page, err := r.listUsageLogsWithPagination(ctx, whereClause, args, params)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
-		return nil, nil, err
-	}
-	return logs, page, nil
+	return conditions, args
 }
 
 // UsageStats represents usage statistics

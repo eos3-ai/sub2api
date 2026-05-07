@@ -2099,6 +2099,7 @@ func setDefaults() {
 	viper.SetDefault("security.admin_api_key_read_only.allowed_paths", []string{
 		"/api/v1/admin/users/export",
 		"/api/v1/admin/usage",
+		"/api/v1/admin/usage/export",
 		"/api/v1/admin/payment/orders/export",
 	})
 	viper.SetDefault("security.admin_api_key_read_only.allowed_path_prefixes", []string{})

@@ -175,6 +175,14 @@ type UsageLog struct {
 	Subscription *UserSubscription
 }
 
+type UsageBillingExportRow struct {
+	APIKeyName    string
+	Model         string
+	BilledCost    float64
+	TotalTokens   int64
+	TotalRequests int64
+}
+
 func (u *UsageLog) TotalTokens() int {
 	return u.InputTokens + u.OutputTokens + u.CacheCreationTokens + u.CacheReadTokens
 }

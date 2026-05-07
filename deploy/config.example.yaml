@@ -151,6 +151,7 @@ security:
     allowed_paths:
       - "/api/v1/admin/users/export"
       - "/api/v1/admin/usage"
+      - "/api/v1/admin/usage/export"
       - "/api/v1/admin/payment/orders/export"
     # Prefix allowlist (segment boundary match)
     # 前缀白名单（按路径段边界匹配）

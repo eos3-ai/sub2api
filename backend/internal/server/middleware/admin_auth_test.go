@@ -45,6 +45,7 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 				AllowedPaths: []string{
 					"/api/v1/admin/users/export",
 					"/api/v1/admin/usage",
+					"/api/v1/admin/usage/export",
 					"/api/v1/admin/payment/orders/export",
 				},
 			},
@@ -59,6 +60,9 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	router.GET("/api/v1/admin/usage", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	router.GET("/api/v1/admin/usage/export", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	router.GET("/api/v1/admin/payment/orders/export", func(c *gin.Context) {

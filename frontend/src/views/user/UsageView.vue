@@ -485,6 +485,16 @@
               <span class="text-gray-400">{{ t('admin.usage.outputCost') }}</span>
               <span class="font-medium text-white">${{ tooltipData.output_cost.toFixed(6) }}</span>
             </div>
+            <template v-if="!tooltipData?.billing_mode || tooltipData.billing_mode === BILLING_MODE_TOKEN">
+              <div v-if="tooltipData && tooltipData.input_tokens > 0" class="flex items-center justify-between gap-4">
+                <span class="text-gray-400">{{ t('usage.inputTokenPrice') }}</span>
+                <span class="font-medium text-sky-300">{{ formatTokenPricePerMillion(tooltipData.input_cost, tooltipData.input_tokens) }} {{ t('usage.perMillionTokens') }}</span>
+              </div>
+              <div v-if="tooltipData && tooltipData.output_tokens > 0" class="flex items-center justify-between gap-4">
+                <span class="text-gray-400">{{ t('usage.outputTokenPrice') }}</span>
+                <span class="font-medium text-violet-300">{{ formatTokenPricePerMillion(tooltipData.output_cost, tooltipData.output_tokens) }} {{ t('usage.perMillionTokens') }}</span>
+              </div>
+            </template>
             <div v-if="tooltipData && tooltipData.cache_creation_cost > 0" class="flex items-center justify-between gap-4">
               <span class="text-gray-400">{{ t('admin.usage.cacheCreationCost') }}</span>
               <span class="font-medium text-white">${{ tooltipData.cache_creation_cost.toFixed(6) }}</span>
@@ -495,6 +505,12 @@
             </div>
           </div>
           <!-- Rate and Summary -->
+          <div class="flex items-center justify-between gap-6">
+            <span class="text-gray-400">{{ t('usage.serviceTier') }}</span>
+            <span class="font-semibold text-cyan-300">{{
+              getUsageServiceTierLabel(tooltipData?.service_tier, t)
+            }}</span>
+          </div>
           <div class="flex items-center justify-between gap-6">
             <span class="text-gray-400">{{ t('usage.rate') }}</span>
             <span class="font-semibold text-blue-400"
@@ -537,6 +553,9 @@ import EmptyState from '@/components/common/EmptyState.vue'
   import type { UsageLog, ApiKey, UsageQueryParams, UsageStatsResponse } from '@/types'
   import type { Column } from '@/components/common/types'
   import { formatDateTime, formatReasoningEffort } from '@/utils/format'
+  import { BILLING_MODE_TOKEN } from '@/utils/billingMode'
+  import { formatTokenPricePerMillion } from '@/utils/usagePricing'
+  import { getUsageServiceTierLabel } from '@/utils/usageServiceTier'
 
 const { t } = useI18n()
 const appStore = useAppStore()
@@ -755,28 +774,6 @@ const handlePageSizeChange = (pageSize: number) => {
   loadUsageLogs()
 }
 
-/**
- * Escape CSV value to prevent injection and handle special characters
- */
-const escapeCSVValue = (value: unknown): string => {
-  if (value == null) return ''
-
-  const str = String(value)
-  const escaped = str.replace(/"/g, '""')
-
-  // Prevent formula injection by prefixing dangerous characters with single quote
-  if (/^[=+\-@\t\r]/.test(str)) {
-    return `"\'${escaped}"`
-  }
-
-  // Escape values containing comma, quote, or newline
-  if (/[,"\n\r]/.test(str)) {
-    return `"${escaped}"`
-  }
-
-  return str
-}
-
 const exportToCSV = () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
@@ -797,82 +794,17 @@ const exportToCSV = () => {
     })
 }
 
-// Fetches all records with the given filters and aggregates them into a billing CSV Blob.
-// This is the fetcher passed to appStore.startExport so it runs in the background.
-const createBillingCsvBlob = async (
-  total: number,
-  currentFilters: UsageQueryParams
-): Promise<Blob> => {
-  const allLogs: UsageLog[] = []
-  const pageSize = 100
-  const totalPages = Math.ceil(total / pageSize)
-  for (let page = 1; page <= totalPages; page++) {
-    const resp = await usageAPI.query({ page, page_size: pageSize, ...currentFilters })
-    allLogs.push(...resp.items)
-  }
-
-  if (allLogs.length === 0) throw new Error('No data to export')
-
-  interface ModelBilling {
-    apiKeyName: string
-    model: string
-    totalCost: number
-    totalTokens: number
-    totalRequests: number
-  }
-
-  const modelMap = new Map<string, ModelBilling>()
-  allLogs.forEach((log) => {
-    const apiKeyName = log.api_key?.name || ''
-    const key = `${apiKeyName}||${log.model}`
-    const existing = modelMap.get(key)
-    const totalTokens =
-      log.input_tokens + log.output_tokens + log.cache_creation_tokens + log.cache_read_tokens
-    if (existing) {
-      existing.totalCost += log.actual_cost
-      existing.totalTokens += totalTokens
-      existing.totalRequests += 1
-    } else {
-      modelMap.set(key, {
-        apiKeyName,
-        model: log.model,
-        totalCost: log.actual_cost,
-        totalTokens,
-        totalRequests: 1
-      })
-    }
-  })
-
-  const billingData = Array.from(modelMap.values()).sort((a, b) => b.totalCost - a.totalCost)
-  const headers = ['API Key Name', 'Model', 'Billed Cost', 'Total Tokens', 'Total Requests']
-  const rows = billingData.map((item) =>
-    [
-      item.apiKeyName,
-      item.model,
-      item.totalCost.toFixed(8),
-      item.totalTokens,
-      item.totalRequests
-    ].map(escapeCSVValue)
-  )
-  const csvContent = [
-    headers.map(escapeCSVValue).join(','),
-    ...rows.map((row) => row.join(','))
-  ].join('\n')
-  return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-}
-
 const exportBillingToCSV = () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
     return
   }
-  const currentTotal = pagination.total
   const currentFilters = { ...filters.value }
   const filename = `billing_${filters.value.start_date}_to_${filters.value.end_date}.csv`
   exportingType.value = 'billing'
   appStore
     .startExport(
-      () => createBillingCsvBlob(currentTotal, currentFilters),
+      () => usageAPI.exportBillingCsv(currentFilters),
       filename,
       { success: t('usage.billingExportSuccess'), error: t('usage.billingExportFailed') }
     )

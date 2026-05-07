@@ -273,6 +273,22 @@ export async function exportCsv(
   return data as Blob
 }
 
+/**
+ * Export usage billing summary as a CSV Blob.
+ * The backend aggregates the summary server-side.
+ * @param params - Filter params (same as query, without page/page_size)
+ * @returns Blob containing CSV data
+ */
+export async function exportBillingCsv(
+  params: Omit<UsageQueryParams, 'page' | 'page_size'>
+): Promise<Blob> {
+  const { data } = await apiClient.get('/usage/billing-export', {
+    params,
+    responseType: 'blob'
+  })
+  return data as Blob
+}
+
 export const usageAPI = {
   list,
   query,
@@ -281,6 +297,7 @@ export const usageAPI = {
   getByDateRange,
   getById,
   exportCsv,
+  exportBillingCsv,
   // Dashboard
   getDashboardStats,
   getDashboardTrend,

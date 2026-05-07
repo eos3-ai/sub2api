@@ -104,6 +104,22 @@ export async function list(
 }
 
 /**
+ * Export filtered usage logs as a CSV Blob (admin only).
+ * The backend streams the export server-side, avoiding frontend pagination loops.
+ */
+export async function exportCsv(
+  params: Omit<AdminUsageQueryParams, 'page' | 'page_size' | 'exact_total'>,
+  options?: { signal?: AbortSignal }
+): Promise<Blob> {
+  const { data } = await apiClient.get('/admin/usage/export', {
+    params,
+    responseType: 'blob',
+    signal: options?.signal
+  })
+  return data as Blob
+}
+
+/**
  * Get usage statistics with optional filters (admin only)
  * @param params - Query parameters for filtering
  * @returns Usage statistics
@@ -199,6 +215,7 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
 
 export const adminUsageAPI = {
   list,
+  exportCsv,
   getStats,
   searchUsers,
   searchApiKeys,

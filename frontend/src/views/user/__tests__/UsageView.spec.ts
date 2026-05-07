@@ -4,14 +4,30 @@ import { nextTick } from 'vue'
 
 import UsageView from '../UsageView.vue'
 
-const { query, getStatsByDateRange, list, showError, showWarning, showSuccess, showInfo } = vi.hoisted(() => ({
+const {
+  query,
+  getStatsByDateRange,
+  list,
+  exportCsv,
+  exportBillingCsv,
+  showError,
+  showWarning,
+  showSuccess,
+  showInfo,
+  startExport,
+} = vi.hoisted(() => ({
   query: vi.fn(),
   getStatsByDateRange: vi.fn(),
   list: vi.fn(),
+  exportCsv: vi.fn(),
+  exportBillingCsv: vi.fn(),
   showError: vi.fn(),
   showWarning: vi.fn(),
   showSuccess: vi.fn(),
   showInfo: vi.fn(),
+  startExport: vi.fn(async (fetcher: () => Promise<Blob>) => {
+    await fetcher()
+  }),
 }))
 
 const messages: Record<string, string> = {
@@ -47,6 +63,8 @@ vi.mock('@/api', () => ({
   usageAPI: {
     query,
     getStatsByDateRange,
+    exportCsv,
+    exportBillingCsv,
   },
   keysAPI: {
     list,
@@ -54,7 +72,14 @@ vi.mock('@/api', () => ({
 }))
 
 vi.mock('@/stores/app', () => ({
-  useAppStore: () => ({ showError, showWarning, showSuccess, showInfo }),
+  useAppStore: () => ({
+    showError,
+    showWarning,
+    showSuccess,
+    showInfo,
+    startExport,
+    isExporting: false,
+  }),
 }))
 
 vi.mock('vue-i18n', async () => {
@@ -77,10 +102,16 @@ describe('user UsageView tooltip', () => {
     query.mockReset()
     getStatsByDateRange.mockReset()
     list.mockReset()
+    exportCsv.mockReset()
+    exportBillingCsv.mockReset()
     showError.mockReset()
     showWarning.mockReset()
     showSuccess.mockReset()
     showInfo.mockReset()
+    startExport.mockReset()
+    startExport.mockImplementation(async (fetcher: () => Promise<Blob>) => {
+      await fetcher()
+    })
 
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
       x: 0,
@@ -183,7 +214,7 @@ describe('user UsageView tooltip', () => {
     expect(text).toContain('$30.0000 / 1M tokens')
   })
 
-  it('exports csv with input and output unit price columns', async () => {
+  it('exports usage csv through backend export endpoint', async () => {
     const exportedLogs = [
       {
         request_id: 'req-user-export',
@@ -224,16 +255,7 @@ describe('user UsageView tooltip', () => {
       avg_duration_ms: 1,
     })
     list.mockResolvedValue({ items: [] })
-
-    let exportedBlob: Blob | null = null
-    const originalCreateObjectURL = window.URL.createObjectURL
-    const originalRevokeObjectURL = window.URL.revokeObjectURL
-    window.URL.createObjectURL = vi.fn((blob: Blob | MediaSource) => {
-      exportedBlob = blob as Blob
-      return 'blob:usage-export'
-    }) as typeof window.URL.createObjectURL
-    window.URL.revokeObjectURL = vi.fn(() => {}) as typeof window.URL.revokeObjectURL
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    exportCsv.mockResolvedValue(new Blob(['usage csv'], { type: 'text/csv' }))
 
     const wrapper = mount(UsageView, {
       global: {
@@ -255,23 +277,79 @@ describe('user UsageView tooltip', () => {
     const setupState = (wrapper.vm as any).$?.setupState
     await setupState.exportToCSV()
 
-    expect(exportedBlob).not.toBeNull()
-    const hasSortedExportQuery = query.mock.calls.some((call) => {
-      const params = call[0] as Record<string, unknown> | undefined
-      const config = call[1]
-      return (
-        params?.page_size === 100 &&
-        params?.sort_by === 'created_at' &&
-        params?.sort_order === 'desc' &&
-        config === undefined
-      )
+    expect(startExport).toHaveBeenCalled()
+    expect(exportCsv).toHaveBeenCalledWith({
+      api_key_id: undefined,
+      start_date: expect.any(String),
+      end_date: expect.any(String),
     })
-    expect(hasSortedExportQuery).toBe(true)
-    expect(clickSpy).toHaveBeenCalled()
-    expect(showSuccess).toHaveBeenCalled()
+    expect(query).toHaveBeenCalledTimes(1)
+  })
 
-    window.URL.createObjectURL = originalCreateObjectURL
-    window.URL.revokeObjectURL = originalRevokeObjectURL
-    clickSpy.mockRestore()
+  it('exports billing csv through backend billing export endpoint', async () => {
+    query.mockResolvedValue({
+      items: [
+        {
+          request_id: 'req-user-billing-export',
+          actual_cost: 0.092883,
+          total_cost: 0.092883,
+          rate_multiplier: 1,
+          service_tier: 'priority',
+          input_cost: 0.020285,
+          output_cost: 0.00303,
+          cache_creation_cost: 0,
+          cache_read_cost: 0.069568,
+          input_tokens: 4057,
+          output_tokens: 101,
+          cache_creation_tokens: 0,
+          cache_read_tokens: 278272,
+          cache_creation_5m_tokens: 0,
+          cache_creation_1h_tokens: 0,
+          image_count: 0,
+          image_size: null,
+          first_token_ms: null,
+          duration_ms: 1,
+          created_at: '2026-03-08T00:00:00Z',
+        },
+      ],
+      total: 1,
+      pages: 1,
+    })
+    getStatsByDateRange.mockResolvedValue({
+      total_requests: 1,
+      total_tokens: 100,
+      total_cost: 0.1,
+      avg_duration_ms: 1,
+    })
+    list.mockResolvedValue({ items: [] })
+    exportBillingCsv.mockResolvedValue(new Blob(['billing csv'], { type: 'text/csv' }))
+
+    const wrapper = mount(UsageView, {
+      global: {
+        stubs: {
+          AppLayout: AppLayoutStub,
+          TablePageLayout: TablePageLayoutStub,
+          Pagination: true,
+          EmptyState: true,
+          Select: true,
+          DateRangePicker: true,
+          Icon: true,
+          Teleport: true,
+        },
+      },
+    })
+
+    await flushPromises()
+
+    const setupState = (wrapper.vm as any).$?.setupState
+    await setupState.exportBillingToCSV()
+
+    expect(startExport).toHaveBeenCalled()
+    expect(exportBillingCsv).toHaveBeenCalledWith({
+      api_key_id: undefined,
+      start_date: expect.any(String),
+      end_date: expect.any(String),
+    })
+    expect(query).toHaveBeenCalledTimes(1)
   })
 })

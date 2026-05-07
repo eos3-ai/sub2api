@@ -2,6 +2,8 @@ package admin
 
 import (
 	"context"
+	"encoding/csv"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -61,108 +63,10 @@ type CreateUsageCleanupTaskRequest struct {
 // GET /api/v1/admin/usage
 func (h *UsageHandler) List(c *gin.Context) {
 	page, pageSize := response.ParsePagination(c)
-	exactTotal := false
-	if exactTotalRaw := strings.TrimSpace(c.Query("exact_total")); exactTotalRaw != "" {
-		parsed, err := strconv.ParseBool(exactTotalRaw)
-		if err != nil {
-			response.BadRequest(c, "Invalid exact_total value, use true or false")
-			return
-		}
-		exactTotal = parsed
-	}
-
-	// Parse filters
-	var userID, apiKeyID, accountID, groupID int64
-	if userIDStr := c.Query("user_id"); userIDStr != "" {
-		id, err := strconv.ParseInt(userIDStr, 10, 64)
-		if err != nil {
-			response.BadRequest(c, "Invalid user_id")
-			return
-		}
-		userID = id
-	}
-
-	if apiKeyIDStr := c.Query("api_key_id"); apiKeyIDStr != "" {
-		id, err := strconv.ParseInt(apiKeyIDStr, 10, 64)
-		if err != nil {
-			response.BadRequest(c, "Invalid api_key_id")
-			return
-		}
-		apiKeyID = id
-	}
-
-	if accountIDStr := c.Query("account_id"); accountIDStr != "" {
-		id, err := strconv.ParseInt(accountIDStr, 10, 64)
-		if err != nil {
-			response.BadRequest(c, "Invalid account_id")
-			return
-		}
-		accountID = id
-	}
-
-	if groupIDStr := c.Query("group_id"); groupIDStr != "" {
-		id, err := strconv.ParseInt(groupIDStr, 10, 64)
-		if err != nil {
-			response.BadRequest(c, "Invalid group_id")
-			return
-		}
-		groupID = id
-	}
-
-	model := c.Query("model")
-	billingMode := strings.TrimSpace(c.Query("billing_mode"))
-
-	var requestType *int16
-	var stream *bool
-	if requestTypeStr := strings.TrimSpace(c.Query("request_type")); requestTypeStr != "" {
-		parsed, err := service.ParseUsageRequestType(requestTypeStr)
-		if err != nil {
-			response.BadRequest(c, err.Error())
-			return
-		}
-		value := int16(parsed)
-		requestType = &value
-	} else if streamStr := c.Query("stream"); streamStr != "" {
-		val, err := strconv.ParseBool(streamStr)
-		if err != nil {
-			response.BadRequest(c, "Invalid stream value, use true or false")
-			return
-		}
-		stream = &val
-	}
-
-	var billingType *int8
-	if billingTypeStr := c.Query("billing_type"); billingTypeStr != "" {
-		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
-		if err != nil {
-			response.BadRequest(c, "Invalid billing_type")
-			return
-		}
-		bt := int8(val)
-		billingType = &bt
-	}
-
-	// Parse date range
-	var startTime, endTime *time.Time
-	userTZ := c.Query("timezone") // Get user's timezone from request
-	if startDateStr := c.Query("start_date"); startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
-			return
-		}
-		startTime = &t
-	}
-
-	if endDateStr := c.Query("end_date"); endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
-			return
-		}
-		// Use half-open range [start, end), move to next calendar day start (DST-safe).
-		t = t.AddDate(0, 0, 1)
-		endTime = &t
+	filters, err := parseAdminUsageFilters(c, true)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
 	}
 
 	params := pagination.PaginationParams{
@@ -170,20 +74,6 @@ func (h *UsageHandler) List(c *gin.Context) {
 		PageSize:  pageSize,
 		SortBy:    c.DefaultQuery("sort_by", "created_at"),
 		SortOrder: c.DefaultQuery("sort_order", "desc"),
-	}
-	filters := usagestats.UsageLogFilters{
-		UserID:      userID,
-		APIKeyID:    apiKeyID,
-		AccountID:   accountID,
-		GroupID:     groupID,
-		Model:       model,
-		RequestType: requestType,
-		Stream:      stream,
-		BillingType: billingType,
-		BillingMode: billingMode,
-		StartTime:   startTime,
-		EndTime:     endTime,
-		ExactTotal:  exactTotal,
 	}
 
 	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
@@ -197,6 +87,258 @@ func (h *UsageHandler) List(c *gin.Context) {
 		out = append(out, *dto.UsageLogFromServiceAdmin(&records[i]))
 	}
 	response.Paginated(c, out, result.Total, page, pageSize)
+}
+
+// Export streams filtered usage records as CSV.
+// GET /api/v1/admin/usage/export
+func (h *UsageHandler) Export(c *gin.Context) {
+	filters, err := parseAdminUsageFilters(c, false)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	filename := "admin_usage.csv"
+	if filters.StartTime != nil && filters.EndTime != nil {
+		filename = fmt.Sprintf("admin_usage_%s_to_%s.csv",
+			filters.StartTime.Format("2006-01-02"),
+			filters.EndTime.AddDate(0, 0, -1).Format("2006-01-02"))
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.Status(http.StatusOK)
+
+	writer := csv.NewWriter(c.Writer)
+	if err := writer.Write(adminUsageExportHeaders()); err != nil {
+		return
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return
+	}
+	c.Writer.Flush()
+
+	err = h.usageService.ExportWithFilters(c.Request.Context(), filters, 5000, func(records []service.UsageLog) error {
+		for i := range records {
+			if err := writer.Write(adminUsageExportRow(&records[i])); err != nil {
+				return err
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return err
+		}
+		c.Writer.Flush()
+		return nil
+	})
+	if err != nil {
+		logger.LegacyPrintf("handler.admin.usage", "[UsageExport] 导出失败: err=%v", err)
+	}
+}
+
+func parseAdminUsageFilters(c *gin.Context, includeExactTotal bool) (usagestats.UsageLogFilters, error) {
+	var filters usagestats.UsageLogFilters
+	if includeExactTotal {
+		exactTotalRaw := strings.TrimSpace(c.Query("exact_total"))
+		if exactTotalRaw != "" {
+			parsed, err := strconv.ParseBool(exactTotalRaw)
+			if err != nil {
+				return filters, fmt.Errorf("Invalid exact_total value, use true or false")
+			}
+			filters.ExactTotal = parsed
+		}
+	}
+
+	if userIDStr := c.Query("user_id"); userIDStr != "" {
+		id, err := strconv.ParseInt(userIDStr, 10, 64)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid user_id")
+		}
+		filters.UserID = id
+	}
+
+	if apiKeyIDStr := c.Query("api_key_id"); apiKeyIDStr != "" {
+		id, err := strconv.ParseInt(apiKeyIDStr, 10, 64)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid api_key_id")
+		}
+		filters.APIKeyID = id
+	}
+
+	if accountIDStr := c.Query("account_id"); accountIDStr != "" {
+		id, err := strconv.ParseInt(accountIDStr, 10, 64)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid account_id")
+		}
+		filters.AccountID = id
+	}
+
+	if groupIDStr := c.Query("group_id"); groupIDStr != "" {
+		id, err := strconv.ParseInt(groupIDStr, 10, 64)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid group_id")
+		}
+		filters.GroupID = id
+	}
+
+	filters.Model = c.Query("model")
+	filters.BillingMode = strings.TrimSpace(c.Query("billing_mode"))
+
+	if requestTypeStr := strings.TrimSpace(c.Query("request_type")); requestTypeStr != "" {
+		parsed, err := service.ParseUsageRequestType(requestTypeStr)
+		if err != nil {
+			return filters, err
+		}
+		value := int16(parsed)
+		filters.RequestType = &value
+	} else if streamStr := c.Query("stream"); streamStr != "" {
+		val, err := strconv.ParseBool(streamStr)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid stream value, use true or false")
+		}
+		filters.Stream = &val
+	}
+
+	if billingTypeStr := c.Query("billing_type"); billingTypeStr != "" {
+		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid billing_type")
+		}
+		bt := int8(val)
+		filters.BillingType = &bt
+	}
+
+	userTZ := c.Query("timezone")
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid start_date format, use YYYY-MM-DD")
+		}
+		filters.StartTime = &t
+	}
+
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		if err != nil {
+			return filters, fmt.Errorf("Invalid end_date format, use YYYY-MM-DD")
+		}
+		t = t.AddDate(0, 0, 1)
+		filters.EndTime = &t
+	}
+
+	return filters, nil
+}
+
+func adminUsageExportHeaders() []string {
+	return []string{
+		"created_at",
+		"user_email",
+		"api_key_name",
+		"account_name",
+		"model",
+		"reasoning_effort",
+		"group_name",
+		"request_type",
+		"input_tokens",
+		"output_tokens",
+		"cache_read_tokens",
+		"cache_creation_tokens",
+		"input_cost",
+		"output_cost",
+		"cache_read_cost",
+		"cache_creation_cost",
+		"user_rate_multiplier",
+		"account_rate_multiplier",
+		"standard_cost",
+		"user_billed_cost",
+		"account_billed_cost",
+		"first_token_ms",
+		"duration_ms",
+		"request_id",
+		"user_agent",
+		"ip_address",
+	}
+}
+
+func adminUsageExportRow(log *service.UsageLog) []string {
+	userEmail := ""
+	if log.User != nil {
+		userEmail = log.User.Email
+	}
+	apiKeyName := ""
+	if log.APIKey != nil {
+		apiKeyName = log.APIKey.Name
+	}
+	accountName := ""
+	if log.Account != nil {
+		accountName = log.Account.Name
+	}
+	groupName := ""
+	if log.Group != nil {
+		groupName = log.Group.Name
+	}
+	reasoningEffort := ""
+	if log.ReasoningEffort != nil {
+		reasoningEffort = *log.ReasoningEffort
+	}
+	firstTokenMs := ""
+	if log.FirstTokenMs != nil {
+		firstTokenMs = strconv.Itoa(*log.FirstTokenMs)
+	}
+	durationMs := ""
+	if log.DurationMs != nil {
+		durationMs = strconv.Itoa(*log.DurationMs)
+	}
+	userAgent := ""
+	if log.UserAgent != nil {
+		userAgent = *log.UserAgent
+	}
+	ipAddress := ""
+	if log.IPAddress != nil {
+		ipAddress = *log.IPAddress
+	}
+	accountMultiplier := 1.0
+	if log.AccountRateMultiplier != nil {
+		accountMultiplier = *log.AccountRateMultiplier
+	}
+	accountCostBase := log.TotalCost
+	if log.AccountStatsCost != nil {
+		accountCostBase = *log.AccountStatsCost
+	}
+	displayModel := log.RequestedModel
+	if displayModel == "" {
+		displayModel = log.Model
+	}
+
+	return []string{
+		log.CreatedAt.Format(time.RFC3339),
+		sanitizeCSVCell(userEmail),
+		sanitizeCSVCell(apiKeyName),
+		sanitizeCSVCell(accountName),
+		sanitizeCSVCell(displayModel),
+		sanitizeCSVCell(reasoningEffort),
+		sanitizeCSVCell(groupName),
+		log.EffectiveRequestType().String(),
+		strconv.Itoa(log.InputTokens),
+		strconv.Itoa(log.OutputTokens),
+		strconv.Itoa(log.CacheReadTokens),
+		strconv.Itoa(log.CacheCreationTokens),
+		fmt.Sprintf("%.6f", log.InputCost),
+		fmt.Sprintf("%.6f", log.OutputCost),
+		fmt.Sprintf("%.6f", log.CacheReadCost),
+		fmt.Sprintf("%.6f", log.CacheCreationCost),
+		fmt.Sprintf("%.2f", log.RateMultiplier),
+		fmt.Sprintf("%.2f", accountMultiplier),
+		fmt.Sprintf("%.6f", log.TotalCost),
+		fmt.Sprintf("%.6f", log.ActualCost),
+		fmt.Sprintf("%.6f", accountCostBase*accountMultiplier),
+		firstTokenMs,
+		durationMs,
+		sanitizeCSVCell(log.RequestID),
+		sanitizeCSVCell(userAgent),
+		sanitizeCSVCell(ipAddress),
+	}
 }
 
 // Stats handles getting usage statistics with filters
