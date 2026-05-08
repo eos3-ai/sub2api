@@ -4315,6 +4315,7 @@ export default {
       lastRun: 'Last run:',
       lastSuccess: 'Last success:',
       lastError: 'Last error:',
+      result: 'Result',
       noData: 'No data.',
       loadingText: 'loading',
       ready: 'ready',
@@ -4389,7 +4390,12 @@ export default {
         '6h': 'Last 6 hours',
         '24h': 'Last 24 hours',
         '7d': 'Last 7 days',
-        '30d': 'Last 30 days'
+        '30d': 'Last 30 days',
+        custom: 'Custom'
+      },
+      customTimeRange: {
+        startTime: 'Start time',
+        endTime: 'End time'
       },
       openaiTokenStats: {
         title: 'OpenAI Token Request Stats',
@@ -4944,6 +4950,16 @@ export default {
         showAdvancedDeveloperSettings: 'Show advanced developer settings (Distributed Lock)',
         advancedSettingsSummary: 'Advanced settings (Distributed Lock)',
         evalIntervalHint: 'How often the evaluator runs. Keeping the default is recommended.',
+        metricThresholds: 'Metric thresholds',
+        metricThresholdsHint: 'Configure alert thresholds used by the runtime evaluator.',
+        slaMinPercent: 'SLA minimum percentage',
+        slaMinPercentHint: 'Trigger when SLA is below this percentage.',
+        ttftP99MaxMs: 'TTFT P99 maximum (ms)',
+        ttftP99MaxMsHint: 'Trigger when TTFT P99 is above this latency.',
+        requestErrorRateMaxPercent: 'Request error rate maximum (%)',
+        requestErrorRateMaxPercentHint: 'Trigger when request error rate is above this percentage.',
+        upstreamErrorRateMaxPercent: 'Upstream error rate maximum (%)',
+        upstreamErrorRateMaxPercentHint: 'Trigger when upstream error rate is above this percentage.',
         validation: {
           title: 'Please fix the following issues',
           invalid: 'Invalid settings',
@@ -5045,8 +5061,10 @@ export default {
         ignoreContextCanceledHint: 'When enabled, client disconnect (context canceled) errors will not be written to the error log.',
         ignoreNoAvailableAccounts: 'Ignore no available accounts errors',
         ignoreNoAvailableAccountsHint: 'When enabled, "No available accounts" errors will not be written to the error log (not recommended; usually a config issue).',
-        ignoreInvalidApiKeyErrors: 'Ignore invalid API key errors',
-        ignoreInvalidApiKeyErrorsHint: 'When enabled, invalid or missing API key errors (INVALID_API_KEY, API_KEY_REQUIRED) will not be written to the error log.',
+        ignoreInvalidApiKeyErrors: 'Ignore API key authentication errors',
+        ignoreInvalidApiKeyErrorsHint: 'When enabled, invalid, missing, or disabled API key errors (INVALID_API_KEY, API_KEY_REQUIRED, API_KEY_DISABLED) will not be written to the error log.',
+        ignoreInsufficientBalanceErrors: 'Ignore insufficient balance errors',
+        ignoreInsufficientBalanceErrorsHint: 'When enabled, insufficient balance or quota errors will not be written to the error log.',
         autoRefresh: 'Auto Refresh',
         enableAutoRefresh: 'Enable auto refresh',
         enableAutoRefreshHint: 'Automatically refresh dashboard data at a fixed interval.',
@@ -5055,6 +5073,11 @@ export default {
         refreshInterval30s: '30 seconds',
         refreshInterval60s: '60 seconds',
         autoRefreshCountdown: 'Auto refresh: {seconds}s',
+        dashboardCards: 'Dashboard Cards',
+        displayAlertEvents: 'Show alert events',
+        displayAlertEventsHint: 'Show the alert events card on the ops monitoring dashboard.',
+        displayOpenAITokenStats: 'Show OpenAI token stats',
+        displayOpenAITokenStatsHint: 'Show the OpenAI token request statistics card on the ops monitoring dashboard.',
         validation: {
           title: 'Please fix the following issues',
           retentionDaysRange: 'Retention days must be between 1-365 days',

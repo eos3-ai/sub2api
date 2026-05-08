@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -11,6 +13,78 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 )
+
+type opsErrorLoggerSettingRepoStub struct {
+	values map[string]string
+}
+
+func newOpsErrorLoggerSettingRepoStub(t *testing.T, ignoreInvalidAPIKeyErrors bool) *opsErrorLoggerSettingRepoStub {
+	t.Helper()
+
+	raw, err := json.Marshal(map[string]any{
+		"ignore_invalid_api_key_errors": ignoreInvalidAPIKeyErrors,
+	})
+	require.NoError(t, err)
+
+	return &opsErrorLoggerSettingRepoStub{
+		values: map[string]string{
+			service.SettingKeyOpsAdvancedSettings: string(raw),
+		},
+	}
+}
+
+func (s *opsErrorLoggerSettingRepoStub) Get(ctx context.Context, key string) (*service.Setting, error) {
+	value, err := s.GetValue(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return &service.Setting{Key: key, Value: value}, nil
+}
+
+func (s *opsErrorLoggerSettingRepoStub) GetValue(_ context.Context, key string) (string, error) {
+	if value, ok := s.values[key]; ok {
+		return value, nil
+	}
+	return "", service.ErrSettingNotFound
+}
+
+func (s *opsErrorLoggerSettingRepoStub) Set(_ context.Context, key, value string) error {
+	s.values[key] = value
+	return nil
+}
+
+func (s *opsErrorLoggerSettingRepoStub) GetMultiple(_ context.Context, keys []string) (map[string]string, error) {
+	out := make(map[string]string, len(keys))
+	for _, key := range keys {
+		if value, ok := s.values[key]; ok {
+			out[key] = value
+		}
+	}
+	return out, nil
+}
+
+func (s *opsErrorLoggerSettingRepoStub) SetMultiple(_ context.Context, settings map[string]string) error {
+	for key, value := range settings {
+		s.values[key] = value
+	}
+	return nil
+}
+
+func (s *opsErrorLoggerSettingRepoStub) GetAll(_ context.Context) (map[string]string, error) {
+	out := make(map[string]string, len(s.values))
+	for key, value := range s.values {
+		out[key] = value
+	}
+	return out, nil
+}
+
+func (s *opsErrorLoggerSettingRepoStub) Delete(_ context.Context, key string) error {
+	if _, ok := s.values[key]; !ok {
+		return service.ErrSettingNotFound
+	}
+	delete(s.values, key)
+	return nil
+}
 
 func resetOpsErrorLoggerStateForTest(t *testing.T) {
 	t.Helper()
@@ -42,6 +116,59 @@ func resetOpsErrorLoggerStateForTest(t *testing.T) {
 	opsErrorLogShutdownCh = make(chan struct{})
 	opsErrorLogShutdownOnce = sync.Once{}
 	opsErrorLogDrained.Store(false)
+}
+
+func TestShouldSkipOpsErrorLog_IgnoreApiKeyAuthErrorsIncludesDisabled(t *testing.T) {
+	repo := newOpsErrorLoggerSettingRepoStub(t, true)
+	ops := service.NewOpsService(nil, repo, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	tests := []struct {
+		name    string
+		message string
+		body    string
+	}{
+		{
+			name:    "disabled code in body",
+			message: "API key is disabled",
+			body:    `{"error":{"type":"authentication_error","code":"API_KEY_DISABLED","message":"API key is disabled"}}`,
+		},
+		{
+			name:    "disabled message only",
+			message: "API key is disabled",
+			body:    `{"error":{"type":"authentication_error","message":"API key is disabled"}}`,
+		},
+		{
+			name:    "invalid key existing behavior",
+			message: "Invalid API key",
+			body:    `{"error":{"type":"authentication_error","code":"INVALID_API_KEY","message":"Invalid API key"}}`,
+		},
+		{
+			name:    "missing key existing behavior",
+			message: "API key required",
+			body:    `{"error":{"type":"authentication_error","code":"API_KEY_REQUIRED","message":"API key required"}}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			require.True(t, shouldSkipOpsErrorLog(context.Background(), ops, tc.message, tc.body, "/v1/messages"))
+		})
+	}
+
+	require.False(t, shouldSkipOpsErrorLog(context.Background(), ops, "upstream failed", `{"error":{"code":"UPSTREAM_ERROR"}}`, "/v1/messages"))
+}
+
+func TestShouldSkipOpsErrorLog_DoesNotIgnoreDisabledAPIKeyWhenDisabled(t *testing.T) {
+	repo := newOpsErrorLoggerSettingRepoStub(t, false)
+	ops := service.NewOpsService(nil, repo, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+
+	require.False(t, shouldSkipOpsErrorLog(
+		context.Background(),
+		ops,
+		"API key is disabled",
+		`{"error":{"type":"authentication_error","code":"API_KEY_DISABLED","message":"API key is disabled"}}`,
+		"/v1/messages",
+	))
 }
 
 func TestAttachOpsRequestBodyToEntry_SanitizeAndTrim(t *testing.T) {

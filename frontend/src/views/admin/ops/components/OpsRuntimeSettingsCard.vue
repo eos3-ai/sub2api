@@ -286,7 +286,9 @@ onMounted(() => {
             <div class="mt-2 grid grid-cols-1 gap-3 rounded-lg bg-gray-100 p-3 dark:bg-dark-800 md:grid-cols-2">
               <div class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.ops.runtime.lockEnabled') }}:
-                <span class="ml-1 font-mono text-gray-700 dark:text-gray-300">{{ alertSettings.distributed_lock.enabled }}</span>
+                <span class="ml-1 font-medium text-gray-700 dark:text-gray-300">
+                  {{ alertSettings.distributed_lock.enabled ? t('common.enabled') : t('common.disabled') }}
+                </span>
               </div>
               <div class="text-xs text-gray-500 dark:text-gray-400">
                 {{ t('admin.ops.runtime.lockKey') }}:
@@ -533,4 +535,3 @@ onMounted(() => {
     </template>
   </BaseDialog>
 </template>
-

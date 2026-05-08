@@ -35,6 +35,8 @@ const (
 	opsErrNoAvailableAccounts        = "no available accounts"
 	opsErrInvalidAPIKey              = "invalid_api_key"
 	opsErrAPIKeyRequired             = "api_key_required"
+	opsErrAPIKeyDisabled             = "api_key_disabled"
+	opsErrAPIKeyDisabledMessage      = "api key is disabled"
 	opsErrInsufficientBalance        = "insufficient balance"
 	opsErrInsufficientAccountBalance = "insufficient account balance"
 	opsErrInsufficientQuota          = "insufficient_quota"
@@ -1286,9 +1288,12 @@ func shouldSkipOpsErrorLog(ctx context.Context, ops *service.OpsService, message
 		}
 	}
 
-	// Check if invalid/missing API key errors should be ignored (user misconfiguration)
+	// Check if invalid/missing/disabled API key errors should be ignored (user misconfiguration)
 	if settings.IgnoreInvalidApiKeyErrors {
-		if strings.Contains(bodyLower, opsErrInvalidAPIKey) || strings.Contains(bodyLower, opsErrAPIKeyRequired) {
+		if strings.Contains(bodyLower, opsErrInvalidAPIKey) || strings.Contains(bodyLower, opsErrAPIKeyRequired) ||
+			strings.Contains(bodyLower, opsErrAPIKeyDisabled) ||
+			strings.Contains(bodyLower, opsErrAPIKeyDisabledMessage) ||
+			strings.Contains(msgLower, opsErrAPIKeyDisabledMessage) {
 			return true
 		}
 	}
