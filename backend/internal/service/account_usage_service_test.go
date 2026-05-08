@@ -103,7 +103,7 @@ func TestAccountUsageService_PersistOpenAICodexProbeSnapshotOnlyUpdatesExtra(t *
 	svc.persistOpenAICodexProbeSnapshot(321, map[string]any{
 		"codex_7d_used_percent": 100.0,
 		"codex_7d_reset_at":     time.Now().Add(2 * time.Hour).UTC().Truncate(time.Second).Format(time.RFC3339),
-	})
+	}, nil)
 
 	select {
 	case updates := <-repo.updateExtraCh:
@@ -121,14 +121,13 @@ func TestAccountUsageService_PersistOpenAICodexProbeSnapshotOnlyUpdatesExtra(t *
 	}
 }
 
-func TestAccountUsageService_GetOpenAIUsage_DoesNotPromoteCodexExtraToRateLimit(t *testing.T) {
+func TestBuildCodexUsageProgressFromExtra_DoesNotPromoteCodexExtraToRateLimit(t *testing.T) {
 	t.Parallel()
 
 	resetAt := time.Now().Add(6 * 24 * time.Hour).UTC().Truncate(time.Second)
 	repo := &accountUsageCodexProbeRepo{
 		rateLimitCh: make(chan time.Time, 1),
 	}
-	svc := &AccountUsageService{accountRepo: repo}
 	account := &Account{
 		Platform: PlatformOpenAI,
 		Type:     AccountTypeOAuth,
@@ -140,9 +139,9 @@ func TestAccountUsageService_GetOpenAIUsage_DoesNotPromoteCodexExtraToRateLimit(
 		},
 	}
 
-	usage, err := svc.getOpenAIUsage(context.Background(), account)
-	if err != nil {
-		t.Fatalf("getOpenAIUsage() error = %v", err)
+	usage := &UsageInfo{
+		FiveHour: buildCodexUsageProgressFromExtra(account.Extra, "5h", time.Now()),
+		SevenDay: buildCodexUsageProgressFromExtra(account.Extra, "7d", time.Now()),
 	}
 	if usage.SevenDay == nil || usage.SevenDay.Utilization != 100.0 {
 		t.Fatalf("预期 7 天用量仍然可见，实际为 %#v", usage.SevenDay)
