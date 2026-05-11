@@ -9,30 +9,38 @@ import (
 
 // PaymentPlan represents a frontend-friendly payment package definition.
 type PaymentPlan struct {
-	ID                string   `json:"id"`
-	Name              string   `json:"name"`
-	AmountUSD         float64  `json:"amount_usd"`
-	PayUSD            float64  `json:"pay_usd"`
-	CreditsUSD        float64  `json:"credits_usd"`
-	ExchangeRate      float64  `json:"exchange_rate"`
-	DiscountRate      float64  `json:"discount_rate"`
-	Enabled           bool     `json:"enabled"`
-	AvailableChannels []string `json:"available_channels,omitempty"`
+	ID                string                 `json:"id"`
+	Name              string                 `json:"name"`
+	AmountUSD         float64                `json:"amount_usd"`
+	PayUSD            float64                `json:"pay_usd"`
+	CreditsUSD        float64                `json:"credits_usd"`
+	ExchangeRate      float64                `json:"exchange_rate"`
+	DiscountRate      float64                `json:"discount_rate"`
+	Enabled           bool                   `json:"enabled"`
+	AvailableChannels []string               `json:"available_channels,omitempty"`
+	AvailableOptions  []PaymentChannelOption `json:"available_channel_options,omitempty"`
 }
 
 type PaymentSubscriptionPlan struct {
-	GroupID               int64    `json:"group_id"`
-	GroupName             string   `json:"group_name"`
-	Description           string   `json:"description,omitempty"`
-	Platform              string   `json:"platform"`
-	PriceUSD              float64  `json:"price_usd"`
-	ValidityDays          int      `json:"validity_days"`
-	DailyLimitUSD         *float64 `json:"daily_limit_usd,omitempty"`
-	WeeklyLimitUSD        *float64 `json:"weekly_limit_usd,omitempty"`
-	MonthlyLimitUSD       *float64 `json:"monthly_limit_usd,omitempty"`
-	ExchangeRate          float64  `json:"exchange_rate"`
-	AvailableChannels     []string `json:"available_channels,omitempty"`
-	HasActiveSubscription bool     `json:"has_active_subscription"`
+	GroupID               int64                  `json:"group_id"`
+	GroupName             string                 `json:"group_name"`
+	Description           string                 `json:"description,omitempty"`
+	Platform              string                 `json:"platform"`
+	PriceUSD              float64                `json:"price_usd"`
+	ValidityDays          int                    `json:"validity_days"`
+	DailyLimitUSD         *float64               `json:"daily_limit_usd,omitempty"`
+	WeeklyLimitUSD        *float64               `json:"weekly_limit_usd,omitempty"`
+	MonthlyLimitUSD       *float64               `json:"monthly_limit_usd,omitempty"`
+	ExchangeRate          float64                `json:"exchange_rate"`
+	AvailableChannels     []string               `json:"available_channels,omitempty"`
+	AvailableOptions      []PaymentChannelOption `json:"available_channel_options,omitempty"`
+	HasActiveSubscription bool                   `json:"has_active_subscription"`
+}
+
+type PaymentChannelOption struct {
+	Provider string `json:"provider"`
+	Method   string `json:"method"`
+	Channel  string `json:"channel"`
 }
 
 // PaymentOrder represents a payment order for API responses.

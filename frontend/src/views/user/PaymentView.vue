@@ -165,50 +165,40 @@
             </div>
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <button
-                v-if="availablePayMethods.includes('alipay')"
+                v-for="option in paymentOptions"
+                :key="option.channel"
                 type="button"
                 class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
                 :class="
-                  payMethod === 'alipay'
+                  payMethod === option.channel
                     ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
                     : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
                 "
-                @click="payMethod = 'alipay'"
+                @click="payMethod = option.channel"
               >
                 <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
-                  <svg viewBox="0 0 24 24" class="h-6 w-6 text-primary-600 dark:text-primary-400" aria-hidden="true">
+                  <svg
+                    v-if="option.method === 'alipay'"
+                    viewBox="0 0 24 24"
+                    class="h-6 w-6 text-primary-600 dark:text-primary-400"
+                    aria-hidden="true"
+                  >
                     <path
                       fill="currentColor"
                       d="M12 2a10 10 0 100 20 10 10 0 000-20zm4.4 6.1l-2.2 7.7h-1.8l-.9-2.7H8.8l-.9 2.7H6.1l2.7-7.7h1.8l.7 2.2h2.4l.7-2.2h1.8zM9.3 11.1h2.4l-1.2-3.5-1.2 3.5z"
                     />
                   </svg>
-                </span>
-                <span>{{ t('payment.alipay') }}</span>
-              </button>
-
-              <button
-                v-if="availablePayMethods.includes('wechat')"
-                type="button"
-                class="flex items-center gap-3 rounded-2xl border px-6 py-4 text-left text-base font-semibold transition"
-                :class="
-                  payMethod === 'wechat'
-                    ? 'border-primary-500 bg-primary-50 text-gray-900 dark:border-primary-400 dark:bg-primary-900/10 dark:text-white'
-                    : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-dark-700 dark:bg-dark-800 dark:text-white dark:hover:bg-dark-700'
-                "
-                @click="payMethod = 'wechat'"
-              >
-                <span class="flex h-10 w-10 items-center justify-center rounded-2xl bg-white shadow-sm dark:bg-dark-900">
-                  <svg viewBox="0 0 24 24" class="h-6 w-6 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
+                  <svg v-else viewBox="0 0 24 24" class="h-6 w-6 text-emerald-600 dark:text-emerald-400" aria-hidden="true">
                     <path
                       fill="currentColor"
                       d="M8.2 4.8C4.8 4.8 2 7.1 2 10c0 1.7.9 3.2 2.3 4.2L3.6 16c-.1.2 0 .4.2.5.1.1.3.1.4 0l2-1.2c.6.2 1.3.3 2 .3 3.4 0 6.2-2.3 6.2-5.2S11.6 4.8 8.2 4.8zm-2 4.7c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zm4 0c-.5 0-.9-.4-.9-.9s.4-.9.9-.9.9.4.9.9-.4.9-.9.9zM21.9 13.3c0-2.4-2.4-4.3-5.4-4.3-3 0-5.4 1.9-5.4 4.3s2.4 4.3 5.4 4.3c.5 0 1-.1 1.5-.2l1.6.9c.2.1.4.1.6-.1.1-.1.1-.3.1-.4l-.5-1.3c1.1-.8 1.9-1.9 1.9-3.2zm-7.4.3c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8zm3.5 0c-.4 0-.8-.3-.8-.8s.3-.8.8-.8.8.3.8.8-.4.8-.8.8z"
                     />
                   </svg>
                 </span>
-                <span>{{ t('payment.wechat') }}</span>
+                <span>{{ paymentOptionLabel(option) }}</span>
               </button>
             </div>
-            <p v-if="availablePayMethods.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
+            <p v-if="paymentOptions.length === 0" class="text-sm text-amber-600 dark:text-amber-400">
               {{ t('payment.noPayMethodEnabled') }}
             </p>
 
@@ -322,7 +312,7 @@
                       {{ orderTypeLabel(o.order_type) }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
-                      {{ shouldShowChannel(o.order_type) ? channelLabel(o.channel || o.provider) : '-' }}
+                      {{ shouldShowChannel(o.order_type) ? orderChannelLabel(o) : '-' }}
                     </td>
                     <td class="px-5 py-4 text-sm text-gray-700 dark:text-dark-300">
                       ${{ o.total_usd.toFixed(2) }}
@@ -542,9 +532,12 @@ import InvoiceRequestModal from '@/components/user/InvoiceRequestModal.vue'
 import { useAppStore } from '@/stores'
 import {
   paymentAPI,
+  type PaymentChannelOption,
+  type PaymentCreateChannel,
   type PaymentOrder,
   type PaymentPayMethod,
   type PaymentPlan,
+  type PaymentProviderChannel,
   type PaymentSubscriptionPlan
 } from '@/api/payment'
 import { formatDateTime } from '@/utils/format'
@@ -569,7 +562,7 @@ const selectedKind = ref<'plan' | 'custom' | 'subscription' | null>(null)
 const selectedPlan = ref<PaymentPlan | null>(null)
 const selectedSubscriptionPlan = ref<PaymentSubscriptionPlan | null>(null)
 const customAmountUSDInput = ref('')
-const payMethod = ref<PaymentPayMethod | ''>('alipay')
+const payMethod = ref<PaymentCreateChannel | ''>('')
 const creatingOrder = ref(false)
 const checkoutOpen = ref(false)
 
@@ -600,26 +593,28 @@ const customAmountUSD = computed(() => {
   return Number.isFinite(parsed) ? parsed : 0
 })
 
-const availablePayMethods = computed<PaymentPayMethod[]>(() => {
-  const legacyDefaults: PaymentPayMethod[] = ['alipay', 'wechat']
-  const allChannelConfigs = [
-    ...plans.value.map((plan) => plan.available_channels),
-    ...subscriptionPlans.value.map((plan) => plan.available_channels)
+const paymentOptions = computed<PaymentChannelOption[]>(() => {
+  const explicitOptions = [
+    ...plans.value.flatMap((plan) => normalizePaymentChannelOptions(plan.available_channel_options)),
+    ...subscriptionPlans.value.flatMap((plan) => normalizePaymentChannelOptions(plan.available_channel_options))
   ]
-  if (allChannelConfigs.length === 0) return legacyDefaults
+  if (explicitOptions.length > 0) return dedupePaymentOptions(explicitOptions)
 
-  const hasExplicitChannels = allChannelConfigs.some((channels) => Array.isArray(channels))
-  if (!hasExplicitChannels) return legacyDefaults
+  const legacyMethods = [
+    ...plans.value.flatMap((plan) => normalizeLegacyPaymentMethods(plan.available_channels)),
+    ...subscriptionPlans.value.flatMap((plan) => normalizeLegacyPaymentMethods(plan.available_channels))
+  ]
+  return dedupePaymentOptions(
+    legacyMethods.map((method) => ({
+      provider: 'zpay',
+      method,
+      channel: `zpay_${method}` as PaymentProviderChannel
+    }))
+  )
+})
 
-  const enabled = new Set<PaymentPayMethod>()
-  for (const channels of allChannelConfigs) {
-    for (const channel of channels || []) {
-      if (channel === 'alipay' || channel === 'wechat') {
-        enabled.add(channel)
-      }
-    }
-  }
-  return legacyDefaults.filter((method) => enabled.has(method))
+const selectedPaymentOption = computed(() => {
+  return paymentOptions.value.find((option) => option.channel === payMethod.value) || null
 })
 
 const selectedAmountUSD = computed(() => {
@@ -669,9 +664,60 @@ const canPayNow = computed(() => {
   if (selectedKind.value === 'plan' && !selectedPlan.value) return false
   if (selectedKind.value === 'subscription' && !selectedSubscriptionPlan.value) return false
   if (selectedKind.value === 'custom' && !(customAmountUSD.value > 0)) return false
-  if (!payMethod.value) return false
+  if (!selectedPaymentOption.value) return false
   return true
 })
+
+function normalizePaymentProvider(provider: unknown): 'zpay' | 'stripe' | '' {
+  const value = String(provider || '').trim().toLowerCase()
+  return value === 'zpay' || value === 'stripe' ? value : ''
+}
+
+function normalizePaymentMethod(method: unknown): PaymentPayMethod | '' {
+  const value = String(method || '').trim().toLowerCase()
+  if (value === 'alipay' || value === 'zpay') return 'alipay'
+  if (value === 'wechat' || value === 'wxpay' || value === 'wechat_pay') return 'wechat'
+  return ''
+}
+
+function normalizePaymentChannelOptions(options?: PaymentChannelOption[]): PaymentChannelOption[] {
+  if (!Array.isArray(options)) return []
+  const out: PaymentChannelOption[] = []
+  for (const option of options) {
+    const provider = normalizePaymentProvider(option?.provider)
+    const method = normalizePaymentMethod(option?.method)
+    if (!provider || !method) continue
+    const channel = `${provider}_${method}` as PaymentProviderChannel
+    out.push({ provider, method, channel })
+  }
+  return out
+}
+
+function normalizeLegacyPaymentMethods(methods?: PaymentPayMethod[]): PaymentPayMethod[] {
+  if (!Array.isArray(methods)) return []
+  const out: PaymentPayMethod[] = []
+  for (const method of methods) {
+    const normalized = normalizePaymentMethod(method)
+    if (normalized) out.push(normalized)
+  }
+  return out
+}
+
+function dedupePaymentOptions(options: PaymentChannelOption[]): PaymentChannelOption[] {
+  const seen = new Set<string>()
+  const out: PaymentChannelOption[] = []
+  for (const option of options) {
+    if (seen.has(option.channel)) continue
+    seen.add(option.channel)
+    out.push(option)
+  }
+  return out
+}
+
+function paymentOptionLabel(option: PaymentChannelOption): string {
+  const methodLabel = option.method === 'alipay' ? t('payment.alipay') : t('payment.wechat')
+  return `${methodLabel}（${option.provider}）`
+}
 
 function isNotFoundError(error: unknown): boolean {
   const status = (error as { status?: number }).status
@@ -890,7 +936,7 @@ async function payNow() {
     appStore.showWarning(t('payment.selectAmount'))
     return
   }
-  if (!payMethod.value) {
+  if (!selectedPaymentOption.value) {
     appStore.showWarning(t('payment.noPayMethodEnabled'))
     return
   }
@@ -918,17 +964,17 @@ async function payNow() {
     if (selectedKind.value === 'custom') {
       resp = await paymentAPI.createPaymentOrder({
         amount_usd: customAmountUSD.value,
-        channel: payMethod.value as PaymentPayMethod
+        channel: payMethod.value as PaymentCreateChannel
       })
     } else if (selectedKind.value === 'subscription') {
       resp = await paymentAPI.createPaymentOrder({
         subscription_group_id: selectedSubscriptionPlan.value!.group_id,
-        channel: payMethod.value as PaymentPayMethod
+        channel: payMethod.value as PaymentCreateChannel
       })
     } else {
       resp = await paymentAPI.createPaymentOrder({
         plan_id: selectedPlan.value!.id,
-        channel: payMethod.value as PaymentPayMethod
+        channel: payMethod.value as PaymentCreateChannel
       })
     }
     appStore.showSuccess(t('payment.orderCreated') + ` (${resp.order.order_no})`)
@@ -971,14 +1017,14 @@ watch(
 )
 
 watch(
-  () => availablePayMethods.value,
-  (methods) => {
-    if (methods.length === 0) {
+  () => paymentOptions.value,
+  (options) => {
+    if (options.length === 0) {
       payMethod.value = ''
       return
     }
-    if (!payMethod.value || !methods.includes(payMethod.value as PaymentPayMethod)) {
-      payMethod.value = methods[0]
+    if (!payMethod.value || !options.some((option) => option.channel === payMethod.value)) {
+      payMethod.value = options[0].channel
     }
   },
   { immediate: true }
@@ -986,11 +1032,25 @@ watch(
 
 function channelLabel(channel: string): string {
   // 根据实际支付渠道返回标签
-  if (channel === 'alipay') return t('payment.alipay')
-  if (channel === 'wechat' || channel === 'wxpay') return t('payment.wechat')
+  const method = normalizePaymentMethod(channel)
+  if (method === 'alipay') return t('payment.alipay')
+  if (method === 'wechat') return t('payment.wechat')
   if (channel === 'admin') return t('payment.adminRecharge')
   if (channel === 'activity') return t('payment.activityRecharge')
   return channel
+}
+
+function orderChannelLabel(order: PaymentOrder): string {
+  const provider = normalizePaymentProvider(order.provider)
+  const method = normalizePaymentMethod(order.channel || order.provider)
+  if (provider && method) {
+    return paymentOptionLabel({
+      provider,
+      method,
+      channel: `${provider}_${method}` as PaymentProviderChannel
+    })
+  }
+  return channelLabel(order.channel || order.provider)
 }
 
 function shouldShowChannel(orderType?: string): boolean {

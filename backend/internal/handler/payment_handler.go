@@ -45,7 +45,7 @@ type createPaymentOrderRequest struct {
 	PlanID              string   `json:"plan_id"`
 	AmountUSD           *float64 `json:"amount_usd,omitempty"`
 	SubscriptionGroupID *int64   `json:"subscription_group_id,omitempty"`
-	Channel             string   `json:"channel" binding:"required,oneof=zpay stripe alipay wechat"`
+	Channel             string   `json:"channel" binding:"required"`
 }
 
 // GetPlans returns configured payment packages as "plans".
@@ -57,7 +57,8 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 	}
 
 	paymentCfg := h.cfg.Payment
-	availableChannels := h.availableUserPaymentChannels()
+	availableOptions := h.availableUserPaymentChannelOptions()
+	availableChannels := availableChannelsFromOptions(availableOptions)
 	discount := normalizedDiscountRate(paymentCfg.DiscountRate)
 	plans := make([]dto.PaymentPlan, 0, len(paymentCfg.Packages))
 	for i, pkg := range paymentCfg.Packages {
@@ -78,6 +79,7 @@ func (h *PaymentHandler) GetPlans(c *gin.Context) {
 			DiscountRate:      discount,
 			Enabled:           paymentCfg.Enabled,
 			AvailableChannels: append([]string(nil), availableChannels...),
+			AvailableOptions:  append([]dto.PaymentChannelOption(nil), availableOptions...),
 		})
 	}
 	response.Success(c, plans)
@@ -106,7 +108,8 @@ func (h *PaymentHandler) GetSubscriptionPlans(c *gin.Context) {
 	// Subscription billing should be "displayed USD amount = paid CNY amount".
 	// Keep exchange rate as 1 for subscription plan presentation.
 	exchangeRate := 1.0
-	availableChannels := h.availableUserPaymentChannels()
+	availableOptions := h.availableUserPaymentChannelOptions()
+	availableChannels := availableChannelsFromOptions(availableOptions)
 	out := make([]dto.PaymentSubscriptionPlan, 0, len(plans))
 	for i := range plans {
 		item := plans[i]
@@ -122,6 +125,7 @@ func (h *PaymentHandler) GetSubscriptionPlans(c *gin.Context) {
 			MonthlyLimitUSD:       item.MonthlyLimitUSD,
 			ExchangeRate:          exchangeRate,
 			AvailableChannels:     append([]string(nil), availableChannels...),
+			AvailableOptions:      append([]dto.PaymentChannelOption(nil), availableOptions...),
 			HasActiveSubscription: item.HasActiveSubscription,
 		})
 	}
@@ -154,12 +158,14 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "payment config is missing")
 		return
 	}
-	if !h.isCreateChannelEnabled(req.Channel) {
+	channelSelection, ok := h.resolveCreateChannel(req.Channel)
+	if !ok {
 		response.BadRequest(c, "payment channel is disabled")
 		return
 	}
 
-	channel := h.resolveCreateChannel(req.Channel)
+	provider := channelSelection.Provider
+	channel := channelSelection.Method
 
 	var amountCNY float64
 	bizType := service.PaymentBizTypeOnlineRecharge
@@ -213,8 +219,6 @@ func (h *PaymentHandler) CreateOrder(c *gin.Context) {
 		payUSD := (*req.AmountUSD) * discount
 		amountCNY = payUSD * h.cfg.Payment.ExchangeRate
 	}
-
-	provider := normalizePaymentProvider(channel)
 
 	order, err := h.paymentService.CreateOrder(c.Request.Context(), &service.CreatePaymentOrderRequest{
 		UserID:          subject.UserID,
@@ -366,88 +370,174 @@ func normalizedDiscountRate(discountRate float64) float64 {
 	return discountRate
 }
 
-func normalizePaymentProvider(channel string) string {
-	switch strings.ToLower(strings.TrimSpace(channel)) {
-	case "alipay", "wechat":
-		return "zpay"
-	default:
-		return strings.ToLower(strings.TrimSpace(channel))
-	}
+type createPaymentChannelSelection struct {
+	Provider string
+	Method   string
 }
 
-func (h *PaymentHandler) availableUserPaymentChannels() []string {
-	enabled := h.enabledUserPaymentChannelSet()
-	out := make([]string, 0, 2)
-	for _, channel := range []string{"alipay", "wechat"} {
-		if _, ok := enabled[channel]; ok {
-			out = append(out, channel)
-		}
-	}
-	return out
-}
-
-func (h *PaymentHandler) enabledUserPaymentChannelSet() map[string]struct{} {
-	out := make(map[string]struct{})
+func (h *PaymentHandler) availableUserPaymentChannelOptions() []dto.PaymentChannelOption {
 	if h == nil || h.cfg == nil {
-		return out
+		return nil
 	}
 	paymentCfg := h.cfg.Payment
-	if !paymentCfg.Enabled || !paymentCfg.Zpay.Enabled {
-		return out
+	if !paymentCfg.Enabled {
+		return nil
 	}
 
-	methods := parseCommaListLower(paymentCfg.Zpay.PaymentMethods)
-	if len(methods) == 0 {
-		// Keep historical behavior when payment_methods is not explicitly set.
-		out["alipay"] = struct{}{}
-		out["wechat"] = struct{}{}
-		return out
+	out := make([]dto.PaymentChannelOption, 0, 4)
+	if paymentCfg.Zpay.Enabled {
+		out = appendPaymentChannelOptions(out, "zpay", paymentCfg.Zpay.PaymentMethods, []string{"alipay", "wechat"})
+	}
+	if paymentCfg.Stripe.Enabled {
+		out = appendPaymentChannelOptions(out, "stripe", paymentCfg.Stripe.PaymentMethods, []string{"wechat"})
+	}
+	return out
+}
+
+func appendPaymentChannelOptions(out []dto.PaymentChannelOption, provider string, rawMethods string, fallbackMethods []string) []dto.PaymentChannelOption {
+	hasExplicitMethods := strings.TrimSpace(rawMethods) != ""
+	enabled := normalizePaymentMethodSet(rawMethods)
+	if len(enabled) == 0 && !hasExplicitMethods {
+		enabled = make(map[string]struct{}, len(fallbackMethods))
+		for _, method := range fallbackMethods {
+			if normalized := normalizeUserPaymentMethod(method); normalized != "" {
+				enabled[normalized] = struct{}{}
+			}
+		}
 	}
 
-	for _, method := range methods {
-		switch method {
-		case "alipay", "zpay":
-			out["alipay"] = struct{}{}
-		case "wechat", "wxpay", "wechat_pay":
-			out["wechat"] = struct{}{}
+	for _, method := range []string{"alipay", "wechat"} {
+		if _, ok := enabled[method]; !ok {
+			continue
+		}
+		out = append(out, dto.PaymentChannelOption{
+			Provider: provider,
+			Method:   method,
+			Channel:  provider + "_" + method,
+		})
+	}
+	return out
+}
+
+func availableChannelsFromOptions(options []dto.PaymentChannelOption) []string {
+	enabled := make(map[string]struct{}, 2)
+	for _, option := range options {
+		if option.Method == "alipay" || option.Method == "wechat" {
+			enabled[option.Method] = struct{}{}
+		}
+	}
+
+	out := make([]string, 0, 2)
+	for _, method := range []string{"alipay", "wechat"} {
+		if _, ok := enabled[method]; ok {
+			out = append(out, method)
 		}
 	}
 	return out
+}
+
+func normalizePaymentMethodSet(rawMethods string) map[string]struct{} {
+	methods := parseCommaListLower(rawMethods)
+	if len(methods) == 0 {
+		return nil
+	}
+
+	out := make(map[string]struct{}, len(methods))
+	for _, method := range methods {
+		if normalized := normalizeUserPaymentMethod(method); normalized != "" {
+			out[normalized] = struct{}{}
+		}
+	}
+	return out
+}
+
+func normalizeUserPaymentMethod(method string) string {
+	switch strings.ToLower(strings.TrimSpace(method)) {
+	case "alipay", "zpay":
+		return "alipay"
+	case "wechat", "wxpay", "wechat_pay":
+		return "wechat"
+	default:
+		return ""
+	}
 }
 
 func (h *PaymentHandler) isCreateChannelEnabled(channel string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(channel))
-	if h == nil || h.cfg == nil {
-		return false
-	}
-
-	switch normalized {
-	case "alipay", "wechat":
-		_, ok := h.enabledUserPaymentChannelSet()[normalized]
-		return ok
-	case "zpay":
-		return h.cfg.Payment.Zpay.Enabled && len(h.availableUserPaymentChannels()) > 0
-	case "stripe":
-		return h.cfg.Payment.Enabled && h.cfg.Payment.Stripe.Enabled
-	default:
-		return false
-	}
+	_, ok := h.resolveCreateChannel(channel)
+	return ok
 }
 
-func (h *PaymentHandler) resolveCreateChannel(channel string) string {
+func (h *PaymentHandler) resolveCreateChannel(channel string) (createPaymentChannelSelection, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(channel))
-	if normalized != "zpay" {
-		return normalized
+	if normalized == "" {
+		return createPaymentChannelSelection{}, false
 	}
 
-	enabled := h.enabledUserPaymentChannelSet()
-	if _, ok := enabled["alipay"]; ok {
-		return "alipay"
+	options := h.availableUserPaymentChannelOptions()
+	if len(options) == 0 {
+		return createPaymentChannelSelection{}, false
 	}
-	if _, ok := enabled["wechat"]; ok {
-		return "wechat"
+
+	if normalized == "zpay" || normalized == "stripe" {
+		for _, option := range options {
+			if option.Provider == normalized {
+				return createPaymentChannelSelection{Provider: option.Provider, Method: option.Method}, true
+			}
+		}
+		return createPaymentChannelSelection{}, false
 	}
-	return normalized
+
+	if method := normalizeUserPaymentMethod(normalized); method != "" {
+		// Preserve legacy alipay/wechat payloads as ZPay selections when available,
+		// then fall back to another enabled provider for old clients reading
+		// available_channels from a Stripe-only configuration.
+		if selection, ok := findPaymentChannelOption(options, "zpay", method); ok {
+			return selection, true
+		}
+		return findFirstPaymentChannelOptionByMethod(options, method)
+	}
+
+	provider, method, ok := splitProviderMethodChannel(normalized)
+	if !ok {
+		return createPaymentChannelSelection{}, false
+	}
+	return findPaymentChannelOption(options, provider, method)
+}
+
+func findPaymentChannelOption(options []dto.PaymentChannelOption, provider string, method string) (createPaymentChannelSelection, bool) {
+	for _, option := range options {
+		if option.Provider == provider && option.Method == method {
+			return createPaymentChannelSelection{Provider: option.Provider, Method: option.Method}, true
+		}
+	}
+	return createPaymentChannelSelection{}, false
+}
+
+func findFirstPaymentChannelOptionByMethod(options []dto.PaymentChannelOption, method string) (createPaymentChannelSelection, bool) {
+	for _, option := range options {
+		if option.Method == method {
+			return createPaymentChannelSelection{Provider: option.Provider, Method: option.Method}, true
+		}
+	}
+	return createPaymentChannelSelection{}, false
+}
+
+func splitProviderMethodChannel(channel string) (string, string, bool) {
+	parts := strings.FieldsFunc(channel, func(r rune) bool {
+		return r == '_' || r == ':' || r == '-'
+	})
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	provider := strings.ToLower(strings.TrimSpace(parts[0]))
+	if provider != "zpay" && provider != "stripe" {
+		return "", "", false
+	}
+	method := normalizeUserPaymentMethod(parts[1])
+	if method == "" {
+		return "", "", false
+	}
+	return provider, method, true
 }
 
 func parseCommaListLower(raw string) []string {

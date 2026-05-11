@@ -17,8 +17,16 @@ import type {
 } from '@/types/payment'
 
 export type PaymentChannel = 'zpay' | 'stripe' | 'admin' | 'activity'
+export type UserPaymentProvider = 'zpay' | 'stripe'
 export type PaymentPayMethod = 'alipay' | 'wechat'
-export type PaymentCreateChannel = PaymentChannel | PaymentPayMethod
+export type PaymentProviderChannel = `${UserPaymentProvider}_${PaymentPayMethod}`
+export type PaymentCreateChannel = PaymentChannel | PaymentPayMethod | PaymentProviderChannel
+
+export interface PaymentChannelOption {
+  provider: UserPaymentProvider
+  method: PaymentPayMethod
+  channel: PaymentProviderChannel
+}
 
 export interface PaymentPlan {
   id: string
@@ -29,6 +37,7 @@ export interface PaymentPlan {
   exchange_rate: number
   discount_rate: number
   available_channels?: PaymentPayMethod[]
+  available_channel_options?: PaymentChannelOption[]
   description?: string
   enabled?: boolean
 }
@@ -45,6 +54,7 @@ export interface PaymentSubscriptionPlan {
   monthly_limit_usd?: number | null
   exchange_rate: number
   available_channels?: PaymentPayMethod[]
+  available_channel_options?: PaymentChannelOption[]
   has_active_subscription?: boolean
 }
 
