@@ -122,6 +122,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 	// Password reset requires email verification to be enabled
 	emailVerifyEnabled := settings[SettingKeyEmailVerifyEnabled] == "true"
 	passwordResetEnabled := emailVerifyEnabled && settings[SettingKeyPasswordResetEnabled] == "true"
+	// Public payment_enabled currently reflects the legacy config/env payment
+	// stack, not the DB-backed SettingPaymentEnabled. See docs/PAYMENT_LINEAGE_CN.md.
 	paymentEnabled := s.cfg != nil && s.cfg.Payment.Enabled
 
 	return &PublicSettings{

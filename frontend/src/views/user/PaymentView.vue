@@ -532,6 +532,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import FirstRechargePromotion from '@/components/FirstRechargePromotion.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
@@ -551,6 +552,7 @@ import QRCode from 'qrcode'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const router = useRouter()
 
 const loadingPlans = ref(false)
 const plansUnavailable = ref(false)
@@ -710,6 +712,20 @@ function estimatePayCNY(usd: number, rate?: number, discount?: number): number {
   if (!(resolvedRate > 0)) return 0
   if (!(resolvedDiscount > 0 && resolvedDiscount <= 1)) return usd * resolvedRate
   return usd * resolvedRate * resolvedDiscount
+}
+
+async function ensurePaymentPageEnabled(): Promise<boolean> {
+  let paymentEnabled = appStore.cachedPublicSettings?.payment_enabled
+  if (typeof paymentEnabled !== 'boolean' && typeof appStore.fetchPublicSettings === 'function') {
+    const settings = await appStore.fetchPublicSettings()
+    paymentEnabled = settings?.payment_enabled
+  }
+  if (paymentEnabled === false) {
+    appStore.showWarning(t('payment.serviceUnavailableHint'))
+    await router.replace('/dashboard')
+    return false
+  }
+  return true
 }
 
 async function loadPlans() {
@@ -1033,7 +1049,8 @@ async function copyOrderNo(orderNo: string) {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  if (!(await ensurePaymentPageEnabled())) return
   loadPlans()
   loadSubscriptionPlans()
   loadOrders()

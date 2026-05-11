@@ -281,7 +281,8 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'Payment',
       titleKey: 'payment.title',
-      descriptionKey: 'payment.description'
+      descriptionKey: 'payment.description',
+      requiresPayment: true
     }
   },
   {
@@ -721,7 +722,12 @@ function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: bo
   return false
 }
 
-router.beforeEach((to, _from, next) => {
+async function resolvePaymentEnabledForRoute(appStore: ReturnType<typeof useAppStore>): Promise<boolean> {
+  const settings = appStore.cachedPublicSettings ?? await appStore.fetchPublicSettings()
+  return settings?.payment_enabled === true || appStore.cachedPublicSettings?.payment_enabled === true
+}
+
+router.beforeEach(async (to, _from, next) => {
   // 开始导航加载状态
   navigationLoading.startNavigation()
 
@@ -802,7 +808,7 @@ router.beforeEach((to, _from, next) => {
 
   // Check payment requirement (internal payment system only)
   if (to.meta.requiresPayment) {
-    const paymentEnabled = appStore.cachedPublicSettings?.payment_enabled
+    const paymentEnabled = await resolvePaymentEnabledForRoute(appStore)
     if (!paymentEnabled) {
       next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
       return

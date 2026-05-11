@@ -13,6 +13,10 @@ import (
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
+// DB-backed payment-v2 settings.
+// Lineage: erio introduced this stack in 63d1860d, merged via PR #1572 from
+// touwaeriol/feat/payment-system-v2. Do not confuse SettingPaymentEnabled with
+// config.PaymentConfig.Enabled; see docs/PAYMENT_LINEAGE_CN.md.
 const (
 	SettingPaymentEnabled      = "payment_enabled"
 	SettingMinRechargeAmount   = "MIN_RECHARGE_AMOUNT"

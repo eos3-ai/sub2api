@@ -1324,6 +1324,10 @@ type DingtalkBotConfig struct {
 	DefaultRemark    string `mapstructure:"default_remark"`
 }
 
+// PaymentConfig is the legacy config/env-backed payment stack.
+// Lineage: zhaoyapeng introduced it in 284ff0a7d; Claude Code later
+// adjusted env-driven user channel toggles in 4cfe1559. See
+// docs/PAYMENT_LINEAGE_CN.md before wiring new payment enable checks to it.
 type PaymentConfig struct {
 	Enabled            bool             `mapstructure:"enabled"`
 	BaseURL            string           `mapstructure:"base_url"`

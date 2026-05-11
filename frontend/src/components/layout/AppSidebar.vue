@@ -170,6 +170,7 @@ const siteName = computed(() => appStore.siteName)
 const siteLogo = computed(() => appStore.siteLogo)
 const siteVersion = computed(() => appStore.siteVersion)
 const settingsLoaded = computed(() => appStore.publicSettingsLoaded)
+const paymentMenuVisible = computed(() => appStore.cachedPublicSettings?.payment_enabled !== false)
 
 // SVG Icon Components
 const DashboardIcon = {
@@ -461,7 +462,9 @@ const userNavItems = computed(() => {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/group-monitor', label: t('nav.groupMonitor'), icon: ChartIcon, hideInSimpleMode: true },
-    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
+    ...(paymentMenuVisible.value
+      ? [{ path: '/payment', label: t('nav.payment'), icon: CreditCardIcon }]
+      : []),
     { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
     { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -489,7 +492,9 @@ const personalNavItems = computed(() => {
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
     { path: '/group-monitor', label: t('nav.groupMonitor'), icon: ChartIcon, hideInSimpleMode: true },
-    { path: '/payment', label: t('nav.payment'), icon: CreditCardIcon },
+    ...(paymentMenuVisible.value
+      ? [{ path: '/payment', label: t('nav.payment'), icon: CreditCardIcon }]
+      : []),
     { path: '/invoices', label: t('nav.invoices'), icon: CreditCardIcon },
     { path: '/referral', label: t('nav.referral'), icon: UsersIcon, hideInSimpleMode: true },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
