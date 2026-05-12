@@ -749,7 +749,7 @@ router.beforeEach(async (to, _from, next) => {
     const menuItem = publicItems.find((item) => item.id === id)
       ?? (authStore.isBackoffice ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
-      const siteName = appStore.siteName || 'Sub2API'
+      const siteName = appStore.siteName || 'TokenCloud'
       document.title = `${menuItem.label} - ${siteName}`
     } else {
       document.title = resolveDocumentTitle(to.meta.title, appStore.siteName, to.meta.titleKey as string)
