@@ -424,14 +424,17 @@ function mountView() {
   });
 }
 
-async function openPaymentTab(wrapper: ReturnType<typeof mountView>) {
+async function openPaymentSection(wrapper: ReturnType<typeof mountView>) {
+  (wrapper.vm as { activeTab: string }).activeTab = "payment";
+  await flushPromises();
+}
+
+async function assertPaymentTabHidden(wrapper: ReturnType<typeof mountView>) {
   const paymentTabButton = wrapper
     .findAll("button")
     .find((node) => node.text().includes("admin.settings.tabs.payment"));
 
-  expect(paymentTabButton).toBeDefined();
-  await paymentTabButton?.trigger("click");
-  await flushPromises();
+  expect(paymentTabButton).toBeUndefined();
 }
 
 async function openSecurityTab(wrapper: ReturnType<typeof mountView>) {
@@ -543,7 +546,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPaymentSection(wrapper);
 
     expect(wrapper.text()).not.toContain("可见方式");
     expect(wrapper.text()).not.toContain("支付来源");
@@ -553,7 +556,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPaymentSection(wrapper);
 
     const paymentLinks = wrapper
       .findAll("a")
@@ -577,7 +580,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPaymentSection(wrapper);
     await wrapper.find("form").trigger("submit.prevent");
     await flushPromises();
 
@@ -644,7 +647,7 @@ describe("admin SettingsView payment visible method controls", () => {
     });
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPaymentSection(wrapper);
     await wrapper.get(".provider-toggle-stub").trigger("click");
     await flushPromises();
 
@@ -668,7 +671,7 @@ describe("admin SettingsView payment visible method controls", () => {
     const wrapper = mountView();
 
     await flushPromises();
-    await openPaymentTab(wrapper);
+    await openPaymentSection(wrapper);
 
     const imageUploads = wrapper.findAll(".image-upload-stub");
     expect(imageUploads.length).toBeGreaterThan(0);
@@ -680,6 +683,13 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(paymentHelpImageUpload).toBeDefined();
     expect(paymentHelpImageUpload?.attributes("data-upload-label")).toBe("上传图片");
     expect(paymentHelpImageUpload?.attributes("data-remove-label")).toBe("移除");
+  });
+
+  it("hides the payment tab from the settings tab bar", async () => {
+    const wrapper = mountView();
+
+    await flushPromises();
+    await assertPaymentTabHidden(wrapper);
   });
 });
 
