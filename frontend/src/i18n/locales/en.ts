@@ -6468,7 +6468,9 @@ export default {
     createOrder: 'Confirm Payment',
     methods: {
       easypay: 'EasyPay',
+      admin: 'Admin Adjustment',
       alipay: 'Alipay',
+      wechat: 'WeChat Pay',
       wxpay: 'WeChat Pay',
       stripe: 'Stripe',
       airwallex: 'Airwallex',

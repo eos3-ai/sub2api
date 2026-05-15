@@ -6653,7 +6653,9 @@ export default {
     createOrder: '确认支付',
     methods: {
       easypay: '易支付',
+      admin: '管理员调整',
       alipay: '支付宝',
+      wechat: '微信支付',
       wxpay: '微信支付',
       stripe: 'Stripe',
       airwallex: 'Airwallex',

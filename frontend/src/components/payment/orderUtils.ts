@@ -28,7 +28,27 @@ export function canRefund(status: string): boolean {
   return REFUNDABLE_STATUSES.includes(status)
 }
 
-export function formatOrderDateTime(dateStr: string): string {
+export function toFiniteOrderNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value.trim())
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+  return fallback
+}
+
+export function formatOrderAmount(value: unknown, fractionDigits = 2): string {
+  return toFiniteOrderNumber(value).toFixed(fractionDigits)
+}
+
+export function orderAmountsDiffer(left: unknown, right: unknown): boolean {
+  return Math.abs(toFiniteOrderNumber(left) - toFiniteOrderNumber(right)) > 0.000001
+}
+
+export function formatOrderDateTime(dateStr?: string | null): string {
   if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString()
+  const date = new Date(dateStr)
+  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
