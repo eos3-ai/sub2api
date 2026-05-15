@@ -316,6 +316,7 @@ import {
   validatePromoCode,
   validateInvitationCode
 } from '@/api/auth'
+import { reportOcpcEvent } from '@/api/tracking'
 import { buildAuthErrorMessage } from '@/utils/authError'
 import {
   isRegistrationEmailSuffixAllowed,
@@ -367,6 +368,7 @@ const loginAgreementRevision = ref<string>('')
 const loginAgreementDocuments = ref<LoginAgreementDocument[]>([])
 const agreementAccepted = ref<boolean>(false)
 const showAgreementModal = ref<boolean>(false)
+const ocpcLandingNewType = ref<number>(1)
 
 // Turnstile
 const turnstileRef = ref<InstanceType<typeof TurnstileWidget> | null>(null)
@@ -470,6 +472,7 @@ onMounted(async () => {
     registrationEmailSuffixWhitelist.value = normalizeRegistrationEmailSuffixWhitelist(
       settings.registration_email_suffix_whitelist || []
     )
+    ocpcLandingNewType.value = settings.baidu_ocpc_landing_new_type || 1
     applyLoginAgreementSettings(settings)
 
     // Read promo code from URL parameter only if promo code is enabled
@@ -489,6 +492,10 @@ onMounted(async () => {
   } finally {
     settingsLoaded.value = true
   }
+
+  reportOcpcEvent(ocpcLandingNewType.value).catch((error) => {
+    console.warn('Failed to report Baidu OCPC landing event:', error)
+  })
 })
 
 watch(

@@ -16,6 +16,7 @@ func RegisterAdminRoutes(
 ) {
 	admin := v1.Group("/admin")
 	admin.Use(gin.HandlerFunc(adminAuth))
+	admin.Use(middleware.RequireAdminPermission())
 	{
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
@@ -95,8 +96,23 @@ func RegisterAdminRoutes(
 		// 风控中心
 		registerContentModerationRoutes(admin, h)
 
+		// 发票管理
+		registerInvoiceRoutes(admin, h)
+
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+	}
+}
+
+func registerInvoiceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	invoices := admin.Group("/invoices")
+	{
+		invoices.GET("", h.Admin.Invoice.List)
+		invoices.GET("/export", h.Admin.Invoice.Export)
+		invoices.GET("/:id", h.Admin.Invoice.GetByID)
+		invoices.POST("/:id/approve", h.Admin.Invoice.Approve)
+		invoices.POST("/:id/reject", h.Admin.Invoice.Reject)
+		invoices.POST("/:id/issue", h.Admin.Invoice.Issue)
 	}
 }
 
@@ -424,6 +440,9 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		adminSettings.GET("/admin-api-key", h.Admin.Setting.GetAdminAPIKey)
 		adminSettings.POST("/admin-api-key/regenerate", h.Admin.Setting.RegenerateAdminAPIKey)
 		adminSettings.DELETE("/admin-api-key", h.Admin.Setting.DeleteAdminAPIKey)
+		adminSettings.GET("/admin-api-key-readonly", h.Admin.Setting.GetAdminAPIKeyReadOnly)
+		adminSettings.POST("/admin-api-key-readonly/regenerate", h.Admin.Setting.RegenerateAdminAPIKeyReadOnly)
+		adminSettings.DELETE("/admin-api-key-readonly", h.Admin.Setting.DeleteAdminAPIKeyReadOnly)
 		// 529过载冷却配置
 		adminSettings.GET("/overload-cooldown", h.Admin.Setting.GetOverloadCooldownSettings)
 		adminSettings.PUT("/overload-cooldown", h.Admin.Setting.UpdateOverloadCooldownSettings)

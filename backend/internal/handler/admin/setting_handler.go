@@ -2651,6 +2651,46 @@ func (h *SettingHandler) DeleteAdminAPIKey(c *gin.Context) {
 	response.Success(c, gin.H{"message": "Admin API key deleted"})
 }
 
+// GetAdminAPIKeyReadOnly 获取只读管理员 API Key 状态
+// GET /api/v1/admin/settings/admin-api-key-readonly
+func (h *SettingHandler) GetAdminAPIKeyReadOnly(c *gin.Context) {
+	maskedKey, exists, err := h.settingService.GetAdminAPIKeyReadOnlyStatus(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"exists":     exists,
+		"masked_key": maskedKey,
+	})
+}
+
+// RegenerateAdminAPIKeyReadOnly 生成/重新生成只读管理员 API Key
+// POST /api/v1/admin/settings/admin-api-key-readonly/regenerate
+func (h *SettingHandler) RegenerateAdminAPIKeyReadOnly(c *gin.Context) {
+	key, err := h.settingService.GenerateAdminAPIKeyReadOnly(c.Request.Context())
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{
+		"key": key,
+	})
+}
+
+// DeleteAdminAPIKeyReadOnly 删除只读管理员 API Key
+// DELETE /api/v1/admin/settings/admin-api-key-readonly
+func (h *SettingHandler) DeleteAdminAPIKeyReadOnly(c *gin.Context) {
+	if err := h.settingService.DeleteAdminAPIKeyReadOnly(c.Request.Context()); err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"message": "Read-only Admin API key deleted"})
+}
+
 // GetOverloadCooldownSettings 获取529过载冷却配置
 // GET /api/v1/admin/settings/overload-cooldown
 func (h *SettingHandler) GetOverloadCooldownSettings(c *gin.Context) {

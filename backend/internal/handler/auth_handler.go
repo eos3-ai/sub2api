@@ -49,6 +49,8 @@ type RegisterRequest struct {
 	PromoCode      string `json:"promo_code"`      // 注册优惠码
 	InvitationCode string `json:"invitation_code"` // 邀请码
 	AffCode        string `json:"aff_code"`        // 邀请返利码
+	BdVid          string `json:"bd_vid"`          // 百度广告 vid
+	BdLandingURL   string `json:"bd_landing_url"`  // 百度落地页 URL
 }
 
 // SendVerifyCodeRequest 发送验证码请求
@@ -68,6 +70,8 @@ type LoginRequest struct {
 	Email          string `json:"email" binding:"required,email"`
 	Password       string `json:"password" binding:"required"`
 	TurnstileToken string `json:"turnstile_token"`
+	BdVid          string `json:"bd_vid"`         // 百度广告 vid
+	BdLandingURL   string `json:"bd_landing_url"` // 百度落地页 URL
 }
 
 // AuthResponse 认证响应格式（匹配前端期望）
@@ -179,6 +183,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingURL, service.GetBaiduOcpcRegisterNewType())
 	h.respondWithTokenPair(c, user)
 }
 
@@ -255,6 +260,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	h.authService.RecordSuccessfulLogin(c.Request.Context(), user.ID)
 
+	service.ReportBaiduOcpcEvent(req.BdVid, req.BdLandingURL, service.GetBaiduOcpcLoginNewType())
 	h.respondWithTokenPair(c, user)
 }
 

@@ -272,6 +272,8 @@ type PublicSettings struct {
 	SoraClientEnabled                bool                     `json:"sora_client_enabled"`
 	BackendModeEnabled               bool                     `json:"backend_mode_enabled"`
 	PaymentEnabled                   bool                     `json:"payment_enabled"`
+	BaiduTongjiID                    string                   `json:"baidu_tongji_id,omitempty"`
+	BaiduOcpcLandingNewType          int                      `json:"baidu_ocpc_landing_new_type,omitempty"`
 	Version                          string                   `json:"version"`
 	BalanceLowNotifyEnabled          bool                     `json:"balance_low_notify_enabled"`
 	AccountQuotaNotifyEnabled        bool                     `json:"account_quota_notify_enabled"`

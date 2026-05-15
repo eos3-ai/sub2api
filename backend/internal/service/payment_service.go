@@ -116,6 +116,18 @@ type OrderListParams struct {
 	OrderType   string
 	PaymentType string
 	Keyword     string
+	From        *time.Time
+	To          *time.Time
+}
+
+type AdminPaymentOrderSummary struct {
+	TotalOrders       int     `json:"total_orders"`
+	PaidOrders        int     `json:"paid_orders"`
+	RefundedOrders    int     `json:"refunded_orders"`
+	AmountTotal       float64 `json:"amount_total"`
+	PayAmountTotal    float64 `json:"pay_amount_total"`
+	RefundAmountTotal float64 `json:"refund_amount_total"`
+	NetPayAmountTotal float64 `json:"net_pay_amount_total"`
 }
 
 type RefundPlan struct {

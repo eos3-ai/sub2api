@@ -2,8 +2,10 @@
 package middleware
 
 import (
+	"context"
 	"crypto/subtle"
 	"errors"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -21,9 +23,10 @@ func NewAdminAuthMiddleware(
 }
 
 // adminAuth 管理员认证中间件实现
-// 支持两种认证方式（通过不同的 header 区分）：
-// 1. Admin API Key: x-api-key: <admin-api-key>
-// 2. JWT Token: Authorization: Bearer <jwt-token> (需要管理员角色)
+// 支持三种认证方式：
+// 1. Admin API Key（读写）: x-api-key: <admin-api-key>
+// 2. Admin API Key（只读）: x-api-key: <admin-api-key-read-only>（仅 GET 白名单）
+// 3. JWT Token: Authorization: Bearer <jwt-token> (需要后台角色：admin/sales)
 func adminAuth(
 	authService *service.AuthService,
 	userService *service.UserService,
@@ -115,6 +118,58 @@ func extractJWTFromWebSocketSubprotocol(c *gin.Context) string {
 	return ""
 }
 
+type adminAPIKeyAccess int
+
+const (
+	adminAPIKeyAccessReadWrite adminAPIKeyAccess = iota
+	adminAPIKeyAccessReadOnly
+)
+
+func isReadOnlyAdminAPIKeyMethod(method string) bool {
+	return method == http.MethodGet
+}
+
+var readOnlyAdminAPIKeyAllowlist = map[string]struct{}{
+	"/api/v1/admin/users/export":           {},
+	"/api/v1/admin/usage/export":           {},
+	"/api/v1/admin/payment/orders/export":  {},
+	"/api/v1/admin/invoices/export":        {},
+	"/api/v1/admin/usage":                  {},
+	"/api/v1/admin/payment/orders/summary": {},
+}
+
+func isReadOnlyAdminAPIKeyAllowedPath(rawPath string) bool {
+	path := strings.TrimSpace(rawPath)
+	if path != "" && path != "/" {
+		path = strings.TrimRight(path, "/")
+	}
+	_, ok := readOnlyAdminAPIKeyAllowlist[path]
+	return ok
+}
+
+func matchAdminAPIKeyAccess(ctx context.Context, key string, settingService *service.SettingService) (adminAPIKeyAccess, bool, error) {
+	if settingService == nil {
+		return adminAPIKeyAccessReadWrite, false, nil
+	}
+
+	storedKeyReadWrite, err := settingService.GetAdminAPIKey(ctx)
+	if err != nil {
+		return adminAPIKeyAccessReadWrite, false, err
+	}
+	storedKeyReadOnly, err := settingService.GetAdminAPIKeyReadOnly(ctx)
+	if err != nil {
+		return adminAPIKeyAccessReadWrite, false, err
+	}
+
+	if storedKeyReadWrite != "" && subtle.ConstantTimeCompare([]byte(key), []byte(storedKeyReadWrite)) == 1 {
+		return adminAPIKeyAccessReadWrite, true, nil
+	}
+	if storedKeyReadOnly != "" && subtle.ConstantTimeCompare([]byte(key), []byte(storedKeyReadOnly)) == 1 {
+		return adminAPIKeyAccessReadOnly, true, nil
+	}
+	return adminAPIKeyAccessReadWrite, false, nil
+}
+
 // validateAdminAPIKey 验证管理员 API Key
 func validateAdminAPIKey(
 	c *gin.Context,
@@ -122,16 +177,23 @@ func validateAdminAPIKey(
 	settingService *service.SettingService,
 	userService *service.UserService,
 ) bool {
-	storedKey, err := settingService.GetAdminAPIKey(c.Request.Context())
+	access, matched, err := matchAdminAPIKeyAccess(c.Request.Context(), key, settingService)
 	if err != nil {
 		AbortWithError(c, 500, "INTERNAL_ERROR", "Internal server error")
 		return false
 	}
 
 	// 未配置或不匹配，统一返回相同错误（避免信息泄露）
-	if storedKey == "" || subtle.ConstantTimeCompare([]byte(key), []byte(storedKey)) != 1 {
+	if !matched {
 		AbortWithError(c, 401, "INVALID_ADMIN_KEY", "Invalid admin API key")
 		return false
+	}
+
+	if access == adminAPIKeyAccessReadOnly {
+		if !isReadOnlyAdminAPIKeyMethod(c.Request.Method) || !isReadOnlyAdminAPIKeyAllowedPath(c.Request.URL.Path) {
+			AbortWithError(c, 403, "ADMIN_API_KEY_READ_ONLY", "Admin API key is read-only")
+			return false
+		}
 	}
 
 	// 获取真实的管理员用户
@@ -150,7 +212,7 @@ func validateAdminAPIKey(
 	return true
 }
 
-// validateJWTForAdmin 验证 JWT 并检查管理员权限
+// validateJWTForAdmin 验证 JWT 并检查后台角色权限（admin/sales）
 func validateJWTForAdmin(
 	c *gin.Context,
 	token string,
@@ -187,9 +249,9 @@ func validateJWTForAdmin(
 		return false
 	}
 
-	// 检查管理员权限
-	if !user.IsAdmin() {
-		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
+	// 检查后台权限
+	if !IsBackofficeRole(user.Role) {
+		AbortWithError(c, 403, "FORBIDDEN", "Backoffice access required")
 		return false
 	}
 

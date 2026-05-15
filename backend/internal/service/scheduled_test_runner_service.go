@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,6 +12,14 @@ import (
 )
 
 const scheduledTestDefaultMaxWorkers = 10
+
+const (
+	scheduledTestExtraAutoDisabledKey    = "scheduled_test_auto_disabled"
+	scheduledTestExtraDisabledAtKey      = "scheduled_test_disabled_at"
+	scheduledTestExtraDisabledReasonKey  = "scheduled_test_disabled_reason"
+	scheduledTestExtraRecoveredAtKey     = "scheduled_test_recovered_at"
+	scheduledTestExtraRecoveredReasonKey = "scheduled_test_recovered_reason"
+)
 
 // ScheduledTestRunnerService periodically scans due test plans and executes them.
 type ScheduledTestRunnerService struct {
@@ -105,6 +114,10 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 
 	sem := make(chan struct{}, scheduledTestDefaultMaxWorkers)
 	var wg sync.WaitGroup
+	var resultMu sync.Mutex
+	failedAccountIDs := make(map[int64]struct{})
+	failedReasons := make(map[int64]string)
+	succeededAccountIDs := make(map[int64]struct{})
 
 	for _, plan := range plans {
 		sem <- struct{}{}
@@ -112,38 +125,61 @@ func (s *ScheduledTestRunnerService) runScheduled() {
 		go func(p *ScheduledTestPlan) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			s.runOnePlan(ctx, p)
+			abnormal, reason := s.runOnePlan(ctx, p)
+			resultMu.Lock()
+			defer resultMu.Unlock()
+			if abnormal {
+				failedAccountIDs[p.AccountID] = struct{}{}
+				if reason != "" {
+					failedReasons[p.AccountID] = reason
+				}
+				return
+			}
+			succeededAccountIDs[p.AccountID] = struct{}{}
 		}(plan)
 	}
 
 	wg.Wait()
+	s.applyScheduledTestSchedulableState(ctx, failedAccountIDs, failedReasons, succeededAccountIDs, time.Now())
 }
 
-func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan) {
+func (s *ScheduledTestRunnerService) runOnePlan(ctx context.Context, plan *ScheduledTestPlan) (bool, string) {
 	result, err := s.accountTestSvc.RunTestBackground(ctx, plan.AccountID, plan.ModelID)
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground error: %v", plan.ID, err)
-		return
+		return true, strings.TrimSpace(err.Error())
+	}
+	if result == nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d RunTestBackground returned nil result", plan.ID)
+		return true, "scheduled test returned nil result"
 	}
 
 	if err := s.scheduledSvc.SaveResult(ctx, plan.ID, plan.MaxResults, result); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d SaveResult error: %v", plan.ID, err)
 	}
+	isAbnormal := !strings.EqualFold(result.Status, "success")
 
 	// Auto-recover account if test succeeded and auto_recover is enabled.
-	if result.Status == "success" && plan.AutoRecover {
+	if !isAbnormal && plan.AutoRecover {
 		s.tryRecoverAccount(ctx, plan.AccountID, plan.ID)
 	}
 
 	nextRun, err := computeNextRun(plan.CronExpression, time.Now())
 	if err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d computeNextRun error: %v", plan.ID, err)
-		return
+		if isAbnormal {
+			return true, scheduledTestFailureReason(result)
+		}
+		return false, ""
 	}
 
 	if err := s.planRepo.UpdateAfterRun(ctx, plan.ID, time.Now(), nextRun); err != nil {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d UpdateAfterRun error: %v", plan.ID, err)
 	}
+	if isAbnormal {
+		return true, scheduledTestFailureReason(result)
+	}
+	return false, ""
 }
 
 // tryRecoverAccount attempts to recover an account from recoverable runtime state.
@@ -167,4 +203,98 @@ func (s *ScheduledTestRunnerService) tryRecoverAccount(ctx context.Context, acco
 	if recovery.ClearedRateLimit {
 		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] plan=%d auto-recover: account=%d cleared rate-limit/runtime state", planID, accountID)
 	}
+}
+
+func (s *ScheduledTestRunnerService) applyScheduledTestSchedulableState(
+	ctx context.Context,
+	failedAccountIDs map[int64]struct{},
+	failedReasons map[int64]string,
+	succeededAccountIDs map[int64]struct{},
+	now time.Time,
+) {
+	if s == nil || s.accountTestSvc == nil || s.accountTestSvc.accountRepo == nil {
+		return
+	}
+	for accountID := range failedAccountIDs {
+		s.tryAutoDisableSchedulableAccount(ctx, accountID, failedReasons[accountID], now)
+	}
+	for accountID := range succeededAccountIDs {
+		if _, failed := failedAccountIDs[accountID]; failed {
+			continue
+		}
+		s.tryAutoResumeSchedulableAccount(ctx, accountID, now)
+	}
+}
+
+func (s *ScheduledTestRunnerService) tryAutoDisableSchedulableAccount(ctx context.Context, accountID int64, reason string, now time.Time) {
+	account, err := s.accountTestSvc.accountRepo.GetByID(ctx, accountID)
+	if err != nil || account == nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-disable get account failed: account=%d err=%v", accountID, err)
+		return
+	}
+	if !account.Schedulable {
+		return
+	}
+
+	if err := s.accountTestSvc.accountRepo.SetSchedulable(ctx, accountID, false); err != nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-disable schedulable failed: account=%d err=%v", accountID, err)
+		return
+	}
+	updates := map[string]any{
+		scheduledTestExtraAutoDisabledKey:    true,
+		scheduledTestExtraDisabledAtKey:      now.Format(time.RFC3339),
+		scheduledTestExtraDisabledReasonKey:  scheduledTestDisableReason(reason),
+		scheduledTestExtraRecoveredAtKey:     nil,
+		scheduledTestExtraRecoveredReasonKey: nil,
+	}
+	if err := s.accountTestSvc.accountRepo.UpdateExtra(ctx, accountID, updates); err != nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-disable update extra failed: account=%d err=%v", accountID, err)
+	}
+	logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-disabled account scheduling: account=%d", accountID)
+}
+
+func (s *ScheduledTestRunnerService) tryAutoResumeSchedulableAccount(ctx context.Context, accountID int64, now time.Time) {
+	account, err := s.accountTestSvc.accountRepo.GetByID(ctx, accountID)
+	if err != nil || account == nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-resume get account failed: account=%d err=%v", accountID, err)
+		return
+	}
+	if account.Schedulable || !account.getExtraBool(scheduledTestExtraAutoDisabledKey) {
+		return
+	}
+
+	if err := s.accountTestSvc.accountRepo.SetSchedulable(ctx, accountID, true); err != nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-resume schedulable failed: account=%d err=%v", accountID, err)
+		return
+	}
+	updates := map[string]any{
+		scheduledTestExtraAutoDisabledKey:    false,
+		scheduledTestExtraRecoveredAtKey:     now.Format(time.RFC3339),
+		scheduledTestExtraRecoveredReasonKey: "scheduled test recovered",
+	}
+	if err := s.accountTestSvc.accountRepo.UpdateExtra(ctx, accountID, updates); err != nil {
+		logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-resume update extra failed: account=%d err=%v", accountID, err)
+	}
+	logger.LegacyPrintf("service.scheduled_test_runner", "[ScheduledTestRunner] auto-resumed account scheduling: account=%d", accountID)
+}
+
+func scheduledTestFailureReason(result *ScheduledTestResult) string {
+	if result == nil {
+		return "scheduled test failed"
+	}
+	if msg := strings.TrimSpace(result.ErrorMessage); msg != "" {
+		return msg
+	}
+	if status := strings.TrimSpace(result.Status); !strings.EqualFold(status, "success") && status != "" {
+		return "scheduled test status=" + status
+	}
+	return "scheduled test failed"
+}
+
+func scheduledTestDisableReason(reason string) string {
+	reason = strings.TrimSpace(reason)
+	if reason == "" {
+		reason = "scheduled test failed"
+	}
+	return truncateString(reason, 1500)
 }

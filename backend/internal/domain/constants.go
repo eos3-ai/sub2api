@@ -13,7 +13,10 @@ const (
 // Role constants
 const (
 	RoleAdmin = "admin"
+	RoleSales = "sales"
 	RoleUser  = "user"
+	// RoleOperator is kept as a source-level alias for legacy dev code.
+	RoleOperator = RoleSales
 )
 
 // Platform constants

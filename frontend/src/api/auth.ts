@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './client'
+import { getBdLandingUrl, getBdVid } from '@/utils/baiduTracking'
 import type {
   LoginRequest,
   RegisterRequest,
@@ -20,6 +21,18 @@ import type {
  * Login response type - can be either full auth or 2FA required
  */
 export type LoginResponse = AuthResponse | TotpLoginResponse
+
+function withBaiduTracking<T extends LoginRequest | RegisterRequest>(
+  payload: T
+): T & { bd_vid?: string; bd_landing_url?: string } {
+  const bdVid = getBdVid()
+  const bdLandingUrl = getBdLandingUrl()
+  return {
+    ...payload,
+    ...(bdVid ? { bd_vid: bdVid } : {}),
+    ...(bdLandingUrl ? { bd_landing_url: bdLandingUrl } : {})
+  }
+}
 
 /**
  * Type guard to check if login response requires 2FA
@@ -89,7 +102,7 @@ export function clearAuthToken(): void {
  * @returns Authentication response with token and user data, or 2FA required response
  */
 export async function login(credentials: LoginRequest): Promise<LoginResponse> {
-  const { data } = await apiClient.post<LoginResponse>('/auth/login', credentials)
+  const { data } = await apiClient.post<LoginResponse>('/auth/login', withBaiduTracking(credentials))
 
   // Only store token if 2FA is not required
   if (!isTotp2FARequired(data)) {
@@ -133,7 +146,7 @@ export async function login2FA(request: TotpLogin2FARequest): Promise<AuthRespon
  * @returns Authentication response with token and user data
  */
 export async function register(userData: RegisterRequest): Promise<AuthResponse> {
-  const { data } = await apiClient.post<AuthResponse>('/auth/register', userData)
+  const { data } = await apiClient.post<AuthResponse>('/auth/register', withBaiduTracking(userData))
 
   // Store token and user data
   setAuthToken(data.access_token)

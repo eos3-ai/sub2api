@@ -49,6 +49,30 @@ export interface UpdatePaymentConfigRequest {
   help_text?: string
 }
 
+export interface AdminPaymentOrderSummary {
+  total_orders: number
+  paid_orders: number
+  refunded_orders: number
+  amount_total: number
+  pay_amount_total: number
+  refund_amount_total: number
+  net_pay_amount_total: number
+}
+
+export interface AdminPaymentOrderFilters {
+  page?: number
+  page_size?: number
+  status?: string
+  payment_type?: string
+  user_id?: number
+  keyword?: string
+  from?: string
+  to?: string
+  start_date?: string
+  end_date?: string
+  order_type?: string
+}
+
 export const adminPaymentAPI = {
   // ==================== Config ====================
 
@@ -74,18 +98,21 @@ export const adminPaymentAPI = {
   // ==================== Orders ====================
 
   /** Get all orders (paginated, with filters) */
-  getOrders(params?: {
-    page?: number
-    page_size?: number
-    status?: string
-    payment_type?: string
-    user_id?: number
-    keyword?: string
-    start_date?: string
-    end_date?: string
-    order_type?: string
-  }) {
+  getOrders(params?: AdminPaymentOrderFilters) {
     return apiClient.get<BasePaginationResponse<PaymentOrder>>('/admin/payment/orders', { params })
+  },
+
+  /** Get aggregate values for the current order filters */
+  getOrderSummary(params?: Omit<AdminPaymentOrderFilters, 'page' | 'page_size'>) {
+    return apiClient.get<AdminPaymentOrderSummary>('/admin/payment/orders/summary', { params })
+  },
+
+  /** Export orders as CSV */
+  exportOrders(params?: Omit<AdminPaymentOrderFilters, 'page' | 'page_size' | 'start_date' | 'end_date'>) {
+    return apiClient.get<Blob>('/admin/payment/orders/export', {
+      params,
+      responseType: 'blob'
+    })
   },
 
   /** Get a specific order by ID */

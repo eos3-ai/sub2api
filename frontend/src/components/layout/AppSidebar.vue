@@ -24,7 +24,7 @@
     <!-- Navigation -->
     <nav class="sidebar-nav scrollbar-hide">
       <!-- Admin View: Admin menu first, then personal menu -->
-      <template v-if="isAdmin">
+      <template v-if="isBackoffice">
         <!-- Admin Section -->
         <div class="sidebar-section">
           <template v-for="item in adminNavItems" :key="item.path">
@@ -235,7 +235,7 @@ const adminSettingsStore = useAdminSettingsStore()
 
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
-const isAdmin = computed(() => authStore.isAdmin)
+const isBackoffice = computed(() => authStore.isBackoffice)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
 // Track which parent nav groups are expanded
@@ -667,11 +667,13 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/model-pricing', label: t('nav.modelPricing'), icon: PriceTagIcon, hideInSimpleMode: true },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
     { path: '/purchase', label: t('nav.buySubscription'), icon: RechargeSubscriptionIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/orders', label: t('nav.myOrders'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagPayment },
+    { path: '/invoices', label: t('nav.myInvoices'), icon: OrderIcon, hideInSimpleMode: true, featureFlag: flagPayment },
     { path: '/redeem', label: t('nav.redeem'), icon: GiftIcon, hideInSimpleMode: true },
     { path: '/affiliate', label: t('nav.affiliate'), icon: UsersIcon, hideInSimpleMode: true, featureFlag: flagAffiliate },
     { path: '/profile', label: t('nav.profile'), icon: UserIcon },
@@ -764,10 +766,11 @@ const adminNavItems = computed((): NavItem[] => {
         { path: '/admin/orders/plans', label: t('nav.paymentPlans'), icon: CreditCardIcon },
       ],
     },
+    { path: '/admin/invoices', label: t('nav.invoiceManagement'), icon: OrderListIcon, hideInSimpleMode: true, featureFlag: flagAdminPayment },
     { path: '/admin/usage', label: t('nav.usage'), icon: ChartIcon }
   ]
 
-  const visible = applyFeatureFlags(baseItems)
+  const visible = authStore.isAdmin ? applyFeatureFlags(baseItems) : filterSalesAdminNav(applyFeatureFlags(baseItems))
 
   // 简单模式下，在系统设置前插入 API密钥
   if (authStore.isSimpleMode) {
@@ -786,6 +789,25 @@ const adminNavItems = computed((): NavItem[] => {
   }
   return visible
 })
+
+const salesAdminPaths = new Set(['/admin/dashboard', '/admin/users', '/admin/orders', '/admin/usage', '/admin/invoices'])
+
+function filterSalesAdminNav(items: NavItem[]): NavItem[] {
+  const out: NavItem[] = []
+  for (const item of items) {
+    if (item.children?.length) {
+      const children = item.children.filter((child) => salesAdminPaths.has(child.path))
+      if (children.length > 0) {
+        out.push({ ...item, children })
+      }
+      continue
+    }
+    if (salesAdminPaths.has(item.path)) {
+      out.push(item)
+    }
+  }
+  return out
+}
 
 function toggleSidebar() {
   appStore.toggleSidebar()
@@ -876,7 +898,7 @@ if (
 
 // Fetch admin settings (for feature-gated nav items like Ops).
 watch(
-  isAdmin,
+  isBackoffice,
   (v) => {
     if (v) {
       adminSettingsStore.fetch()
@@ -886,7 +908,7 @@ watch(
 )
 
 onMounted(() => {
-  if (isAdmin.value) {
+  if (isBackoffice.value) {
     adminSettingsStore.fetch()
   }
 })

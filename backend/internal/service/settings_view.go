@@ -241,6 +241,8 @@ type PublicSettings struct {
 	WeChatOAuthMobileEnabled bool
 	BackendModeEnabled       bool
 	PaymentEnabled           bool
+	BaiduTongjiID            string
+	BaiduOcpcLandingNewType  int
 	OIDCOAuthEnabled         bool
 	OIDCOAuthProviderName    string
 	GitHubOAuthEnabled       bool

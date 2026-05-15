@@ -20,6 +20,11 @@ declare module 'vue-router' {
     requiresAdmin?: boolean
 
     /**
+     * Explicit role allowlist for backoffice routes.
+     */
+    allowedRoles?: Array<'admin' | 'sales' | 'user'>
+
+    /**
      * Page title for this route
      */
     title?: string

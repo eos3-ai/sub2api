@@ -1,7 +1,12 @@
 package admin
 
 import (
+	"bytes"
+	"encoding/csv"
+	"fmt"
 	"strconv"
+	"strings"
+	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -55,6 +60,10 @@ func (h *PaymentHandler) ListOrders(c *gin.Context) {
 			userID = v
 		}
 	}
+	from, to, ok := parseOrderTimeRange(c)
+	if !ok {
+		return
+	}
 	orders, total, err := h.paymentService.AdminListOrders(c.Request.Context(), userID, service.OrderListParams{
 		Page:        page,
 		PageSize:    pageSize,
@@ -62,12 +71,107 @@ func (h *PaymentHandler) ListOrders(c *gin.Context) {
 		OrderType:   c.Query("order_type"),
 		PaymentType: c.Query("payment_type"),
 		Keyword:     c.Query("keyword"),
+		From:        from,
+		To:          to,
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Paginated(c, sanitizeAdminPaymentOrdersForResponse(orders), int64(total), page, pageSize)
+}
+
+// OrderSummary returns aggregate values for admin payment order filters.
+// GET /api/v1/admin/payment/orders/summary
+func (h *PaymentHandler) OrderSummary(c *gin.Context) {
+	var userID int64
+	if uid := c.Query("user_id"); uid != "" {
+		if v, err := strconv.ParseInt(uid, 10, 64); err == nil {
+			userID = v
+		}
+	}
+	from, to, ok := parseOrderTimeRange(c)
+	if !ok {
+		return
+	}
+	summary, err := h.paymentService.AdminOrderSummary(c.Request.Context(), userID, service.OrderListParams{
+		Status:      c.Query("status"),
+		OrderType:   c.Query("order_type"),
+		PaymentType: c.Query("payment_type"),
+		Keyword:     c.Query("keyword"),
+		From:        from,
+		To:          to,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, summary)
+}
+
+// ExportOrders exports payment orders as CSV.
+// GET /api/v1/admin/payment/orders/export
+func (h *PaymentHandler) ExportOrders(c *gin.Context) {
+	var userID int64
+	if uid := c.Query("user_id"); uid != "" {
+		if v, err := strconv.ParseInt(uid, 10, 64); err == nil {
+			userID = v
+		}
+	}
+	from, to, ok := parseOrderTimeRange(c)
+	if !ok {
+		return
+	}
+	orders, err := h.paymentService.AdminExportOrders(c.Request.Context(), userID, service.OrderListParams{
+		Status:      c.Query("status"),
+		OrderType:   c.Query("order_type"),
+		PaymentType: c.Query("payment_type"),
+		Keyword:     c.Query("keyword"),
+		From:        from,
+		To:          to,
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString("\xEF\xBB\xBF")
+	w := csv.NewWriter(&buf)
+	_ = w.Write([]string{
+		"id", "out_trade_no", "user_id", "user_email", "amount", "pay_amount", "currency",
+		"payment_type", "order_type", "status", "created_at", "paid_at", "completed_at",
+		"refund_amount", "provider_instance_id",
+	})
+	for _, order := range orders {
+		_ = w.Write([]string{
+			csvSafeInt(order.ID),
+			csvSafe(order.OutTradeNo),
+			csvSafeInt(order.UserID),
+			csvSafe(order.UserEmail),
+			csvSafeFloat(order.Amount),
+			csvSafeFloat(order.PayAmount),
+			csvSafe(service.PaymentOrderCurrency(order)),
+			csvSafe(order.PaymentType),
+			csvSafe(order.OrderType),
+			csvSafe(order.Status),
+			csvSafeTime(&order.CreatedAt),
+			csvSafeTime(order.PaidAt),
+			csvSafeTime(order.CompletedAt),
+			csvSafeFloat(order.RefundAmount),
+			csvSafeStringPtr(order.ProviderInstanceID),
+		})
+	}
+	w.Flush()
+	if err := w.Error(); err != nil {
+		response.InternalError(c, "failed to export orders")
+		return
+	}
+
+	filename := "payment_orders_" + time.Now().UTC().Format("20060102_150405") + ".csv"
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	c.Data(200, "text/csv; charset=utf-8", buf.Bytes())
 }
 
 // GetOrderDetail returns detailed information about a single order.
@@ -133,6 +237,78 @@ func sanitizeAdminPaymentOrderForResponse(order *dbent.PaymentOrder) *dbent.Paym
 	cloned := *order
 	cloned.ProviderSnapshot = nil
 	return &cloned
+}
+
+func parseOrderTimeRange(c *gin.Context) (*time.Time, *time.Time, bool) {
+	from, ok := parseOptionalOrderTime(c, "from", false)
+	if !ok {
+		return nil, nil, false
+	}
+	to, ok := parseOptionalOrderTime(c, "to", true)
+	if !ok {
+		return nil, nil, false
+	}
+	return from, to, true
+}
+
+func parseOptionalOrderTime(c *gin.Context, key string, endOfDay bool) (*time.Time, bool) {
+	raw := strings.TrimSpace(c.Query(key))
+	if raw == "" {
+		switch key {
+		case "from":
+			raw = strings.TrimSpace(c.Query("start_date"))
+		case "to":
+			raw = strings.TrimSpace(c.Query("end_date"))
+		}
+	}
+	if raw == "" {
+		return nil, true
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return &t, true
+	}
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		if endOfDay {
+			t = t.Add(24*time.Hour - time.Nanosecond)
+		}
+		return &t, true
+	}
+	response.BadRequest(c, "Invalid "+key+" time")
+	return nil, false
+}
+
+func csvSafe(value string) string {
+	if value == "" {
+		return ""
+	}
+	switch value[0] {
+	case '=', '+', '-', '@', '\t', '\r':
+		return "'" + value
+	default:
+		return value
+	}
+}
+
+func csvSafeStringPtr(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return csvSafe(*value)
+}
+
+func csvSafeInt(value int64) string {
+	return strconv.FormatInt(value, 10)
+}
+
+func csvSafeFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', 2, 64)
+}
+
+func csvSafeTime(value *time.Time) string {
+	if value == nil || value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339)
 }
 
 // AdminProcessRefundRequest is the request body for admin refund processing.

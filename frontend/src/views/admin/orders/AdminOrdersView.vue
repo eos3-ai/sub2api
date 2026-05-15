@@ -10,11 +10,24 @@
           <Select v-model="orderFilters.status" :options="statusFilterOptions" class="w-36" @change="loadOrders" />
           <Select v-model="orderFilters.payment_type" :options="paymentTypeFilterOptions" class="w-40" @change="loadOrders" />
           <Select v-model="orderFilters.order_type" :options="orderTypeFilterOptions" class="w-36" @change="loadOrders" />
+          <input v-model="orderFilters.from" type="date" class="input w-40" @change="loadOrders" />
+          <input v-model="orderFilters.to" type="date" class="input w-40" @change="loadOrders" />
           <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
+            <button @click="exportOrders" :disabled="ordersLoading || exportingOrders" class="btn btn-secondary">
+              <Icon name="download" size="md" />
+              {{ exportingOrders ? t('common.loading') : t('common.export') }}
+            </button>
             <button @click="loadOrders" :disabled="ordersLoading" class="btn btn-secondary" :title="t('common.refresh')">
               <Icon name="refresh" size="md" :class="ordersLoading ? 'animate-spin' : ''" />
             </button>
           </div>
+        </div>
+      </div>
+
+      <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" :class="orderSummaryLoading ? 'opacity-70' : ''">
+        <div v-for="card in orderSummaryCards" :key="card.key" class="card p-4">
+          <p class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">{{ card.label }}</p>
+          <p class="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{{ card.value }}</p>
         </div>
       </div>
 
@@ -26,26 +39,26 @@
               <Icon name="eye" size="sm" />
               {{ t('common.view') }}
             </button>
-            <button v-if="row.status === 'PENDING'" @click="handleCancelOrder(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
+            <button v-if="isAdmin && row.status === 'PENDING'" @click="handleCancelOrder(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-yellow-600 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
               <Icon name="x" size="sm" />
               {{ t('payment.orders.cancel') }}
             </button>
-            <button v-if="row.status === 'FAILED'" @click="handleRetryOrder(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">
+            <button v-if="isAdmin && row.status === 'FAILED'" @click="handleRetryOrder(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20">
               <Icon name="refresh" size="sm" />
               {{ t('payment.admin.retry') }}
             </button>
-            <template v-if="row.status === 'REFUND_REQUESTED'">
+            <template v-if="isAdmin && row.status === 'REFUND_REQUESTED'">
               <span v-if="row.refund_amount" class="rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">{{ row.order_type === 'balance' ? '$' : '¥' }}{{ row.refund_amount.toFixed(2) }}</span>
               <button @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
                 <Icon name="check" size="sm" />
                 {{ t('payment.admin.approveRefund') }}
               </button>
             </template>
-            <button v-else-if="row.status === 'REFUND_FAILED'" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
+            <button v-else-if="isAdmin && row.status === 'REFUND_FAILED'" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20">
               <Icon name="refresh" size="sm" />
               {{ t('payment.admin.retryRefund') }}
             </button>
-            <button v-else-if="row.status === 'COMPLETED' || row.status === 'PARTIALLY_REFUNDED'" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
+            <button v-else-if="isAdmin && (row.status === 'COMPLETED' || row.status === 'PARTIALLY_REFUNDED')" @click="openRefundDialog(row)" class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20">
               <Icon name="dollar" size="sm" />
               {{ t('payment.admin.refund') }}
             </button>
@@ -115,7 +128,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
-import { adminPaymentAPI } from '@/api/admin/payment'
+import { useAuthStore } from '@/stores/auth'
+import { adminPaymentAPI, type AdminPaymentOrderFilters, type AdminPaymentOrderSummary } from '@/api/admin/payment'
 import { extractI18nErrorMessage } from '@/utils/apiError'
 import { formatOrderDateTime } from '@/components/payment/orderUtils'
 import type { PaymentOrder } from '@/types/payment'
@@ -138,12 +152,17 @@ interface AuditLog {
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const isAdmin = computed(() => authStore.isAdmin)
 
 const ordersLoading = ref(false)
+const exportingOrders = ref(false)
+const orderSummaryLoading = ref(false)
 const orders = ref<PaymentOrder[]>([])
 const orderSearch = ref('')
-const orderFilters = reactive({ status: '', payment_type: '', order_type: '' })
+const orderFilters = reactive({ status: '', payment_type: '', order_type: '', from: '', to: '' })
 const orderPagination = reactive({ page: 1, page_size: 20, total: 0 })
+const orderSummary = ref<AdminPaymentOrderSummary>(emptyOrderSummary())
 const selectedOrder = ref<PaymentOrder | null>(null)
 const showDetailDialog = ref(false)
 const showRefundDialog = ref(false)
@@ -156,14 +175,42 @@ function debounceLoadOrders() {
   debounceTimer = setTimeout(() => loadOrders(), 300)
 }
 
+function emptyOrderSummary(): AdminPaymentOrderSummary {
+  return {
+    total_orders: 0,
+    paid_orders: 0,
+    refunded_orders: 0,
+    amount_total: 0,
+    pay_amount_total: 0,
+    refund_amount_total: 0,
+    net_pay_amount_total: 0,
+  }
+}
+
+function buildOrderFilters(): Omit<AdminPaymentOrderFilters, 'page' | 'page_size' | 'start_date' | 'end_date'> {
+  return {
+    keyword: orderSearch.value || undefined,
+    status: orderFilters.status || undefined,
+    payment_type: orderFilters.payment_type || undefined,
+    order_type: orderFilters.order_type || undefined,
+    from: orderFilters.from || undefined,
+    to: orderFilters.to || undefined,
+  }
+}
+
+function buildOrderListParams(): AdminPaymentOrderFilters {
+  return {
+    page: orderPagination.page,
+    page_size: orderPagination.page_size,
+    ...buildOrderFilters(),
+  }
+}
+
 async function loadOrders() {
   ordersLoading.value = true
+  void loadOrderSummary()
   try {
-    const res = await adminPaymentAPI.getOrders({
-      page: orderPagination.page, page_size: orderPagination.page_size,
-      keyword: orderSearch.value || undefined, status: orderFilters.status || undefined,
-      payment_type: orderFilters.payment_type || undefined, order_type: orderFilters.order_type || undefined,
-    })
+    const res = await adminPaymentAPI.getOrders(buildOrderListParams())
     orders.value = res.data.items || []
     orderPagination.total = res.data.total || 0
   } catch (err: unknown) {
@@ -171,8 +218,52 @@ async function loadOrders() {
   } finally { ordersLoading.value = false }
 }
 
+async function loadOrderSummary() {
+  orderSummaryLoading.value = true
+  try {
+    const res = await adminPaymentAPI.getOrderSummary(buildOrderFilters())
+    orderSummary.value = { ...emptyOrderSummary(), ...res.data }
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    orderSummaryLoading.value = false
+  }
+}
+
 function handleOrderPageChange(page: number) { orderPagination.page = page; loadOrders() }
 function handleOrderPageSizeChange(size: number) { orderPagination.page_size = size; orderPagination.page = 1; loadOrders() }
+
+async function exportOrders() {
+  exportingOrders.value = true
+  try {
+    const res = await adminPaymentAPI.exportOrders(buildOrderFilters())
+    const blob = res.data
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `payment_orders_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (err: unknown) {
+    appStore.showError(extractI18nErrorMessage(err, t, 'payment.errors', t('common.error')))
+  } finally {
+    exportingOrders.value = false
+  }
+}
+
+function formatMoney(value: number): string {
+  return `¥${Number(value || 0).toFixed(2)}`
+}
+
+const orderSummaryCards = computed(() => [
+  { key: 'total_orders', label: t('payment.admin.summaryTotalOrders'), value: orderSummary.value.total_orders.toLocaleString() },
+  { key: 'paid_orders', label: t('payment.admin.summaryPaidOrders'), value: orderSummary.value.paid_orders.toLocaleString() },
+  { key: 'pay_amount', label: t('payment.admin.summaryPayAmount'), value: formatMoney(orderSummary.value.pay_amount_total) },
+  { key: 'refund_amount', label: t('payment.admin.summaryRefundAmount'), value: formatMoney(orderSummary.value.refund_amount_total) },
+  { key: 'net_amount', label: t('payment.admin.summaryNetAmount'), value: formatMoney(orderSummary.value.net_pay_amount_total) },
+])
 
 const statusFilterOptions = computed(() => [
   { value: '', label: t('payment.admin.allStatuses') },

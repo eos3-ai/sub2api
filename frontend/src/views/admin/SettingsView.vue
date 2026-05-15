@@ -198,6 +198,60 @@
               </div>
             </div>
           </div>
+
+          <div class="card">
+            <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                只读 Admin API Key
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                仅允许访问白名单 GET 导出接口，适合外部报表或只读集成。
+              </p>
+            </div>
+            <div class="space-y-4 p-6">
+              <div v-if="adminApiKeyReadOnlyLoading" class="flex items-center gap-2 text-gray-500">
+                <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></div>
+                {{ t("common.loading") }}
+              </div>
+              <div v-else-if="!adminApiKeyReadOnlyExists" class="flex items-center justify-between">
+                <span class="text-gray-500 dark:text-gray-400">未配置只读 Key</span>
+                <button type="button" class="btn btn-primary btn-sm" :disabled="adminApiKeyReadOnlyOperating" @click="createAdminApiKeyReadOnly">
+                  {{ adminApiKeyReadOnlyOperating ? t("admin.settings.adminApiKey.creating") : t("admin.settings.adminApiKey.create") }}
+                </button>
+              </div>
+              <div v-else class="space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">当前只读 Key</label>
+                    <code class="rounded bg-gray-100 px-2 py-1 font-mono text-sm text-gray-900 dark:bg-dark-700 dark:text-gray-100">
+                      {{ adminApiKeyReadOnlyMasked }}
+                    </code>
+                  </div>
+                  <div class="flex gap-2">
+                    <button type="button" class="btn btn-secondary btn-sm" :disabled="adminApiKeyReadOnlyOperating" @click="regenerateAdminApiKeyReadOnly">
+                      {{ adminApiKeyReadOnlyOperating ? t("admin.settings.adminApiKey.regenerating") : t("admin.settings.adminApiKey.regenerate") }}
+                    </button>
+                    <button type="button" class="btn btn-secondary btn-sm text-red-600 hover:text-red-700 dark:text-red-400" :disabled="adminApiKeyReadOnlyOperating" @click="deleteAdminApiKeyReadOnly">
+                      {{ t("admin.settings.adminApiKey.delete") }}
+                    </button>
+                  </div>
+                </div>
+                <div v-if="newAdminApiKeyReadOnly" class="space-y-3 rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-900/20">
+                  <p class="text-sm font-medium text-green-700 dark:text-green-300">
+                    {{ t("admin.settings.adminApiKey.keyWarning") }}
+                  </p>
+                  <div class="flex items-center gap-2">
+                    <code class="flex-1 select-all break-all rounded border border-green-300 bg-white px-3 py-2 font-mono text-sm dark:border-green-700 dark:bg-dark-800">
+                      {{ newAdminApiKeyReadOnly }}
+                    </code>
+                    <button type="button" class="btn btn-primary btn-sm flex-shrink-0" @click="copyNewReadOnlyKey">
+                      {{ t("admin.settings.adminApiKey.copyKey") }}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <!-- /Tab: Security — Admin API Key -->
 
@@ -6288,6 +6342,11 @@ const adminApiKeyExists = ref(false);
 const adminApiKeyMasked = ref("");
 const adminApiKeyOperating = ref(false);
 const newAdminApiKey = ref("");
+const adminApiKeyReadOnlyLoading = ref(true);
+const adminApiKeyReadOnlyExists = ref(false);
+const adminApiKeyReadOnlyMasked = ref("");
+const adminApiKeyReadOnlyOperating = ref(false);
+const newAdminApiKeyReadOnly = ref("");
 const subscriptionGroups = ref<AdminGroup[]>([]);
 
 // Overload Cooldown (529) 状态
@@ -7952,6 +8011,67 @@ function copyNewKey() {
     });
 }
 
+async function loadAdminApiKeyReadOnly() {
+  adminApiKeyReadOnlyLoading.value = true;
+  try {
+    const status = await adminAPI.settings.getAdminApiKeyReadOnly();
+    adminApiKeyReadOnlyExists.value = status.exists;
+    adminApiKeyReadOnlyMasked.value = status.masked_key;
+  } catch (_error: unknown) {
+    // Silent fail - admin API key status is non-critical
+  } finally {
+    adminApiKeyReadOnlyLoading.value = false;
+  }
+}
+
+async function createAdminApiKeyReadOnly() {
+  adminApiKeyReadOnlyOperating.value = true;
+  try {
+    const result = await adminAPI.settings.regenerateAdminApiKeyReadOnly();
+    newAdminApiKeyReadOnly.value = result.key;
+    adminApiKeyReadOnlyExists.value = true;
+    adminApiKeyReadOnlyMasked.value =
+      result.key.substring(0, 13) + "..." + result.key.slice(-4);
+    appStore.showSuccess(t("admin.settings.adminApiKey.keyGenerated"));
+  } catch (error: unknown) {
+    appStore.showError(extractApiErrorMessage(error, t("common.error")));
+  } finally {
+    adminApiKeyReadOnlyOperating.value = false;
+  }
+}
+
+async function regenerateAdminApiKeyReadOnly() {
+  if (!confirm(t("admin.settings.adminApiKey.regenerateConfirm"))) return;
+  await createAdminApiKeyReadOnly();
+}
+
+async function deleteAdminApiKeyReadOnly() {
+  if (!confirm(t("admin.settings.adminApiKey.deleteConfirm"))) return;
+  adminApiKeyReadOnlyOperating.value = true;
+  try {
+    await adminAPI.settings.deleteAdminApiKeyReadOnly();
+    adminApiKeyReadOnlyExists.value = false;
+    adminApiKeyReadOnlyMasked.value = "";
+    newAdminApiKeyReadOnly.value = "";
+    appStore.showSuccess(t("admin.settings.adminApiKey.keyDeleted"));
+  } catch (error: unknown) {
+    appStore.showError(extractApiErrorMessage(error, t("common.error")));
+  } finally {
+    adminApiKeyReadOnlyOperating.value = false;
+  }
+}
+
+function copyNewReadOnlyKey() {
+  navigator.clipboard
+    .writeText(newAdminApiKeyReadOnly.value)
+    .then(() => {
+      appStore.showSuccess(t("admin.settings.adminApiKey.keyCopied"));
+    })
+    .catch(() => {
+      appStore.showError(t("common.copyFailed"));
+    });
+}
+
 // Overload Cooldown 方法
 async function loadOverloadCooldownSettings() {
   overloadCooldownLoading.value = true;
@@ -8632,6 +8752,7 @@ onMounted(() => {
   loadSettings();
   loadSubscriptionGroups();
   loadAdminApiKey();
+  loadAdminApiKeyReadOnly();
   loadOverloadCooldownSettings();
   loadRateLimit429CooldownSettings();
   loadStreamTimeoutSettings();

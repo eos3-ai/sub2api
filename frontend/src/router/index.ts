@@ -244,6 +244,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/model-pricing',
+    name: 'ModelPricing',
+    component: () => import('@/views/user/ModelPricingView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Model Pricing',
+      titleKey: 'modelPricing.title',
+      descriptionKey: 'modelPricing.description'
+    }
+  },
+  {
     path: '/subscriptions',
     name: 'Subscriptions',
     component: () => import('@/views/user/SubscriptionsView.vue'),
@@ -277,6 +289,19 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: false,
       title: 'My Orders',
       titleKey: 'nav.myOrders',
+      requiresPayment: true
+    }
+  },
+  {
+    path: '/invoices',
+    name: 'Invoices',
+    component: () => import('@/views/user/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'My Invoices',
+      titleKey: 'nav.myInvoices',
+      descriptionKey: 'invoice.description',
       requiresPayment: true
     }
   },
@@ -363,6 +388,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowedRoles: ['admin', 'sales'],
       title: 'Admin Dashboard',
       titleKey: 'admin.dashboard.title',
       descriptionKey: 'admin.dashboard.description'
@@ -387,6 +413,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowedRoles: ['admin', 'sales'],
       title: 'User Management',
       titleKey: 'admin.users.title',
       descriptionKey: 'admin.users.description'
@@ -547,6 +574,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowedRoles: ['admin', 'sales'],
       title: 'Usage Records',
       titleKey: 'admin.usage.title',
       descriptionKey: 'admin.usage.description'
@@ -614,6 +642,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowedRoles: ['admin', 'sales'],
       title: 'Order Management',
       titleKey: 'nav.orderManagement',
       requiresPayment: true
@@ -628,6 +657,20 @@ const routes: RouteRecordRaw[] = [
       requiresAdmin: true,
       title: 'Subscription Plans',
       titleKey: 'nav.paymentPlans',
+      requiresPayment: true
+    }
+  },
+  {
+    path: '/admin/invoices',
+    name: 'AdminInvoices',
+    component: () => import('@/views/admin/InvoicesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      allowedRoles: ['admin', 'sales'],
+      title: 'Invoice Management',
+      titleKey: 'nav.invoiceManagement',
+      descriptionKey: 'invoice.adminDescription',
       requiresPayment: true
     }
   },
@@ -714,7 +757,7 @@ router.beforeEach((to, _from, next) => {
     const publicItems = appStore.cachedPublicSettings?.custom_menu_items ?? []
     const adminSettingsStore = useAdminSettingsStore()
     const menuItem = publicItems.find((item) => item.id === id)
-      ?? (authStore.isAdmin ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
+      ?? (authStore.isBackoffice ? adminSettingsStore.customMenuItems.find((item) => item.id === id) : undefined)
     if (menuItem?.label) {
       const siteName = appStore.siteName || 'Sub2API'
       document.title = `${menuItem.label} - ${siteName}`
@@ -735,12 +778,12 @@ router.beforeEach((to, _from, next) => {
     if (authStore.isAuthenticated && (to.path === '/login' || to.path === '/register')) {
       // In backend mode, non-admin users should NOT be redirected away from login
       // (they are blocked from all protected routes, so redirecting would cause a loop)
-      if (appStore.backendModeEnabled && !authStore.isAdmin) {
+      if (appStore.backendModeEnabled && !authStore.isBackoffice) {
         next()
         return
       }
       // Admin users go to admin dashboard, regular users go to user dashboard
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
       return
     }
     // Backend mode: block public pages for unauthenticated users (except login, key-usage, setup)
@@ -766,10 +809,13 @@ router.beforeEach((to, _from, next) => {
   }
 
   // Check admin requirement
-  if (requiresAdmin && !authStore.isAdmin) {
-    // User is authenticated but not admin, redirect to user dashboard
-    next('/dashboard')
-    return
+  if (requiresAdmin) {
+    const role = authStore.user?.role
+    const allowedRoles = (to.meta.allowedRoles as Array<'admin' | 'sales' | 'user'> | undefined) ?? ['admin']
+    if (!role || !allowedRoles.includes(role)) {
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
+      return
+    }
   }
 
 
@@ -777,7 +823,7 @@ router.beforeEach((to, _from, next) => {
   if (to.meta.requiresPayment) {
     const paymentEnabled = appStore.cachedPublicSettings?.payment_enabled
     if (!paymentEnabled) {
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
@@ -802,14 +848,14 @@ router.beforeEach((to, _from, next) => {
 
     if (restrictedPaths.some((path) => to.path.startsWith(path))) {
       // 简易模式下访问受限页面,重定向到仪表板
-      next(authStore.isAdmin ? '/admin/dashboard' : '/dashboard')
+      next(authStore.isBackoffice ? '/admin/dashboard' : '/dashboard')
       return
     }
   }
 
   // Backend mode: admin gets full access, non-admin blocked
   if (appStore.backendModeEnabled) {
-    if (authStore.isAuthenticated && authStore.isAdmin) {
+    if (authStore.isAuthenticated && authStore.isBackoffice) {
       next()
       return
     }

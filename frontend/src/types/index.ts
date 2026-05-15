@@ -84,7 +84,7 @@ export interface User {
   linuxdo_bound?: boolean
   oidc_bound?: boolean
   wechat_bound?: boolean
-  role: 'admin' | 'user' // User role for authorization
+  role: 'admin' | 'sales' | 'user' // User role for authorization
   balance: number // User balance for API usage
   concurrency: number // Allowed concurrent requests
   rpm_limit?: number // User-level RPM cap (0 = unlimited); effective as fallback when group has no rpm_limit
@@ -113,6 +113,8 @@ export interface LoginRequest {
   email: string
   password: string
   turnstile_token?: string
+  bd_vid?: string
+  bd_landing_url?: string
 }
 
 export interface RegisterRequest {
@@ -123,6 +125,8 @@ export interface RegisterRequest {
   promo_code?: string
   invitation_code?: string
   aff_code?: string
+  bd_vid?: string
+  bd_landing_url?: string
 }
 
 export interface AffiliateInvitee {
@@ -224,6 +228,8 @@ export interface PublicSettings {
   github_oauth_enabled: boolean
   google_oauth_enabled: boolean
   backend_mode_enabled: boolean
+  baidu_tongji_id?: string
+  baidu_ocpc_landing_new_type?: number
   version: string
   balance_low_notify_enabled: boolean
   account_quota_notify_enabled: boolean
@@ -1458,7 +1464,7 @@ export interface UpdateUserRequest {
   password?: string
   username?: string
   notes?: string
-  role?: 'admin' | 'user'
+  role?: 'admin' | 'sales' | 'user'
   balance?: number
   concurrency?: number
   status?: 'active' | 'disabled'

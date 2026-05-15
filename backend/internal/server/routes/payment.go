@@ -68,6 +68,7 @@ func RegisterPaymentRoutes(
 	// --- Admin payment endpoints (admin auth) ---
 	adminGroup := v1.Group("/admin/payment")
 	adminGroup.Use(gin.HandlerFunc(adminAuth))
+	adminGroup.Use(middleware.RequireAdminPermission())
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
@@ -80,6 +81,8 @@ func RegisterPaymentRoutes(
 		adminOrders := adminGroup.Group("/orders")
 		{
 			adminOrders.GET("", adminPaymentHandler.ListOrders)
+			adminOrders.GET("/summary", adminPaymentHandler.OrderSummary)
+			adminOrders.GET("/export", adminPaymentHandler.ExportOrders)
 			adminOrders.GET("/:id", adminPaymentHandler.GetOrderDetail)
 			adminOrders.POST("/:id/cancel", adminPaymentHandler.CancelOrder)
 			adminOrders.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)

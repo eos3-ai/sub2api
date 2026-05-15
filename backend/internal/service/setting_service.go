@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"math"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -729,6 +730,8 @@ func (s *SettingService) GetPublicSettings(ctx context.Context) (*PublicSettings
 		WeChatOAuthMobileEnabled:         weChatMobileEnabled,
 		BackendModeEnabled:               settings[SettingKeyBackendModeEnabled] == "true",
 		PaymentEnabled:                   settings[SettingPaymentEnabled] == "true",
+		BaiduTongjiID:                    strings.TrimSpace(os.Getenv("BAIDU_TONGJI_ID")),
+		BaiduOcpcLandingNewType:          GetBaiduOcpcLandingNewType(),
 		OIDCOAuthEnabled:                 oidcEnabled,
 		OIDCOAuthProviderName:            oidcProviderName,
 		GitHubOAuthEnabled:               gitHubEnabled,
@@ -936,6 +939,8 @@ type PublicSettingsInjectionPayload struct {
 	GoogleOAuthEnabled               bool                     `json:"google_oauth_enabled"`
 	BackendModeEnabled               bool                     `json:"backend_mode_enabled"`
 	PaymentEnabled                   bool                     `json:"payment_enabled"`
+	BaiduTongjiID                    string                   `json:"baidu_tongji_id,omitempty"`
+	BaiduOcpcLandingNewType          int                      `json:"baidu_ocpc_landing_new_type,omitempty"`
 	Version                          string                   `json:"version"`
 	BalanceLowNotifyEnabled          bool                     `json:"balance_low_notify_enabled"`
 	AccountQuotaNotifyEnabled        bool                     `json:"account_quota_notify_enabled"`
@@ -1000,6 +1005,8 @@ func (s *SettingService) GetPublicSettingsForInjection(ctx context.Context) (any
 		GoogleOAuthEnabled:               settings.GoogleOAuthEnabled,
 		BackendModeEnabled:               settings.BackendModeEnabled,
 		PaymentEnabled:                   settings.PaymentEnabled,
+		BaiduTongjiID:                    settings.BaiduTongjiID,
+		BaiduOcpcLandingNewType:          settings.BaiduOcpcLandingNewType,
 		Version:                          s.version,
 		BalanceLowNotifyEnabled:          settings.BalanceLowNotifyEnabled,
 		AccountQuotaNotifyEnabled:        settings.AccountQuotaNotifyEnabled,
@@ -2421,6 +2428,7 @@ func (s *SettingService) InitializeDefaultSettings(ctx context.Context) error {
 		SettingKeyForceEmailOnThirdPartySignup:             "false",
 		SettingKeySMTPPort:                                 "587",
 		SettingKeySMTPUseTLS:                               "false",
+		SettingKeyInvoiceDefaultItemName:                   "技术服务费",
 		// Model fallback defaults
 		SettingKeyEnableModelFallback:      "false",
 		SettingKeyFallbackModelAnthropic:   "claude-3-5-sonnet-20241022",
@@ -3094,6 +3102,15 @@ func (s *SettingService) GetIdentityPatchPrompt(ctx context.Context) string {
 	return value
 }
 
+// GetInvoiceDefaultItemName returns the configured default invoice item name.
+func (s *SettingService) GetInvoiceDefaultItemName(ctx context.Context) string {
+	value, err := s.settingRepo.GetValue(ctx, SettingKeyInvoiceDefaultItemName)
+	if err != nil {
+		return ""
+	}
+	return value
+}
+
 // GenerateAdminAPIKey 生成新的管理员 API Key
 func (s *SettingService) GenerateAdminAPIKey(ctx context.Context) (string, error) {
 	// 生成 32 字节随机数 = 64 位十六进制字符
@@ -3152,6 +3169,57 @@ func (s *SettingService) GetAdminAPIKey(ctx context.Context) (string, error) {
 // DeleteAdminAPIKey 删除管理员 API Key
 func (s *SettingService) DeleteAdminAPIKey(ctx context.Context) error {
 	return s.settingRepo.Delete(ctx, SettingKeyAdminAPIKey)
+}
+
+// GenerateAdminAPIKeyReadOnly 生成新的只读管理员 API Key
+func (s *SettingService) GenerateAdminAPIKeyReadOnly(ctx context.Context) (string, error) {
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", fmt.Errorf("generate random bytes: %w", err)
+	}
+
+	key := AdminAPIKeyReadOnlyPrefix + hex.EncodeToString(bytes)
+	if err := s.settingRepo.Set(ctx, SettingKeyAdminAPIKeyReadOnly, key); err != nil {
+		return "", fmt.Errorf("save admin api key read-only: %w", err)
+	}
+	return key, nil
+}
+
+// GetAdminAPIKeyReadOnlyStatus 获取只读管理员 API Key 状态
+func (s *SettingService) GetAdminAPIKeyReadOnlyStatus(ctx context.Context) (maskedKey string, exists bool, err error) {
+	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKeyReadOnly)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if key == "" {
+		return "", false, nil
+	}
+	if len(key) > 17 {
+		maskedKey = key[:13] + "..." + key[len(key)-4:]
+	} else {
+		maskedKey = key
+	}
+	return maskedKey, true, nil
+}
+
+// GetAdminAPIKeyReadOnly 获取完整的只读管理员 API Key（仅供内部验证使用）
+func (s *SettingService) GetAdminAPIKeyReadOnly(ctx context.Context) (string, error) {
+	key, err := s.settingRepo.GetValue(ctx, SettingKeyAdminAPIKeyReadOnly)
+	if err != nil {
+		if errors.Is(err, ErrSettingNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+	return key, nil
+}
+
+// DeleteAdminAPIKeyReadOnly 删除只读管理员 API Key
+func (s *SettingService) DeleteAdminAPIKeyReadOnly(ctx context.Context) error {
+	return s.settingRepo.Delete(ctx, SettingKeyAdminAPIKeyReadOnly)
 }
 
 // IsModelFallbackEnabled 检查是否启用模型兜底机制

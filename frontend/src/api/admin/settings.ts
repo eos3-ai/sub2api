@@ -845,6 +845,27 @@ export async function deleteAdminApiKey(): Promise<{ message: string }> {
   return data;
 }
 
+export async function getAdminApiKeyReadOnly(): Promise<AdminApiKeyStatus> {
+  const { data } = await apiClient.get<AdminApiKeyStatus>(
+    "/admin/settings/admin-api-key-readonly",
+  );
+  return data;
+}
+
+export async function regenerateAdminApiKeyReadOnly(): Promise<{ key: string }> {
+  const { data } = await apiClient.post<{ key: string }>(
+    "/admin/settings/admin-api-key-readonly/regenerate",
+  );
+  return data;
+}
+
+export async function deleteAdminApiKeyReadOnly(): Promise<{ message: string }> {
+  const { data } = await apiClient.delete<{ message: string }>(
+    "/admin/settings/admin-api-key-readonly",
+  );
+  return data;
+}
+
 // ==================== Overload Cooldown Settings ====================
 
 /**
@@ -1113,6 +1134,9 @@ export const settingsAPI = {
   getAdminApiKey,
   regenerateAdminApiKey,
   deleteAdminApiKey,
+  getAdminApiKeyReadOnly,
+  regenerateAdminApiKeyReadOnly,
+  deleteAdminApiKeyReadOnly,
   getOverloadCooldownSettings,
   updateOverloadCooldownSettings,
   getRateLimit429CooldownSettings,

@@ -112,6 +112,18 @@ func RegisterUserRoutes(
 			subscriptions.GET("/summary", h.Subscription.GetSummary)
 		}
 
+		// 发票
+		invoices := authenticated.Group("/invoices")
+		{
+			invoices.GET("/eligible-orders", h.Invoice.ListEligibleOrders)
+			invoices.GET("/profile", h.Invoice.GetProfile)
+			invoices.PUT("/profile", h.Invoice.UpdateProfile)
+			invoices.GET("", h.Invoice.ListMyInvoiceRequests)
+			invoices.POST("", h.Invoice.CreateInvoiceRequest)
+			invoices.GET("/:id", h.Invoice.GetMyInvoiceRequest)
+			invoices.POST("/:id/cancel", h.Invoice.CancelInvoiceRequest)
+		}
+
 		// 渠道监控（用户只读）
 		monitors := authenticated.Group("/channel-monitors")
 		{

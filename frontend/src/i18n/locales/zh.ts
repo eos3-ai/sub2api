@@ -373,8 +373,11 @@ export default {
     mySubscriptions: '我的订阅',
     buySubscription: '充值/订阅',
     docs: '文档',
+    modelPricing: '模型倍率',
     myOrders: '我的订单',
+    myInvoices: '我的发票',
     orderManagement: '订单管理',
+    invoiceManagement: '发票管理',
     paymentDashboard: '支付概览',
     paymentConfig: '支付配置',
     paymentPlans: '订阅套餐',
@@ -383,6 +386,51 @@ export default {
     channelMonitor: '渠道监控',
     channelStatus: '渠道状态',
     riskControl: '风控中心',
+  },
+
+  invoice: {
+    description: '管理开票申请与发票明细',
+    adminDescription: '审核、驳回、标记开票并导出发票申请'
+  },
+
+  modelPricing: {
+    title: '模型倍率',
+    description: '查看不同模型入口的倍率与结算口径',
+    tabs: {
+      claudeCode: 'Claude Code',
+      codex: 'Codex',
+      gemini: 'Gemini'
+    },
+    fullFormulaText: '完整计费以官方 token 价格、缓存价格和渠道折扣综合计算。',
+    fullFormulaNote: '下方倍率用于快速理解人民币余额与美元用量额度的换算关系。',
+    officialPrice: '官方价格',
+    officialPriceHint: '官方价格可能变动，具体 token 单价以官方页面为准。',
+    officialPriceLink: '查看官方价格',
+    colType: '类型',
+    colRate: '模型倍率',
+    colFormula: '简易公式',
+    rows: {
+      claudeLow: {
+        type: 'claude code-low-price',
+        formula: '1 人民币 = 1 美元用量'
+      },
+      claudeStandard: {
+        type: 'claude code',
+        formula: '2 人民币 = 1 美元用量'
+      },
+      claudeVip: {
+        type: 'claude code VIP',
+        formula: '3 人民币 = 1 美元用量'
+      },
+      codex: {
+        type: 'Codex',
+        formula: '1 人民币 = 1 美元用量'
+      },
+      gemini: {
+        type: 'Gemini',
+        formula: '4 人民币 = 1 美元用量'
+      }
+    }
   },
 
   // Auth
@@ -1734,6 +1782,7 @@ export default {
       statusFilter: '状态筛选',
       allStatuses: '全部状态',
       admin: '管理员',
+      sales: '销售',
       user: '用户',
       disabled: '禁用',
       email: '邮箱',
@@ -6789,6 +6838,11 @@ export default {
       weeks: '周',
       months: '月',
       searchOrders: '搜索订单...',
+      summaryTotalOrders: '订单总数',
+      summaryPaidOrders: '已支付订单',
+      summaryPayAmount: '实付合计',
+      summaryRefundAmount: '退款合计',
+      summaryNetAmount: '净实付',
       allStatuses: '全部状态',
       allPaymentTypes: '全部支付方式',
       allOrderTypes: '全部订单类型',

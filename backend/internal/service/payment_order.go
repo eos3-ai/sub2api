@@ -756,7 +756,7 @@ func (s *PaymentService) GetOrder(ctx context.Context, orderID, userID int64) (*
 	if o.UserID != userID {
 		return nil, infraerrors.Forbidden("FORBIDDEN", "no permission for this order")
 	}
-	return o, nil
+	return applyPaymentOrderLegacyCompat(o), nil
 }
 
 func (s *PaymentService) GetOrderByID(ctx context.Context, orderID int64) (*dbent.PaymentOrder, error) {
@@ -764,19 +764,25 @@ func (s *PaymentService) GetOrderByID(ctx context.Context, orderID int64) (*dben
 	if err != nil {
 		return nil, infraerrors.NotFound("NOT_FOUND", "order not found")
 	}
-	return o, nil
+	return applyPaymentOrderLegacyCompat(o), nil
 }
 
 func (s *PaymentService) GetUserOrders(ctx context.Context, userID int64, p OrderListParams) ([]*dbent.PaymentOrder, int, error) {
 	q := s.entClient.PaymentOrder.Query().Where(paymentorder.UserIDEQ(userID))
 	if p.Status != "" {
-		q = q.Where(paymentorder.StatusEQ(p.Status))
+		q = q.Where(paymentorder.StatusIn(paymentOrderStatusQueryVariants(p.Status)...))
 	}
 	if p.OrderType != "" {
 		q = q.Where(paymentorder.OrderTypeEQ(p.OrderType))
 	}
 	if p.PaymentType != "" {
 		q = q.Where(paymentorder.PaymentTypeEQ(p.PaymentType))
+	}
+	if p.From != nil {
+		q = q.Where(paymentorder.CreatedAtGTE(*p.From))
+	}
+	if p.To != nil {
+		q = q.Where(paymentorder.CreatedAtLTE(*p.To))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
@@ -787,7 +793,7 @@ func (s *PaymentService) GetUserOrders(ctx context.Context, userID int64, p Orde
 	if err != nil {
 		return nil, 0, fmt.Errorf("query user orders: %w", err)
 	}
-	return orders, total, nil
+	return applyPaymentOrdersLegacyCompat(orders), total, nil
 }
 
 // AdminListOrders returns a paginated list of orders. If userID > 0, filters by user.
@@ -797,13 +803,19 @@ func (s *PaymentService) AdminListOrders(ctx context.Context, userID int64, p Or
 		q = q.Where(paymentorder.UserIDEQ(userID))
 	}
 	if p.Status != "" {
-		q = q.Where(paymentorder.StatusEQ(p.Status))
+		q = q.Where(paymentorder.StatusIn(paymentOrderStatusQueryVariants(p.Status)...))
 	}
 	if p.OrderType != "" {
 		q = q.Where(paymentorder.OrderTypeEQ(p.OrderType))
 	}
 	if p.PaymentType != "" {
 		q = q.Where(paymentorder.PaymentTypeEQ(p.PaymentType))
+	}
+	if p.From != nil {
+		q = q.Where(paymentorder.CreatedAtGTE(*p.From))
+	}
+	if p.To != nil {
+		q = q.Where(paymentorder.CreatedAtLTE(*p.To))
 	}
 	if p.Keyword != "" {
 		q = q.Where(paymentorder.Or(
@@ -821,5 +833,112 @@ func (s *PaymentService) AdminListOrders(ctx context.Context, userID int64, p Or
 	if err != nil {
 		return nil, 0, fmt.Errorf("query admin orders: %w", err)
 	}
-	return orders, total, nil
+	return applyPaymentOrdersLegacyCompat(orders), total, nil
+}
+
+// AdminExportOrders returns all orders matching the admin filters without pagination.
+func (s *PaymentService) AdminExportOrders(ctx context.Context, userID int64, p OrderListParams) ([]*dbent.PaymentOrder, error) {
+	q := s.entClient.PaymentOrder.Query()
+	if userID > 0 {
+		q = q.Where(paymentorder.UserIDEQ(userID))
+	}
+	if p.Status != "" {
+		q = q.Where(paymentorder.StatusIn(paymentOrderStatusQueryVariants(p.Status)...))
+	}
+	if p.OrderType != "" {
+		q = q.Where(paymentorder.OrderTypeEQ(p.OrderType))
+	}
+	if p.PaymentType != "" {
+		q = q.Where(paymentorder.PaymentTypeEQ(p.PaymentType))
+	}
+	if p.From != nil {
+		q = q.Where(paymentorder.CreatedAtGTE(*p.From))
+	}
+	if p.To != nil {
+		q = q.Where(paymentorder.CreatedAtLTE(*p.To))
+	}
+	if p.Keyword != "" {
+		q = q.Where(paymentorder.Or(
+			paymentorder.OutTradeNoContainsFold(p.Keyword),
+			paymentorder.UserEmailContainsFold(p.Keyword),
+			paymentorder.UserNameContainsFold(p.Keyword),
+		))
+	}
+	orders, err := q.Order(dbent.Desc(paymentorder.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("export admin orders: %w", err)
+	}
+	return applyPaymentOrdersLegacyCompat(orders), nil
+}
+
+// AdminOrderSummary returns aggregate totals for the same filters used by the
+// admin order list/export endpoints.
+func (s *PaymentService) AdminOrderSummary(ctx context.Context, userID int64, p OrderListParams) (*AdminPaymentOrderSummary, error) {
+	orders, err := s.AdminExportOrders(ctx, userID, p)
+	if err != nil {
+		return nil, err
+	}
+
+	summary := &AdminPaymentOrderSummary{TotalOrders: len(orders)}
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		summary.AmountTotal += order.Amount
+		summary.PayAmountTotal += order.PayAmount
+		summary.RefundAmountTotal += order.RefundAmount
+		if order.RefundAmount > 0 {
+			summary.RefundedOrders++
+		}
+
+		switch strings.ToUpper(strings.TrimSpace(order.Status)) {
+		case OrderStatusPaid, OrderStatusRecharging, OrderStatusCompleted, OrderStatusPartiallyRefunded:
+			summary.PaidOrders++
+		case OrderStatusRefunded:
+			summary.PaidOrders++
+		case OrderStatusRefundRequested, OrderStatusRefunding, OrderStatusRefundFailed:
+			summary.PaidOrders++
+		}
+	}
+	summary.NetPayAmountTotal = summary.PayAmountTotal - summary.RefundAmountTotal
+	if summary.NetPayAmountTotal < 0 {
+		summary.NetPayAmountTotal = 0
+	}
+	return summary, nil
+}
+
+func applyPaymentOrdersLegacyCompat(orders []*dbent.PaymentOrder) []*dbent.PaymentOrder {
+	for _, order := range orders {
+		applyPaymentOrderLegacyCompat(order)
+	}
+	return orders
+}
+
+func applyPaymentOrderLegacyCompat(order *dbent.PaymentOrder) *dbent.PaymentOrder {
+	if order == nil {
+		return nil
+	}
+	if status := strings.TrimSpace(order.Status); status != "" {
+		order.Status = strings.ToUpper(status)
+	}
+	return order
+}
+
+func paymentOrderStatusQueryVariants(status string) []string {
+	trimmed := strings.TrimSpace(status)
+	if trimmed == "" {
+		return []string{status}
+	}
+	upper := strings.ToUpper(trimmed)
+	lower := strings.ToLower(trimmed)
+	if upper == lower {
+		return []string{trimmed}
+	}
+	if trimmed == upper {
+		return []string{upper, lower}
+	}
+	if trimmed == lower {
+		return []string{lower, upper}
+	}
+	return []string{trimmed, upper, lower}
 }

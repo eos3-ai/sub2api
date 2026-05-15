@@ -14,8 +14,10 @@ const (
 
 // Role constants
 const (
-	RoleAdmin = domain.RoleAdmin
-	RoleUser  = domain.RoleUser
+	RoleAdmin    = domain.RoleAdmin
+	RoleSales    = domain.RoleSales
+	RoleOperator = domain.RoleOperator
+	RoleUser     = domain.RoleUser
 )
 
 // Affiliate rebate settings
@@ -206,6 +208,7 @@ const (
 	SettingKeyTablePageSizeOptions        = "table_page_size_options"       // 表格可选每页条数（JSON 数组）
 	SettingKeyCustomMenuItems             = "custom_menu_items"             // 自定义菜单项（JSON 数组）
 	SettingKeyCustomEndpoints             = "custom_endpoints"              // 自定义端点列表（JSON 数组）
+	SettingKeyInvoiceDefaultItemName      = "invoice_default_item_name"     // 默认开票内容（商品/服务名称）
 
 	// 默认配置
 	SettingKeyDefaultConcurrency   = "default_concurrency"    // 新用户默认并发量
@@ -247,7 +250,8 @@ const (
 	SettingKeyForceEmailOnThirdPartySignup             = "force_email_on_third_party_signup"
 
 	// 管理员 API Key
-	SettingKeyAdminAPIKey = "admin_api_key" // 全局管理员 API Key（用于外部系统集成）
+	SettingKeyAdminAPIKey         = "admin_api_key"           // 全局管理员 API Key（用于外部系统集成）
+	SettingKeyAdminAPIKeyReadOnly = "admin_api_key_read_only" // 只读管理员 API Key（用于外部只读导出）
 
 	// Gemini 配额策略（JSON）
 	SettingKeyGeminiQuotaPolicy = "gemini_quota_policy"
@@ -389,4 +393,7 @@ const (
 )
 
 // AdminAPIKeyPrefix is the prefix for admin API keys (distinct from user "sk-" keys).
-const AdminAPIKeyPrefix = "admin-"
+const (
+	AdminAPIKeyPrefix         = "admin-"
+	AdminAPIKeyReadOnlyPrefix = "admin-ro-"
+)
