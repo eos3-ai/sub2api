@@ -34,6 +34,30 @@ const formatLocalDate = (date: Date): string => {
 }
 
 describe('DateRangePicker', () => {
+  it('defaults empty values to the last 7 days preset', () => {
+    const now = new Date()
+    const weekAgo = new Date(now)
+    weekAgo.setDate(weekAgo.getDate() - 6)
+
+    const wrapper = mount(DateRangePicker, {
+      props: {
+        startDate: '',
+        endDate: ''
+      },
+      global: {
+        stubs: {
+          Icon: true
+        }
+      }
+    })
+
+    expect(wrapper.text()).toContain('Last 7 Days')
+    expect(wrapper.text()).not.toContain('Select date range')
+    expect(wrapper.emitted('update:startDate')?.[0]).toEqual([formatLocalDate(weekAgo)])
+    expect(wrapper.emitted('update:endDate')?.[0]).toEqual([formatLocalDate(now)])
+    expect(wrapper.emitted('change')).toBeUndefined()
+  })
+
   it('uses last 24 hours as the default recognized preset', () => {
     const now = new Date()
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)

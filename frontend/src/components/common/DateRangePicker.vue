@@ -79,6 +79,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
+import { formatLocalDate, getDefaultDateRange, type DateRange } from '@/utils/dateRange'
 
 interface DatePreset {
   labelKey: string
@@ -104,9 +105,12 @@ const { t, locale } = useI18n()
 
 const isOpen = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
-const localStartDate = ref(props.startDate)
-const localEndDate = ref(props.endDate)
-const activePreset = ref<string | null>('last24Hours')
+const initialDateRange = props.startDate && props.endDate
+  ? { start: props.startDate, end: props.endDate }
+  : getDefaultDateRange()
+const localStartDate = ref(initialDateRange.start)
+const localEndDate = ref(initialDateRange.end)
+const activePreset = ref<string | null>(null)
 
 const today = computed(() => {
   // Use local timezone to avoid UTC timezone issues
@@ -122,16 +126,8 @@ const today = computed(() => {
 const tomorrow = computed(() => {
   const d = new Date()
   d.setDate(d.getDate() + 1)
-  return formatDateToString(d)
+  return formatLocalDate(d)
 })
-
-// Helper function to format date to YYYY-MM-DD using local timezone
-const formatDateToString = (date: Date): string => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 const presets: DatePreset[] = [
   {
@@ -148,7 +144,7 @@ const presets: DatePreset[] = [
     getRange: () => {
       const d = new Date()
       d.setDate(d.getDate() - 1)
-      const yesterday = formatDateToString(d)
+      const yesterday = formatLocalDate(d)
       return { start: yesterday, end: yesterday }
     }
   },
@@ -159,8 +155,8 @@ const presets: DatePreset[] = [
       const end = new Date()
       const start = new Date(end.getTime() - 24 * 60 * 60 * 1000)
       return {
-        start: formatDateToString(start),
-        end: formatDateToString(end)
+        start: formatLocalDate(start),
+        end: formatLocalDate(end)
       }
     }
   },
@@ -171,7 +167,7 @@ const presets: DatePreset[] = [
       const end = today.value
       const d = new Date()
       d.setDate(d.getDate() - 6)
-      const start = formatDateToString(d)
+      const start = formatLocalDate(d)
       return { start, end }
     }
   },
@@ -182,7 +178,7 @@ const presets: DatePreset[] = [
       const end = today.value
       const d = new Date()
       d.setDate(d.getDate() - 13)
-      const start = formatDateToString(d)
+      const start = formatLocalDate(d)
       return { start, end }
     }
   },
@@ -193,7 +189,7 @@ const presets: DatePreset[] = [
       const end = today.value
       const d = new Date()
       d.setDate(d.getDate() - 29)
-      const start = formatDateToString(d)
+      const start = formatLocalDate(d)
       return { start, end }
     }
   },
@@ -202,7 +198,7 @@ const presets: DatePreset[] = [
     value: 'thisMonth',
     getRange: () => {
       const now = new Date()
-      const start = formatDateToString(new Date(now.getFullYear(), now.getMonth(), 1))
+      const start = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1))
       return { start, end: today.value }
     }
   },
@@ -211,12 +207,45 @@ const presets: DatePreset[] = [
     value: 'lastMonth',
     getRange: () => {
       const now = new Date()
-      const start = formatDateToString(new Date(now.getFullYear(), now.getMonth() - 1, 1))
-      const end = formatDateToString(new Date(now.getFullYear(), now.getMonth(), 0))
+      const start = formatLocalDate(new Date(now.getFullYear(), now.getMonth() - 1, 1))
+      const end = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 0))
       return { start, end }
     }
   }
 ]
+
+const normalizeDateRange = (startDate: string, endDate: string): DateRange => {
+  if (startDate && endDate) return { start: startDate, end: endDate }
+  return getDefaultDateRange()
+}
+
+const resolveActivePreset = (startDate: string, endDate: string): string | null => {
+  if (!startDate || !endDate) return null
+  for (const preset of presets) {
+    const range = preset.getRange()
+    if (range.start === startDate && range.end === endDate) {
+      return preset.value
+    }
+  }
+  return null
+}
+
+const setLocalDateRange = (range: DateRange) => {
+  localStartDate.value = range.start
+  localEndDate.value = range.end
+  activePreset.value = resolveActivePreset(range.start, range.end)
+}
+
+const emitDateRangeUpdatesIfNeeded = (range: DateRange) => {
+  if (props.startDate !== range.start) {
+    emit('update:startDate', range.start)
+  }
+  if (props.endDate !== range.end) {
+    emit('update:endDate', range.end)
+  }
+}
+
+setLocalDateRange(initialDateRange)
 
 const displayValue = computed(() => {
   if (activePreset.value) {
@@ -231,7 +260,7 @@ const displayValue = computed(() => {
     return `${formatDate(localStartDate.value)} - ${formatDate(localEndDate.value)}`
   }
 
-  return t('dates.selectDateRange')
+  return t('dates.last7Days')
 })
 
 const formatDate = (dateStr: string): string => {
@@ -252,15 +281,7 @@ const selectPreset = (preset: DatePreset) => {
 }
 
 const onDateChange = () => {
-  // Check if current dates match any preset
-  activePreset.value = null
-  for (const preset of presets) {
-    const range = preset.getRange()
-    if (range.start === localStartDate.value && range.end === localEndDate.value) {
-      activePreset.value = preset.value
-      break
-    }
-  }
+  activePreset.value = resolveActivePreset(localStartDate.value, localEndDate.value)
 }
 
 const toggle = () => {
@@ -268,11 +289,13 @@ const toggle = () => {
 }
 
 const apply = () => {
-  emit('update:startDate', localStartDate.value)
-  emit('update:endDate', localEndDate.value)
+  const range = normalizeDateRange(localStartDate.value, localEndDate.value)
+  setLocalDateRange(range)
+  emit('update:startDate', range.start)
+  emit('update:endDate', range.end)
   emit('change', {
-    startDate: localStartDate.value,
-    endDate: localEndDate.value,
+    startDate: range.start,
+    endDate: range.end,
     preset: activePreset.value
   })
   isOpen.value = false
@@ -290,28 +313,21 @@ const handleEscape = (event: KeyboardEvent) => {
   }
 }
 
-// Sync local state with props
 watch(
-  () => props.startDate,
-  (val) => {
-    localStartDate.value = val
-    onDateChange()
-  }
-)
-
-watch(
-  () => props.endDate,
-  (val) => {
-    localEndDate.value = val
-    onDateChange()
+  () => [props.startDate, props.endDate] as const,
+  ([startDate, endDate]) => {
+    const range = normalizeDateRange(startDate, endDate)
+    setLocalDateRange(range)
+    emitDateRangeUpdatesIfNeeded(range)
   }
 )
 
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
   document.addEventListener('keydown', handleEscape)
-  // Initialize active preset detection
-  onDateChange()
+  const range = normalizeDateRange(props.startDate, props.endDate)
+  setLocalDateRange(range)
+  emitDateRangeUpdatesIfNeeded(range)
 })
 
 onUnmounted(() => {

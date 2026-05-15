@@ -7,8 +7,11 @@
             <Icon name="search" size="md" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input v-model="filters.search" type="text" class="input pl-10" :placeholder="t('admin.affiliates.records.searchPlaceholder')" @input="debounceLoad" />
           </div>
-          <input v-model="filters.start_at" type="date" class="input w-full sm:w-44" :title="t('admin.affiliates.records.startAt')" @change="reloadFromFirstPage" />
-          <input v-model="filters.end_at" type="date" class="input w-full sm:w-44" :title="t('admin.affiliates.records.endAt')" @change="reloadFromFirstPage" />
+          <DateRangePicker
+            v-model:start-date="filters.start_at"
+            v-model:end-date="filters.end_at"
+            @change="reloadFromFirstPage"
+          />
           <button class="btn btn-secondary px-2 md:px-3" :disabled="loading" :title="t('common.refresh')" @click="loadRecords">
             <Icon name="refresh" size="md" :class="loading ? 'animate-spin' : ''" />
           </button>
@@ -147,6 +150,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -156,6 +160,7 @@ import { useAppStore } from '@/stores/app'
 import { affiliatesAPI, type AffiliateInviteRecord, type AffiliateRebateRecord, type AffiliateTransferRecord, type AffiliateUserOverview, type ListAffiliateRecordsParams } from '@/api/admin/affiliates'
 import type { PaginatedResponse } from '@/types'
 import { extractI18nErrorMessage } from '@/utils/apiError'
+import { getDefaultDateRange } from '@/utils/dateRange'
 import { formatDateTime as formatDisplayDateTime } from '@/utils/format'
 
 type RecordType = 'invites' | 'rebates' | 'transfers'
@@ -169,7 +174,12 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const loading = ref(false)
 const records = ref<AffiliateRecord[]>([])
-const filters = reactive({ search: '', start_at: '', end_at: '' })
+const defaultRecordDateRange = getDefaultDateRange()
+const filters = reactive({
+  search: '',
+  start_at: defaultRecordDateRange.start,
+  end_at: defaultRecordDateRange.end,
+})
 const pagination = reactive({ page: 1, page_size: 20, total: 0 })
 const overviewDialog = ref(false)
 const overviewLoading = ref(false)

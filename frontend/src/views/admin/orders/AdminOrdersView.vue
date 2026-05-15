@@ -10,8 +10,11 @@
           <Select v-model="orderFilters.status" :options="statusFilterOptions" class="w-36" @change="loadOrders" />
           <Select v-model="orderFilters.payment_type" :options="paymentTypeFilterOptions" class="w-40" @change="loadOrders" />
           <Select v-model="orderFilters.order_type" :options="orderTypeFilterOptions" class="w-36" @change="loadOrders" />
-          <input v-model="orderFilters.from" type="date" class="input w-40" @change="loadOrders" />
-          <input v-model="orderFilters.to" type="date" class="input w-40" @change="loadOrders" />
+          <DateRangePicker
+            v-model:start-date="orderFilters.from"
+            v-model:end-date="orderFilters.to"
+            @change="loadOrders"
+          />
           <div class="flex flex-1 flex-wrap items-center justify-end gap-2">
             <button @click="exportOrders" :disabled="ordersLoading || exportingOrders" class="btn btn-secondary">
               <Icon name="download" size="md" />
@@ -136,11 +139,13 @@ import type { PaymentOrder } from '@/types/payment'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import AdminRefundDialog from '@/components/admin/payment/AdminRefundDialog.vue'
 import OrderStatusBadge from '@/components/payment/OrderStatusBadge.vue'
 import OrderTable from '@/components/payment/OrderTable.vue'
+import { getDefaultDateRange } from '@/utils/dateRange'
 
 interface AuditLog {
   id: number
@@ -160,7 +165,14 @@ const exportingOrders = ref(false)
 const orderSummaryLoading = ref(false)
 const orders = ref<PaymentOrder[]>([])
 const orderSearch = ref('')
-const orderFilters = reactive({ status: '', payment_type: '', order_type: '', from: '', to: '' })
+const defaultOrderDateRange = getDefaultDateRange()
+const orderFilters = reactive({
+  status: '',
+  payment_type: '',
+  order_type: '',
+  from: defaultOrderDateRange.start,
+  to: defaultOrderDateRange.end,
+})
 const orderPagination = reactive({ page: 1, page_size: 20, total: 0 })
 const orderSummary = ref<AdminPaymentOrderSummary>(emptyOrderSummary())
 const selectedOrder = ref<PaymentOrder | null>(null)

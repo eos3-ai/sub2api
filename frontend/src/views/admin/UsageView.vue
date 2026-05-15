@@ -6,14 +6,11 @@
       <div class="space-y-4">
         <div class="card p-4">
           <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.timeRange') }}:</span>
-              <DateRangePicker
-                v-model:start-date="startDate"
-                v-model:end-date="endDate"
-                @change="onDateRangeChange"
-              />
-            </div>
+            <DateRangePicker
+              v-model:start-date="startDate"
+              v-model:end-date="endDate"
+              @change="onDateRangeChange"
+            />
             <div class="ml-auto flex items-center gap-2">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('admin.dashboard.granularity') }}:</span>
               <div class="w-28">

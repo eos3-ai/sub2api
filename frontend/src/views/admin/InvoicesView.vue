@@ -13,8 +13,11 @@
               <option value="cancelled">已取消</option>
             </select>
             <input v-model.trim="filters.user_email" class="input w-64" placeholder="用户邮箱" @keydown.enter.prevent="applyFilters" />
-            <input v-model="filters.from" type="datetime-local" class="input w-56" />
-            <input v-model="filters.to" type="datetime-local" class="input w-56" />
+            <DateRangePicker
+              v-model:start-date="filters.from"
+              v-model:end-date="filters.to"
+              @change="applyFilters"
+            />
           </div>
           <div class="flex gap-2">
             <button class="btn btn-secondary" :disabled="loading" @click="applyFilters">筛选</button>
@@ -126,11 +129,13 @@
 import { defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue'
 import Pagination from '@/components/common/Pagination.vue'
 import { adminInvoicesAPI } from '@/api/admin/invoices'
 import type { InvoiceDetail, InvoiceRequest, InvoiceStatus } from '@/api/invoices'
 import { useAppStore } from '@/stores'
+import { getDefaultDateRange } from '@/utils/dateRange'
 import { formatDateTime } from '@/utils/format'
 
 const appStore = useAppStore()
@@ -143,12 +148,13 @@ const pageSize = ref(20)
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<InvoiceDetail | null>(null)
+const defaultInvoiceDateRange = getDefaultDateRange()
 
 const filters = reactive({
   status: '' as InvoiceStatus | '',
   user_email: '',
-  from: '',
-  to: ''
+  from: defaultInvoiceDateRange.start,
+  to: defaultInvoiceDateRange.end
 })
 
 const InfoItem = defineComponent({
@@ -178,7 +184,7 @@ async function load() {
       status: filters.status || undefined,
       user_email: filters.user_email || undefined,
       from: toRFC3339(filters.from),
-      to: toRFC3339(filters.to)
+      to: toRFC3339(filters.to, true)
     })
     items.value = data.items || []
     total.value = data.total || 0
@@ -195,10 +201,11 @@ function applyFilters() {
 }
 
 function resetFilters() {
+  const range = getDefaultDateRange()
   filters.status = ''
   filters.user_email = ''
-  filters.from = ''
-  filters.to = ''
+  filters.from = range.start
+  filters.to = range.end
   applyFilters()
 }
 
@@ -268,7 +275,7 @@ async function exportCSV() {
       status: filters.status || undefined,
       user_email: filters.user_email || undefined,
       from: toRFC3339(filters.from),
-      to: toRFC3339(filters.to)
+      to: toRFC3339(filters.to, true)
     })
     const url = URL.createObjectURL(data)
     const link = document.createElement('a')
@@ -283,9 +290,20 @@ async function exportCSV() {
   }
 }
 
-function toRFC3339(value: string): string | undefined {
+function toRFC3339(value: string, endOfDay = false): string | undefined {
   if (!value) return undefined
-  const date = new Date(value)
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  const date = match
+    ? new Date(
+        Number(match[1]),
+        Number(match[2]) - 1,
+        Number(match[3]),
+        endOfDay ? 23 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 999 : 0,
+      )
+    : new Date(value)
   if (Number.isNaN(date.getTime())) return undefined
   return date.toISOString()
 }

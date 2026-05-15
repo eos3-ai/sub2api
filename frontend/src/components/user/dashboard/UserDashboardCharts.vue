@@ -3,10 +3,7 @@
     <!-- Date Range Filter -->
     <div class="card p-4">
       <div class="flex flex-wrap items-center gap-4">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('dashboard.timeRange') }}:</span>
-          <DateRangePicker :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
-        </div>
+        <DateRangePicker :start-date="startDate" :end-date="endDate" @update:startDate="$emit('update:startDate', $event)" @update:endDate="$emit('update:endDate', $event)" @change="$emit('dateRangeChange', $event)" />
         <button @click="$emit('refresh')" :disabled="loading" class="btn btn-secondary">
           {{ t('common.refresh') }}
         </button>
