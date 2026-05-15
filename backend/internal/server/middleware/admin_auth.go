@@ -4,8 +4,10 @@ package middleware
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
@@ -125,25 +127,52 @@ const (
 	adminAPIKeyAccessReadOnly
 )
 
+const readOnlyAdminAPIKeyAllowedPathsEnv = "SECURITY_ADMIN_API_KEY_READ_ONLY_ALLOWED_PATHS"
+
 func isReadOnlyAdminAPIKeyMethod(method string) bool {
 	return method == http.MethodGet
 }
 
-var readOnlyAdminAPIKeyAllowlist = map[string]struct{}{
-	"/api/v1/admin/users/export":           {},
-	"/api/v1/admin/usage/export":           {},
-	"/api/v1/admin/payment/orders/export":  {},
-	"/api/v1/admin/invoices/export":        {},
-	"/api/v1/admin/usage":                  {},
-	"/api/v1/admin/payment/orders/summary": {},
-}
-
-func isReadOnlyAdminAPIKeyAllowedPath(rawPath string) bool {
-	path := strings.TrimSpace(rawPath)
+func normalizeReadOnlyAdminAPIKeyPath(raw string) string {
+	path := strings.TrimSpace(raw)
 	if path != "" && path != "/" {
 		path = strings.TrimRight(path, "/")
 	}
-	_, ok := readOnlyAdminAPIKeyAllowlist[path]
+	return path
+}
+
+func parseReadOnlyAdminAPIKeyAllowedPaths(raw string) map[string]struct{} {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+
+	var values []string
+	if strings.HasPrefix(raw, "[") {
+		if err := json.Unmarshal([]byte(raw), &values); err != nil {
+			return nil
+		}
+	} else {
+		values = strings.FieldsFunc(raw, func(r rune) bool {
+			return r == ',' || r == '\n' || r == '\r' || r == ';'
+		})
+	}
+
+	allowed := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		path := normalizeReadOnlyAdminAPIKeyPath(value)
+		if path == "" || !strings.HasPrefix(path, "/") {
+			continue
+		}
+		allowed[path] = struct{}{}
+	}
+	return allowed
+}
+
+func isReadOnlyAdminAPIKeyAllowedPath(rawPath string) bool {
+	path := normalizeReadOnlyAdminAPIKeyPath(rawPath)
+	allowed := parseReadOnlyAdminAPIKeyAllowedPaths(os.Getenv(readOnlyAdminAPIKeyAllowedPathsEnv))
+	_, ok := allowed[path]
 	return ok
 }
 

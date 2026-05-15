@@ -19,6 +19,7 @@ import (
 
 func TestAdminAPIKeyAccessModes(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	t.Setenv(readOnlyAdminAPIKeyAllowedPathsEnv, "/api/v1/admin/users/export,/api/v1/admin/usage")
 
 	adminReadWriteKey := "admin-test-key-rw"
 	adminReadOnlyKey := "admin-test-key-ro"
@@ -46,6 +47,9 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	router.GET("/api/v1/admin/users", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+	router.GET("/api/v1/admin/usage", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
 	})
 	router.POST("/api/v1/admin/users/export", func(c *gin.Context) {
@@ -76,6 +80,14 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 		require.Equal(t, http.StatusOK, w.Code)
 	})
 
+	t.Run("read_only_key_allows_another_env_configured_path", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/usage", nil)
+		req.Header.Set("x-api-key", adminReadOnlyKey)
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+	})
+
 	t.Run("read_only_key_rejects_get_on_non_allowlisted_path", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
@@ -93,6 +105,21 @@ func TestAdminAPIKeyAccessModes(t *testing.T) {
 		require.Equal(t, http.StatusForbidden, w.Code)
 		require.Contains(t, w.Body.String(), "ADMIN_API_KEY_READ_ONLY")
 	})
+}
+
+func TestReadOnlyAdminAPIKeyAllowedPathComesFromEnv(t *testing.T) {
+	t.Setenv(readOnlyAdminAPIKeyAllowedPathsEnv, "/api/v1/admin/users/export")
+
+	require.True(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/users/export"))
+	require.True(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/users/export/"))
+	require.False(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/users"))
+
+	t.Setenv(readOnlyAdminAPIKeyAllowedPathsEnv, `["/api/v1/admin/invoices/export"]`)
+	require.True(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/invoices/export"))
+	require.False(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/users/export"))
+
+	t.Setenv(readOnlyAdminAPIKeyAllowedPathsEnv, "")
+	require.False(t, isReadOnlyAdminAPIKeyAllowedPath("/api/v1/admin/users/export"))
 }
 
 func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
