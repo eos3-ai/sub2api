@@ -99,6 +99,9 @@ func TestParsePaymentConfig(t *testing.T) {
 		if cfg.LoadBalanceStrategy != payment.DefaultLoadBalanceStrategy {
 			t.Fatalf("expected LoadBalanceStrategy=%s, got %q", payment.DefaultLoadBalanceStrategy, cfg.LoadBalanceStrategy)
 		}
+		if cfg.OrderPrefix != defaultPaymentOrderPrefix {
+			t.Fatalf("expected OrderPrefix=%q, got %q", defaultPaymentOrderPrefix, cfg.OrderPrefix)
+		}
 		if len(cfg.EnabledTypes) != 0 {
 			t.Fatalf("expected empty EnabledTypes, got %v", cfg.EnabledTypes)
 		}
@@ -118,6 +121,7 @@ func TestParsePaymentConfig(t *testing.T) {
 			SettingLoadBalanceStrategy: "least_amount",
 			SettingProductNamePrefix:   "PRE",
 			SettingProductNameSuffix:   "SUF",
+			SettingOrderPrefix:         "tc_",
 		}
 		cfg := svc.parsePaymentConfig(vals)
 
@@ -156,6 +160,9 @@ func TestParsePaymentConfig(t *testing.T) {
 		}
 		if cfg.ProductNameSuffix != "SUF" {
 			t.Fatalf("ProductNameSuffix = %q, want %q", cfg.ProductNameSuffix, "SUF")
+		}
+		if cfg.OrderPrefix != "tc_" {
+			t.Fatalf("OrderPrefix = %q, want %q", cfg.OrderPrefix, "tc_")
 		}
 	})
 
@@ -429,6 +436,49 @@ func TestUpdatePaymentConfig_PersistsVisibleMethodRouting(t *testing.T) {
 	}
 	if repo.values[SettingPaymentVisibleMethodWxpaySource] != VisibleMethodSourceOfficialWechat {
 		t.Fatalf("wxpay source = %q, want %q", repo.values[SettingPaymentVisibleMethodWxpaySource], VisibleMethodSourceOfficialWechat)
+	}
+}
+
+func TestUpdatePaymentConfig_PersistsOrderPrefix(t *testing.T) {
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{}}
+	svc := &PaymentConfigService{settingRepo: repo}
+
+	err := svc.UpdatePaymentConfig(context.Background(), UpdatePaymentConfigRequest{
+		OrderPrefix: paymentConfigStrPtr(" tc- "),
+	})
+	if err != nil {
+		t.Fatalf("UpdatePaymentConfig returned error: %v", err)
+	}
+
+	if got := repo.values[SettingOrderPrefix]; got != "tc-" {
+		t.Fatalf("order prefix = %q, want %q", got, "tc-")
+	}
+}
+
+func TestUpdatePaymentConfig_RejectsInvalidOrderPrefix(t *testing.T) {
+	repo := &paymentConfigSettingRepoStub{values: map[string]string{}}
+	svc := &PaymentConfigService{settingRepo: repo}
+
+	err := svc.UpdatePaymentConfig(context.Background(), UpdatePaymentConfigRequest{
+		OrderPrefix: paymentConfigStrPtr("tc/"),
+	})
+	if err == nil {
+		t.Fatal("expected invalid order prefix error")
+	}
+}
+
+func TestGenerateOutTradeNoUsesConfiguredOrderPrefix(t *testing.T) {
+	got := generateOutTradeNo("tc_")
+	if !strings.HasPrefix(got, "tc_") {
+		t.Fatalf("out_trade_no = %q, want prefix tc_", got)
+	}
+	if len(got) != len("tc_")+16 {
+		t.Fatalf("out_trade_no len = %d, want %d", len(got), len("tc_")+16)
+	}
+
+	fallback := generateOutTradeNo("bad/")
+	if !strings.HasPrefix(fallback, defaultPaymentOrderPrefix) {
+		t.Fatalf("fallback out_trade_no = %q, want prefix %q", fallback, defaultPaymentOrderPrefix)
 	}
 }
 

@@ -27,6 +27,7 @@ const (
 	SettingRechargeFeeRate     = "RECHARGE_FEE_RATE"
 	SettingProductNamePrefix   = "PRODUCT_NAME_PREFIX"
 	SettingProductNameSuffix   = "PRODUCT_NAME_SUFFIX"
+	SettingOrderPrefix         = "PAYMENT_ORDER_PREFIX"
 	SettingHelpImageURL        = "PAYMENT_HELP_IMAGE_URL"
 	SettingHelpText            = "PAYMENT_HELP_TEXT"
 	SettingCancelRateLimitOn   = "CANCEL_RATE_LIMIT_ENABLED"
@@ -38,8 +39,10 @@ const (
 
 // Default values for payment configuration settings.
 const (
-	defaultOrderTimeoutMin  = 30
-	defaultMaxPendingOrders = 3
+	defaultOrderTimeoutMin    = 30
+	defaultMaxPendingOrders   = 3
+	defaultPaymentOrderPrefix = "sub2_"
+	maxPaymentOrderPrefixLen  = 32
 )
 
 // PaymentConfig holds the payment system configuration.
@@ -57,6 +60,7 @@ type PaymentConfig struct {
 	LoadBalanceStrategy       string   `json:"load_balance_strategy"`
 	ProductNamePrefix         string   `json:"product_name_prefix"`
 	ProductNameSuffix         string   `json:"product_name_suffix"`
+	OrderPrefix               string   `json:"order_prefix"`
 	HelpImageURL              string   `json:"help_image_url"`
 	HelpText                  string   `json:"help_text"`
 	StripePublishableKey      string   `json:"stripe_publishable_key,omitempty"`
@@ -84,6 +88,7 @@ type UpdatePaymentConfigRequest struct {
 	LoadBalanceStrategy       *string  `json:"load_balance_strategy"`
 	ProductNamePrefix         *string  `json:"product_name_prefix"`
 	ProductNameSuffix         *string  `json:"product_name_suffix"`
+	OrderPrefix               *string  `json:"order_prefix"`
 	HelpImageURL              *string  `json:"help_image_url"`
 	HelpText                  *string  `json:"help_text"`
 
@@ -198,7 +203,7 @@ func (s *PaymentConfigService) GetPaymentConfig(ctx context.Context) (*PaymentCo
 		SettingPaymentEnabled, SettingMinRechargeAmount, SettingMaxRechargeAmount,
 		SettingDailyRechargeLimit, SettingOrderTimeoutMinutes, SettingMaxPendingOrders,
 		SettingEnabledPaymentTypes, SettingBalancePayDisabled, SettingBalanceRechargeMult, SettingRechargeFeeRate, SettingLoadBalanceStrategy,
-		SettingProductNamePrefix, SettingProductNameSuffix,
+		SettingProductNamePrefix, SettingProductNameSuffix, SettingOrderPrefix,
 		SettingHelpImageURL, SettingHelpText,
 		SettingCancelRateLimitOn, SettingCancelRateLimitMax,
 		SettingCancelWindowSize, SettingCancelWindowUnit, SettingCancelWindowMode,
@@ -229,6 +234,7 @@ func (s *PaymentConfigService) parsePaymentConfig(vals map[string]string) *Payme
 		LoadBalanceStrategy:       vals[SettingLoadBalanceStrategy],
 		ProductNamePrefix:         vals[SettingProductNamePrefix],
 		ProductNameSuffix:         vals[SettingProductNameSuffix],
+		OrderPrefix:               normalizePaymentOrderPrefix(vals[SettingOrderPrefix]),
 		HelpImageURL:              vals[SettingHelpImageURL],
 		HelpText:                  vals[SettingHelpText],
 
@@ -294,6 +300,9 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 			return infraerrors.BadRequest("INVALID_RECHARGE_FEE_RATE", "recharge fee rate allows at most 2 decimal places")
 		}
 	}
+	if err := validatePaymentOrderPrefix(req.OrderPrefix); err != nil {
+		return err
+	}
 	m := map[string]string{
 		SettingPaymentEnabled:                    formatBoolOrEmpty(req.Enabled),
 		SettingMinRechargeAmount:                 formatPositiveFloat(req.MinAmount),
@@ -307,6 +316,7 @@ func (s *PaymentConfigService) UpdatePaymentConfig(ctx context.Context, req Upda
 		SettingLoadBalanceStrategy:               derefStr(req.LoadBalanceStrategy),
 		SettingProductNamePrefix:                 derefStr(req.ProductNamePrefix),
 		SettingProductNameSuffix:                 derefStr(req.ProductNameSuffix),
+		SettingOrderPrefix:                       derefTrimmedStr(req.OrderPrefix),
 		SettingHelpImageURL:                      derefStr(req.HelpImageURL),
 		SettingHelpText:                          derefStr(req.HelpText),
 		SettingCancelRateLimitOn:                 formatBoolOrEmpty(req.CancelRateLimitEnabled),
@@ -360,6 +370,52 @@ func derefStr(v *string) string {
 		return ""
 	}
 	return *v
+}
+
+func derefTrimmedStr(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return strings.TrimSpace(*v)
+}
+
+func normalizePaymentOrderPrefix(raw string) string {
+	prefix := strings.TrimSpace(raw)
+	if prefix == "" || !paymentOrderPrefixAllowed(prefix) || len(prefix) > maxPaymentOrderPrefixLen {
+		return defaultPaymentOrderPrefix
+	}
+	return prefix
+}
+
+func validatePaymentOrderPrefix(v *string) error {
+	if v == nil {
+		return nil
+	}
+	prefix := strings.TrimSpace(*v)
+	if prefix == "" {
+		return nil
+	}
+	if len(prefix) > maxPaymentOrderPrefixLen {
+		return infraerrors.BadRequest("INVALID_PAYMENT_ORDER_PREFIX", fmt.Sprintf("payment order prefix must be at most %d characters", maxPaymentOrderPrefixLen))
+	}
+	if !paymentOrderPrefixAllowed(prefix) {
+		return infraerrors.BadRequest("INVALID_PAYMENT_ORDER_PREFIX", "payment order prefix may only contain letters, numbers, underscores, and hyphens")
+	}
+	return nil
+}
+
+func paymentOrderPrefixAllowed(prefix string) bool {
+	for _, r := range prefix {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '_' || r == '-':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func splitTypes(s string) []string {

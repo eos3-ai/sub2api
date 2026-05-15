@@ -384,6 +384,7 @@ const baseSettingsResponse = {
   payment_load_balance_strategy: "round-robin",
   payment_product_name_prefix: "",
   payment_product_name_suffix: "",
+  payment_order_prefix: "sub2_",
   payment_help_image_url: "",
   payment_help_text: "",
   payment_cancel_rate_limit_enabled: false,
@@ -581,6 +582,7 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_source");
     expect(payload).not.toHaveProperty("payment_visible_method_alipay_enabled");
     expect(payload).not.toHaveProperty("payment_visible_method_wxpay_enabled");
+    expect(payload).toHaveProperty("payment_order_prefix", "sub2_");
   });
 
   it("submits Anthropic cache TTL injection gateway setting", async () => {

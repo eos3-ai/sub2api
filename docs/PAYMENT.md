@@ -58,6 +58,7 @@ Configure the following in Admin Dashboard **Settings → Payment Settings**:
 | **Enable Payment** | Enable or disable the payment system | Off |
 | **Product Name Prefix** | Prefix shown on payment page | - |
 | **Product Name Suffix** | Suffix (e.g., "Credits") | - |
+| **Order Number Prefix** | Prefix used when generating payment `out_trade_no` values | `sub2_` |
 | **Minimum Amount** | Minimum single top-up amount | 1 |
 | **Maximum Amount** | Maximum single top-up amount (empty = unlimited) | - |
 | **Daily Limit** | Per-user daily cumulative limit (empty = unlimited) | - |

@@ -251,6 +251,7 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		PaymentLoadBalanceStrat:                paymentCfg.LoadBalanceStrategy,
 		PaymentProductNamePrefix:               paymentCfg.ProductNamePrefix,
 		PaymentProductNameSuffix:               paymentCfg.ProductNameSuffix,
+		PaymentOrderPrefix:                     paymentCfg.OrderPrefix,
 		PaymentHelpImageURL:                    paymentCfg.HelpImageURL,
 		PaymentHelpText:                        paymentCfg.HelpText,
 		PaymentCancelRateLimitEnabled:          paymentCfg.CancelRateLimitEnabled,
@@ -550,6 +551,7 @@ type UpdateSettingsRequest struct {
 	PaymentLoadBalanceStrat          *string  `json:"payment_load_balance_strategy"`
 	PaymentProductNamePrefix         *string  `json:"payment_product_name_prefix"`
 	PaymentProductNameSuffix         *string  `json:"payment_product_name_suffix"`
+	PaymentOrderPrefix               *string  `json:"payment_order_prefix"`
 	PaymentHelpImageURL              *string  `json:"payment_help_image_url"`
 	PaymentHelpText                  *string  `json:"payment_help_text"`
 
@@ -1606,6 +1608,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			LoadBalanceStrategy:       req.PaymentLoadBalanceStrat,
 			ProductNamePrefix:         req.PaymentProductNamePrefix,
 			ProductNameSuffix:         req.PaymentProductNameSuffix,
+			OrderPrefix:               req.PaymentOrderPrefix,
 			HelpImageURL:              req.PaymentHelpImageURL,
 			HelpText:                  req.PaymentHelpText,
 			CancelRateLimitEnabled:    req.PaymentCancelRateLimitEnabled,
@@ -1796,6 +1799,7 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		PaymentLoadBalanceStrat:                updatedPaymentCfg.LoadBalanceStrategy,
 		PaymentProductNamePrefix:               updatedPaymentCfg.ProductNamePrefix,
 		PaymentProductNameSuffix:               updatedPaymentCfg.ProductNameSuffix,
+		PaymentOrderPrefix:                     updatedPaymentCfg.OrderPrefix,
 		PaymentHelpImageURL:                    updatedPaymentCfg.HelpImageURL,
 		PaymentHelpText:                        updatedPaymentCfg.HelpText,
 		PaymentCancelRateLimitEnabled:          updatedPaymentCfg.CancelRateLimitEnabled,
@@ -1829,7 +1833,8 @@ func hasPaymentFields(req UpdateSettingsRequest) bool {
 		req.PaymentEnabledTypes != nil || req.PaymentBalanceDisabled != nil ||
 		req.PaymentBalanceRechargeMultiplier != nil || req.PaymentRechargeFeeRate != nil ||
 		req.PaymentLoadBalanceStrat != nil || req.PaymentProductNamePrefix != nil ||
-		req.PaymentProductNameSuffix != nil || req.PaymentHelpImageURL != nil ||
+		req.PaymentProductNameSuffix != nil || req.PaymentOrderPrefix != nil ||
+		req.PaymentHelpImageURL != nil ||
 		req.PaymentHelpText != nil || req.PaymentCancelRateLimitEnabled != nil ||
 		req.PaymentCancelRateLimitMax != nil || req.PaymentCancelRateLimitWindow != nil ||
 		req.PaymentCancelRateLimitUnit != nil || req.PaymentCancelRateLimitMode != nil

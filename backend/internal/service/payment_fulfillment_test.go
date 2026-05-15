@@ -319,6 +319,9 @@ func TestParseLegacyPaymentOrderID(t *testing.T) {
 	_, ok = parseLegacyPaymentOrderID("42", &dbent.NotFoundError{})
 	assert.False(t, ok)
 
+	_, ok = parseLegacyPaymentOrderID("tc_42", &dbent.NotFoundError{})
+	assert.False(t, ok)
+
 	_, ok = parseLegacyPaymentOrderID("sub2_42", errors.New("db down"))
 	assert.False(t, ok)
 }
