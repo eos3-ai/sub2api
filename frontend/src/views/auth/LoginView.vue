@@ -1,27 +1,6 @@
 <template>
   <AuthLayout>
     <div class="space-y-6">
-      <div
-        class="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-100"
-      >
-        <p class="font-semibold">📢 AITokenCloud 新系统上线了！</p>
-        <p class="mt-1 leading-relaxed">
-          AITokenCloud 新系统已上线，现已支持 Gemini CLI登录方式已由用户名登录调整为
-          邮箱登录（原账户注册邮箱，密码不变）。
-        </p>
-        <p class="mt-1 leading-relaxed">
-          如忘记注册时使用的邮箱，可点击
-          <button
-            type="button"
-            class="font-semibold text-amber-800 underline underline-offset-2 transition-colors hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-100"
-            @click="showAdminQr = true"
-          >
-            联系管理员
-          </button>
-          获取帮助。
-        </p>
-        <p class="mt-1 leading-relaxed">感谢大家的理解与支持～</p>
-      </div>
       <!-- Title -->
       <div class="text-center">
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -32,7 +11,10 @@
         </p>
       </div>
 
-  <div v-if="!backendModeEnabled && (linuxdoOAuthEnabled || wechatOAuthEnabled || oidcOAuthEnabled)" class="space-y-4">
+      <div
+        v-if="!backendModeEnabled && (linuxdoOAuthEnabled || wechatOAuthEnabled || oidcOAuthEnabled)"
+        class="space-y-4"
+      >
         <LinuxDoOAuthSection
           v-if="linuxdoOAuthEnabled"
           :disabled="isLoading"
@@ -168,23 +150,6 @@
       </form>
     </div>
 
-    <Modal
-      :show="showAdminQr"
-      title="联系管理员"
-      size="sm"
-      closeOnClickOutside
-      @close="showAdminQr = false"
-    >
-      <div class="flex flex-col items-center gap-3">
-        <img
-          :src="adminQrUrl"
-          alt="管理员二维码"
-          class="h-56 w-56 rounded-2xl border border-amber-100 bg-white p-2 shadow-sm dark:border-amber-400/20 dark:bg-dark-900"
-        />
-        <p class="text-xs text-amber-700 dark:text-amber-200">扫码联系管理员</p>
-      </div>
-    </Modal>
-
     <!-- Footer -->
     <template v-if="!backendModeEnabled" #footer>
       <p class="text-gray-500 dark:text-dark-400">
@@ -215,7 +180,6 @@ import { computed, ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AuthLayout } from '@/components/layout'
-import { Modal } from '@/components/common'
 import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
 import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
 import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
@@ -240,8 +204,6 @@ const appStore = useAppStore()
 const isLoading = ref<boolean>(false)
 const errorMessage = ref<string>('')
 const showPassword = ref<boolean>(false)
-const showAdminQr = ref<boolean>(false)
-const adminQrUrl = '/admin-qr.png'
 
 // Public settings
 const turnstileEnabled = ref<boolean>(false)
