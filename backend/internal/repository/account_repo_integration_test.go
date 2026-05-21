@@ -21,11 +21,75 @@ type AccountRepoSuite struct {
 	repo   *accountRepository
 }
 
+type schedulerCacheRecorder struct {
+	setAccounts []*service.Account
+	deleteIDs   []int64
+	accounts    map[int64]*service.Account
+}
+
+func (s *schedulerCacheRecorder) GetSnapshot(ctx context.Context, bucket service.SchedulerBucket) ([]*service.Account, bool, error) {
+	return nil, false, nil
+}
+
+func (s *schedulerCacheRecorder) SetSnapshot(ctx context.Context, bucket service.SchedulerBucket, accounts []service.Account) error {
+	return nil
+}
+
+func (s *schedulerCacheRecorder) GetAccount(ctx context.Context, accountID int64) (*service.Account, error) {
+	if s.accounts == nil {
+		return nil, nil
+	}
+	return s.accounts[accountID], nil
+}
+
+func (s *schedulerCacheRecorder) SetAccount(ctx context.Context, account *service.Account) error {
+	s.setAccounts = append(s.setAccounts, account)
+	if s.accounts == nil {
+		s.accounts = make(map[int64]*service.Account)
+	}
+	if account != nil {
+		s.accounts[account.ID] = account
+	}
+	return nil
+}
+
+func (s *schedulerCacheRecorder) DeleteAccount(ctx context.Context, accountID int64) error {
+	s.deleteIDs = append(s.deleteIDs, accountID)
+	if s.accounts != nil {
+		delete(s.accounts, accountID)
+	}
+	return nil
+}
+
+func (s *schedulerCacheRecorder) UpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error {
+	return nil
+}
+
+func (s *schedulerCacheRecorder) TryLockBucket(ctx context.Context, bucket service.SchedulerBucket, ttl time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (s *schedulerCacheRecorder) UnlockBucket(ctx context.Context, bucket service.SchedulerBucket) error {
+	return nil
+}
+
+func (s *schedulerCacheRecorder) ListBuckets(ctx context.Context) ([]service.SchedulerBucket, error) {
+	return nil, nil
+}
+
+func (s *schedulerCacheRecorder) GetOutboxWatermark(ctx context.Context) (int64, error) {
+	return 0, nil
+}
+
+func (s *schedulerCacheRecorder) SetOutboxWatermark(ctx context.Context, id int64) error {
+	return nil
+}
+
 func (s *AccountRepoSuite) SetupTest() {
 	s.ctx = context.Background()
 	tx := testEntTx(s.T())
 	s.client = tx.Client()
-	s.repo = newAccountRepositoryWithSQL(s.client, tx)
+	s.repo = newAccountRepositoryWithSQL(s.client, tx, nil)
 }
 
 func TestAccountRepoSuite(t *testing.T) {
@@ -73,6 +137,49 @@ func (s *AccountRepoSuite) TestUpdate() {
 	s.Require().Equal("updated", got.Name)
 }
 
+func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnDisabled() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "sync-update", Status: service.StatusActive, Schedulable: true})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	account.Status = service.StatusDisabled
+	err := s.repo.Update(s.ctx, account)
+	s.Require().NoError(err, "Update")
+
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+	s.Require().Equal(service.StatusDisabled, cacheRecorder.setAccounts[0].Status)
+}
+
+func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnCredentialsChange() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:        "sync-credentials-update",
+		Status:      service.StatusActive,
+		Schedulable: true,
+		Credentials: map[string]any{
+			"model_mapping": map[string]any{
+				"gpt-5": "gpt-5.1",
+			},
+		},
+	})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	account.Credentials = map[string]any{
+		"model_mapping": map[string]any{
+			"gpt-5": "gpt-5.2",
+		},
+	}
+	err := s.repo.Update(s.ctx, account)
+	s.Require().NoError(err, "Update")
+
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+	mapping, ok := cacheRecorder.setAccounts[0].Credentials["model_mapping"].(map[string]any)
+	s.Require().True(ok)
+	s.Require().Equal("gpt-5.2", mapping["gpt-5"])
+}
+
 func (s *AccountRepoSuite) TestDelete() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "to-delete"})
 
@@ -81,6 +188,27 @@ func (s *AccountRepoSuite) TestDelete() {
 
 	_, err = s.repo.GetByID(s.ctx, account.ID)
 	s.Require().Error(err, "expected error after delete")
+}
+
+func (s *AccountRepoSuite) TestDelete_RemovesSchedulerAccountSnapshot() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "to-delete-cache"})
+	cacheRecorder := &schedulerCacheRecorder{
+		accounts: map[int64]*service.Account{
+			account.ID: {
+				ID:          account.ID,
+				Name:        account.Name,
+				Status:      service.StatusActive,
+				Schedulable: true,
+			},
+		},
+	}
+	s.repo.schedulerCache = cacheRecorder
+
+	err := s.repo.Delete(s.ctx, account.ID)
+	s.Require().NoError(err, "Delete")
+
+	s.Require().Equal([]int64{account.ID}, cacheRecorder.deleteIDs)
+	s.Require().NotContains(cacheRecorder.accounts, account.ID)
 }
 
 func (s *AccountRepoSuite) TestDelete_WithGroupBindings() {
@@ -110,14 +238,16 @@ func (s *AccountRepoSuite) TestList() {
 
 func (s *AccountRepoSuite) TestListWithFilters() {
 	tests := []struct {
-		name      string
-		setup     func(client *dbent.Client)
-		platform  string
-		accType   string
-		status    string
-		search    string
-		wantCount int
-		validate  func(accounts []service.Account)
+		name        string
+		setup       func(client *dbent.Client)
+		platform    string
+		accType     string
+		status      string
+		search      string
+		groupID     int64
+		privacyMode string
+		wantCount   int
+		validate    func(accounts []service.Account)
 	}{
 		{
 			name: "filter_by_platform",
@@ -156,6 +286,101 @@ func (s *AccountRepoSuite) TestListWithFilters() {
 			},
 		},
 		{
+			name: "filter_by_status_active_excludes_runtime_blocked_accounts",
+			setup: func(client *dbent.Client) {
+				mustCreateAccount(s.T(), client, &service.Account{Name: "active-normal", Status: service.StatusActive})
+				rateLimited := mustCreateAccount(s.T(), client, &service.Account{Name: "active-rate-limited", Status: service.StatusActive})
+				err := client.Account.UpdateOneID(rateLimited.ID).
+					SetRateLimitResetAt(time.Now().Add(10 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				tempUnsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-temp-unsched", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(tempUnsched.ID).
+					SetTempUnschedulableUntil(time.Now().Add(15 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				unsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-unsched", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(unsched.ID).
+					SetSchedulable(false).
+					Exec(context.Background())
+				s.Require().NoError(err)
+			},
+			status:    service.StatusActive,
+			wantCount: 1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("active-normal", accounts[0].Name)
+			},
+		},
+		{
+			name: "filter_by_status_unschedulable_excludes_rate_limited_and_temp_unschedulable",
+			setup: func(client *dbent.Client) {
+				mustCreateAccount(s.T(), client, &service.Account{Name: "active-normal", Status: service.StatusActive, Schedulable: true})
+				unsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-unsched", Status: service.StatusActive})
+				err := client.Account.UpdateOneID(unsched.ID).
+					SetSchedulable(false).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				rateLimited := mustCreateAccount(s.T(), client, &service.Account{Name: "active-rate-limited", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(rateLimited.ID).
+					SetSchedulable(false).
+					SetRateLimitResetAt(time.Now().Add(10 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				tempUnsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-temp-unsched", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(tempUnsched.ID).
+					SetSchedulable(false).
+					SetTempUnschedulableUntil(time.Now().Add(15 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+			},
+			status:    "unschedulable",
+			wantCount: 1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("active-unsched", accounts[0].Name)
+			},
+		},
+		{
+			name: "filter_by_status_rate_limited_excludes_temp_unschedulable",
+			setup: func(client *dbent.Client) {
+				rateLimited := mustCreateAccount(s.T(), client, &service.Account{Name: "active-rate-limited", Status: service.StatusActive})
+				err := client.Account.UpdateOneID(rateLimited.ID).
+					SetRateLimitResetAt(time.Now().Add(10 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				tempUnsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-temp-unsched", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(tempUnsched.ID).
+					SetRateLimitResetAt(time.Now().Add(20 * time.Minute)).
+					SetTempUnschedulableUntil(time.Now().Add(15 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+			},
+			status:    "rate_limited",
+			wantCount: 1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("active-rate-limited", accounts[0].Name)
+			},
+		},
+		{
+			name: "filter_by_status_temp_unschedulable_excludes_manually_unschedulable",
+			setup: func(client *dbent.Client) {
+				tempUnsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-temp-unsched", Status: service.StatusActive, Schedulable: true})
+				err := client.Account.UpdateOneID(tempUnsched.ID).
+					SetTempUnschedulableUntil(time.Now().Add(15 * time.Minute)).
+					Exec(context.Background())
+				s.Require().NoError(err)
+				unsched := mustCreateAccount(s.T(), client, &service.Account{Name: "active-unsched", Status: service.StatusActive})
+				err = client.Account.UpdateOneID(unsched.ID).
+					SetSchedulable(false).
+					Exec(context.Background())
+				s.Require().NoError(err)
+			},
+			status:    "temp_unschedulable",
+			wantCount: 1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("active-temp-unsched", accounts[0].Name)
+			},
+		},
+		{
 			name: "filter_by_search",
 			setup: func(client *dbent.Client) {
 				mustCreateAccount(s.T(), client, &service.Account{Name: "alpha-account"})
@@ -167,6 +392,47 @@ func (s *AccountRepoSuite) TestListWithFilters() {
 				s.Require().Contains(accounts[0].Name, "alpha")
 			},
 		},
+		{
+			name: "filter_by_ungrouped",
+			setup: func(client *dbent.Client) {
+				group := mustCreateGroup(s.T(), client, &service.Group{Name: "g-ungrouped"})
+				grouped := mustCreateAccount(s.T(), client, &service.Account{Name: "grouped-account"})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "ungrouped-account"})
+				mustBindAccountToGroup(s.T(), client, grouped.ID, group.ID, 1)
+			},
+			groupID:   service.AccountListGroupUngrouped,
+			wantCount: 1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("ungrouped-account", accounts[0].Name)
+				s.Require().Empty(accounts[0].GroupIDs)
+			},
+		},
+		{
+			name: "filter_by_privacy_mode",
+			setup: func(client *dbent.Client) {
+				mustCreateAccount(s.T(), client, &service.Account{Name: "privacy-ok", Extra: map[string]any{"privacy_mode": service.PrivacyModeTrainingOff}})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "privacy-fail", Extra: map[string]any{"privacy_mode": service.PrivacyModeFailed}})
+			},
+			privacyMode: service.PrivacyModeTrainingOff,
+			wantCount:   1,
+			validate: func(accounts []service.Account) {
+				s.Require().Equal("privacy-ok", accounts[0].Name)
+			},
+		},
+		{
+			name: "filter_by_privacy_mode_unset",
+			setup: func(client *dbent.Client) {
+				mustCreateAccount(s.T(), client, &service.Account{Name: "privacy-unset", Extra: nil})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "privacy-empty", Extra: map[string]any{"privacy_mode": ""}})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "privacy-set", Extra: map[string]any{"privacy_mode": service.PrivacyModeTrainingOff}})
+			},
+			privacyMode: service.AccountPrivacyModeUnsetFilter,
+			wantCount:   2,
+			validate: func(accounts []service.Account) {
+				names := []string{accounts[0].Name, accounts[1].Name}
+				s.ElementsMatch([]string{"privacy-unset", "privacy-empty"}, names)
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -174,12 +440,12 @@ func (s *AccountRepoSuite) TestListWithFilters() {
 			// 每个 case 重新获取隔离资源
 			tx := testEntTx(s.T())
 			client := tx.Client()
-			repo := newAccountRepositoryWithSQL(client, tx)
+			repo := newAccountRepositoryWithSQL(client, tx, nil)
 			ctx := context.Background()
 
 			tt.setup(client)
 
-			accounts, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, tt.platform, tt.accType, tt.status, tt.search)
+			accounts, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, tt.platform, tt.accType, tt.status, tt.search, tt.groupID, tt.privacyMode)
 			s.Require().NoError(err)
 			s.Require().Len(accounts, tt.wantCount)
 			if tt.validate != nil {
@@ -246,7 +512,7 @@ func (s *AccountRepoSuite) TestPreload_And_VirtualFields() {
 	s.Require().Len(got.Groups, 1, "expected Groups to be populated")
 	s.Require().Equal(group.ID, got.Groups[0].ID)
 
-	accounts, page, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", "", "", "acc")
+	accounts, page, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", "", "", "acc", 0, "")
 	s.Require().NoError(err, "ListWithFilters")
 	s.Require().Equal(int64(1), page.Total)
 	s.Require().Len(accounts, 1)
@@ -365,12 +631,38 @@ func (s *AccountRepoSuite) TestListSchedulableByGroupIDAndPlatform() {
 
 func (s *AccountRepoSuite) TestSetSchedulable() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-sched", Schedulable: true})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
 
 	s.Require().NoError(s.repo.SetSchedulable(s.ctx, account.ID, false))
 
 	got, err := s.repo.GetByID(s.ctx, account.ID)
 	s.Require().NoError(err)
 	s.Require().False(got.Schedulable)
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+}
+
+func (s *AccountRepoSuite) TestBulkUpdate_SyncSchedulerSnapshotOnDisabled() {
+	account1 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "bulk-1", Status: service.StatusActive, Schedulable: true})
+	account2 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "bulk-2", Status: service.StatusActive, Schedulable: true})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	disabled := service.StatusDisabled
+	rows, err := s.repo.BulkUpdate(s.ctx, []int64{account1.ID, account2.ID}, service.AccountBulkUpdate{
+		Status: &disabled,
+	})
+	s.Require().NoError(err)
+	s.Require().Equal(int64(2), rows)
+
+	s.Require().Len(cacheRecorder.setAccounts, 2)
+	ids := map[int64]struct{}{}
+	for _, acc := range cacheRecorder.setAccounts {
+		ids[acc.ID] = struct{}{}
+	}
+	s.Require().Contains(ids, account1.ID)
+	s.Require().Contains(ids, account2.ID)
 }
 
 // --- SetOverloaded / SetRateLimited / ClearRateLimit ---
@@ -415,6 +707,38 @@ func (s *AccountRepoSuite) TestClearRateLimit() {
 	s.Require().Nil(got.OverloadUntil)
 }
 
+func (s *AccountRepoSuite) TestTempUnschedulableFieldsLoadedByGetByIDAndGetByIDs() {
+	acc1 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-1"})
+	acc2 := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-temp-2"})
+
+	until := time.Now().Add(15 * time.Minute).UTC().Truncate(time.Second)
+	reason := `{"rule":"429","matched_keyword":"too many requests"}`
+	s.Require().NoError(s.repo.SetTempUnschedulable(s.ctx, acc1.ID, until, reason))
+
+	gotByID, err := s.repo.GetByID(s.ctx, acc1.ID)
+	s.Require().NoError(err)
+	s.Require().NotNil(gotByID.TempUnschedulableUntil)
+	s.Require().WithinDuration(until, *gotByID.TempUnschedulableUntil, time.Second)
+	s.Require().Equal(reason, gotByID.TempUnschedulableReason)
+
+	gotByIDs, err := s.repo.GetByIDs(s.ctx, []int64{acc2.ID, acc1.ID})
+	s.Require().NoError(err)
+	s.Require().Len(gotByIDs, 2)
+	s.Require().Equal(acc2.ID, gotByIDs[0].ID)
+	s.Require().Nil(gotByIDs[0].TempUnschedulableUntil)
+	s.Require().Equal("", gotByIDs[0].TempUnschedulableReason)
+	s.Require().Equal(acc1.ID, gotByIDs[1].ID)
+	s.Require().NotNil(gotByIDs[1].TempUnschedulableUntil)
+	s.Require().WithinDuration(until, *gotByIDs[1].TempUnschedulableUntil, time.Second)
+	s.Require().Equal(reason, gotByIDs[1].TempUnschedulableReason)
+
+	s.Require().NoError(s.repo.ClearTempUnschedulable(s.ctx, acc1.ID))
+	cleared, err := s.repo.GetByID(s.ctx, acc1.ID)
+	s.Require().NoError(err)
+	s.Require().Nil(cleared.TempUnschedulableUntil)
+	s.Require().Equal("", cleared.TempUnschedulableReason)
+}
+
 // --- UpdateLastUsed ---
 
 func (s *AccountRepoSuite) TestUpdateLastUsed() {
@@ -431,7 +755,7 @@ func (s *AccountRepoSuite) TestUpdateLastUsed() {
 // --- SetError ---
 
 func (s *AccountRepoSuite) TestSetError() {
-	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-err", Status: service.StatusActive})
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-err", Status: service.StatusActive, Schedulable: true})
 
 	s.Require().NoError(s.repo.SetError(s.ctx, account.ID, "something went wrong"))
 
@@ -439,6 +763,42 @@ func (s *AccountRepoSuite) TestSetError() {
 	s.Require().NoError(err)
 	s.Require().Equal(service.StatusError, got.Status)
 	s.Require().Equal("something went wrong", got.ErrorMessage)
+	s.Require().False(got.Schedulable)
+}
+
+func (s *AccountRepoSuite) TestUpdateErrorStatusUnschedulesAccount() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-update-err", Status: service.StatusActive, Schedulable: true})
+	account.Status = service.StatusError
+	account.ErrorMessage = "token revoked"
+	account.Schedulable = true
+
+	s.Require().NoError(s.repo.Update(s.ctx, account))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(service.StatusError, got.Status)
+	s.Require().Equal("token revoked", got.ErrorMessage)
+	s.Require().False(got.Schedulable)
+}
+
+func (s *AccountRepoSuite) TestClearError_SyncSchedulerSnapshotOnRecovery() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:         "acc-clear-err",
+		Status:       service.StatusError,
+		ErrorMessage: "temporary error",
+	})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+
+	s.Require().NoError(s.repo.ClearError(s.ctx, account.ID))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(service.StatusActive, got.Status)
+	s.Require().Empty(got.ErrorMessage)
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+	s.Require().Equal(service.StatusActive, cacheRecorder.setAccounts[0].Status)
 }
 
 // --- UpdateSessionWindow ---
@@ -484,6 +844,96 @@ func (s *AccountRepoSuite) TestUpdateExtra_NilExtra() {
 	got, err := s.repo.GetByID(s.ctx, account.ID)
 	s.Require().NoError(err)
 	s.Require().Equal("val", got.Extra["key"])
+}
+
+func (s *AccountRepoSuite) TestUpdateExtra_SchedulerNeutralSkipsOutboxAndSyncsFreshSnapshot() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "acc-extra-neutral",
+		Platform: service.PlatformOpenAI,
+		Extra:    map[string]any{"codex_usage_updated_at": "old"},
+	})
+	cacheRecorder := &schedulerCacheRecorder{
+		accounts: map[int64]*service.Account{
+			account.ID: {
+				ID:       account.ID,
+				Platform: account.Platform,
+				Status:   service.StatusDisabled,
+				Extra: map[string]any{
+					"codex_usage_updated_at": "old",
+				},
+			},
+		},
+	}
+	s.repo.schedulerCache = cacheRecorder
+
+	updates := map[string]any{
+		"codex_usage_updated_at":     "2026-03-11T10:00:00Z",
+		"codex_5h_used_percent":      88.5,
+		"session_window_utilization": 0.42,
+	}
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, updates))
+
+	got, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("2026-03-11T10:00:00Z", got.Extra["codex_usage_updated_at"])
+	s.Require().Equal(88.5, got.Extra["codex_5h_used_percent"])
+	s.Require().Equal(0.42, got.Extra["session_window_utilization"])
+
+	var outboxCount int
+	s.Require().NoError(scanSingleRow(s.ctx, s.repo.sql, "SELECT COUNT(*) FROM scheduler_outbox", nil, &outboxCount))
+	s.Require().Zero(outboxCount)
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().NotNil(cacheRecorder.accounts[account.ID])
+	s.Require().Equal(service.StatusActive, cacheRecorder.accounts[account.ID].Status)
+	s.Require().Equal("2026-03-11T10:00:00Z", cacheRecorder.accounts[account.ID].Extra["codex_usage_updated_at"])
+}
+
+func (s *AccountRepoSuite) TestUpdateExtra_ExhaustedCodexSnapshotSyncsSchedulerCache() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "acc-extra-codex-exhausted",
+		Platform: service.PlatformOpenAI,
+		Type:     service.AccountTypeOAuth,
+		Extra:    map[string]any{},
+	})
+	cacheRecorder := &schedulerCacheRecorder{}
+	s.repo.schedulerCache = cacheRecorder
+	_, err := s.repo.sql.ExecContext(s.ctx, "TRUNCATE scheduler_outbox")
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"codex_7d_used_percent":        100.0,
+		"codex_7d_reset_at":            "2026-03-12T13:00:00Z",
+		"codex_7d_reset_after_seconds": 86400,
+	}))
+
+	var count int
+	err = scanSingleRow(s.ctx, s.repo.sql, "SELECT COUNT(*) FROM scheduler_outbox", nil, &count)
+	s.Require().NoError(err)
+	s.Require().Equal(0, count)
+	s.Require().Len(cacheRecorder.setAccounts, 1)
+	s.Require().Equal(account.ID, cacheRecorder.setAccounts[0].ID)
+	s.Require().Equal(service.StatusActive, cacheRecorder.setAccounts[0].Status)
+	s.Require().Equal(100.0, cacheRecorder.setAccounts[0].Extra["codex_7d_used_percent"])
+}
+
+func (s *AccountRepoSuite) TestUpdateExtra_SchedulerRelevantStillEnqueuesOutbox() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{
+		Name:     "acc-extra-mixed",
+		Platform: service.PlatformAntigravity,
+		Extra:    map[string]any{},
+	})
+	_, err := s.repo.sql.ExecContext(s.ctx, "TRUNCATE scheduler_outbox")
+	s.Require().NoError(err)
+
+	s.Require().NoError(s.repo.UpdateExtra(s.ctx, account.ID, map[string]any{
+		"mixed_scheduling":       true,
+		"codex_usage_updated_at": "2026-03-11T10:00:00Z",
+	}))
+
+	var count int
+	err = scanSingleRow(s.ctx, s.repo.sql, "SELECT COUNT(*) FROM scheduler_outbox", nil, &count)
+	s.Require().NoError(err)
+	s.Require().Equal(1, count)
 }
 
 // --- GetByCRSAccountID ---

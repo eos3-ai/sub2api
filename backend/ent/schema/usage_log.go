@@ -41,6 +41,22 @@ func (UsageLog) Fields() []ent.Field {
 		field.String("model").
 			MaxLen(100).
 			NotEmpty(),
+		// RequestedModel stores the client-requested model name for stable display and analytics.
+		// NULL means historical rows written before requested_model dual-write was introduced.
+		field.String("requested_model").
+			MaxLen(100).
+			Optional().
+			Nillable(),
+		// UpstreamModel stores the actual upstream model name when model mapping
+		// is applied. NULL means no mapping — the requested model was used as-is.
+		field.String("upstream_model").
+			MaxLen(100).
+			Optional().
+			Nillable(),
+		field.Int64("channel_id").Optional().Nillable().Comment("渠道 ID"),
+		field.String("model_mapping_chain").MaxLen(500).Optional().Nillable().Comment("模型映射链"),
+		field.String("billing_tier").MaxLen(50).Optional().Nillable().Comment("计费层级标签"),
+		field.String("billing_mode").MaxLen(20).Optional().Nillable().Comment("计费模式：token/per_request/image"),
 		field.Int64("group_id").
 			Optional().
 			Nillable(),
@@ -85,6 +101,12 @@ func (UsageLog) Fields() []ent.Field {
 			Default(1).
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
 
+		// account_rate_multiplier: 账号计费倍率快照（NULL 表示按 1.0 处理）
+		field.Float("account_rate_multiplier").
+			Optional().
+			Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}),
+
 		// 其他字段
 		field.Int8("billing_type").
 			Default(0),
@@ -100,6 +122,10 @@ func (UsageLog) Fields() []ent.Field {
 			MaxLen(512).
 			Optional().
 			Nillable(),
+		field.String("ip_address").
+			MaxLen(45). // 支持 IPv6
+			Optional().
+			Nillable(),
 
 		// 图片生成字段（仅 gemini-3-pro-image 等图片模型使用）
 		field.Int("image_count").
@@ -108,6 +134,24 @@ func (UsageLog) Fields() []ent.Field {
 			MaxLen(10).
 			Optional().
 			Nillable(),
+		field.String("image_input_size").
+			MaxLen(32).
+			Optional().
+			Nillable(),
+		field.String("image_output_size").
+			MaxLen(32).
+			Optional().
+			Nillable(),
+		field.String("image_size_source").
+			MaxLen(16).
+			Optional().
+			Nillable(),
+		field.JSON("image_size_breakdown", map[string]int{}).
+			Optional().
+			SchemaType(map[string]string{dialect.Postgres: "jsonb"}),
+		// Cache TTL Override 标记（管理员强制替换了缓存 TTL 计费）
+		field.Bool("cache_ttl_overridden").
+			Default(false),
 
 		// 时间戳（只有 created_at，日志不可修改）
 		field.Time("created_at").
@@ -156,9 +200,12 @@ func (UsageLog) Indexes() []ent.Index {
 		index.Fields("subscription_id"),
 		index.Fields("created_at"),
 		index.Fields("model"),
+		index.Fields("requested_model"),
 		index.Fields("request_id"),
 		// 复合索引用于时间范围查询
 		index.Fields("user_id", "created_at"),
 		index.Fields("api_key_id", "created_at"),
+		// 分组维度时间范围查询（线上由 SQL 迁移创建 group_id IS NOT NULL 的部分索引）
+		index.Fields("group_id", "created_at"),
 	}
 }

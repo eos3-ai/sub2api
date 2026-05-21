@@ -41,8 +41,12 @@ type Account struct {
 	ProxyID *int64 `json:"proxy_id,omitempty"`
 	// Concurrency holds the value of the "concurrency" field.
 	Concurrency int `json:"concurrency,omitempty"`
+	// LoadFactor holds the value of the "load_factor" field.
+	LoadFactor *int `json:"load_factor,omitempty"`
 	// Priority holds the value of the "priority" field.
 	Priority int `json:"priority,omitempty"`
+	// RateMultiplier holds the value of the "rate_multiplier" field.
+	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// ErrorMessage holds the value of the "error_message" field.
@@ -61,6 +65,10 @@ type Account struct {
 	RateLimitResetAt *time.Time `json:"rate_limit_reset_at,omitempty"`
 	// OverloadUntil holds the value of the "overload_until" field.
 	OverloadUntil *time.Time `json:"overload_until,omitempty"`
+	// TempUnschedulableUntil holds the value of the "temp_unschedulable_until" field.
+	TempUnschedulableUntil *time.Time `json:"temp_unschedulable_until,omitempty"`
+	// TempUnschedulableReason holds the value of the "temp_unschedulable_reason" field.
+	TempUnschedulableReason *string `json:"temp_unschedulable_reason,omitempty"`
 	// SessionWindowStart holds the value of the "session_window_start" field.
 	SessionWindowStart *time.Time `json:"session_window_start,omitempty"`
 	// SessionWindowEnd holds the value of the "session_window_end" field.
@@ -135,11 +143,13 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case account.FieldAutoPauseOnExpired, account.FieldSchedulable:
 			values[i] = new(sql.NullBool)
-		case account.FieldID, account.FieldProxyID, account.FieldConcurrency, account.FieldPriority:
+		case account.FieldRateMultiplier:
+			values[i] = new(sql.NullFloat64)
+		case account.FieldID, account.FieldProxyID, account.FieldConcurrency, account.FieldLoadFactor, account.FieldPriority:
 			values[i] = new(sql.NullInt64)
-		case account.FieldName, account.FieldNotes, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMessage, account.FieldSessionWindowStatus:
+		case account.FieldName, account.FieldNotes, account.FieldPlatform, account.FieldType, account.FieldStatus, account.FieldErrorMessage, account.FieldTempUnschedulableReason, account.FieldSessionWindowStatus:
 			values[i] = new(sql.NullString)
-		case account.FieldCreatedAt, account.FieldUpdatedAt, account.FieldDeletedAt, account.FieldLastUsedAt, account.FieldExpiresAt, account.FieldRateLimitedAt, account.FieldRateLimitResetAt, account.FieldOverloadUntil, account.FieldSessionWindowStart, account.FieldSessionWindowEnd:
+		case account.FieldCreatedAt, account.FieldUpdatedAt, account.FieldDeletedAt, account.FieldLastUsedAt, account.FieldExpiresAt, account.FieldRateLimitedAt, account.FieldRateLimitResetAt, account.FieldOverloadUntil, account.FieldTempUnschedulableUntil, account.FieldSessionWindowStart, account.FieldSessionWindowEnd:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -235,11 +245,24 @@ func (_m *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Concurrency = int(value.Int64)
 			}
+		case account.FieldLoadFactor:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field load_factor", values[i])
+			} else if value.Valid {
+				_m.LoadFactor = new(int)
+				*_m.LoadFactor = int(value.Int64)
+			}
 		case account.FieldPriority:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field priority", values[i])
 			} else if value.Valid {
 				_m.Priority = int(value.Int64)
+			}
+		case account.FieldRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.RateMultiplier = value.Float64
 			}
 		case account.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -300,6 +323,20 @@ func (_m *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.OverloadUntil = new(time.Time)
 				*_m.OverloadUntil = value.Time
+			}
+		case account.FieldTempUnschedulableUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field temp_unschedulable_until", values[i])
+			} else if value.Valid {
+				_m.TempUnschedulableUntil = new(time.Time)
+				*_m.TempUnschedulableUntil = value.Time
+			}
+		case account.FieldTempUnschedulableReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field temp_unschedulable_reason", values[i])
+			} else if value.Valid {
+				_m.TempUnschedulableReason = new(string)
+				*_m.TempUnschedulableReason = value.String
 			}
 		case account.FieldSessionWindowStart:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -417,8 +454,16 @@ func (_m *Account) String() string {
 	builder.WriteString("concurrency=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Concurrency))
 	builder.WriteString(", ")
+	if v := _m.LoadFactor; v != nil {
+		builder.WriteString("load_factor=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("priority=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Priority))
+	builder.WriteString(", ")
+	builder.WriteString("rate_multiplier=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplier))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
@@ -457,6 +502,16 @@ func (_m *Account) String() string {
 	if v := _m.OverloadUntil; v != nil {
 		builder.WriteString("overload_until=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TempUnschedulableUntil; v != nil {
+		builder.WriteString("temp_unschedulable_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TempUnschedulableReason; v != nil {
+		builder.WriteString("temp_unschedulable_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.SessionWindowStart; v != nil {

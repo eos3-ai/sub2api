@@ -3,7 +3,7 @@ package schema
 import (
 	"time"
 
-	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
@@ -41,13 +41,13 @@ func (RedeemCode) Fields() []ent.Field {
 			Unique(),
 		field.String("type").
 			MaxLen(20).
-			Default(service.RedeemTypeBalance),
+			Default(domain.RedeemTypeBalance),
 		field.Float("value").
 			SchemaType(map[string]string{dialect.Postgres: "decimal(20,8)"}).
 			Default(0),
 		field.String("status").
 			MaxLen(20).
-			Default(service.StatusUnused),
+			Default(domain.StatusUnused),
 		field.Int64("used_by").
 			Optional().
 			Nillable(),
@@ -62,6 +62,10 @@ func (RedeemCode) Fields() []ent.Field {
 		field.Time("created_at").
 			Immutable().
 			Default(time.Now).
+			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
+		field.Time("expires_at").
+			Optional().
+			Nillable().
 			SchemaType(map[string]string{dialect.Postgres: "timestamptz"}),
 		field.Int64("group_id").
 			Optional().
@@ -90,5 +94,6 @@ func (RedeemCode) Indexes() []ent.Index {
 		index.Fields("status"),
 		index.Fields("used_by"),
 		index.Fields("group_id"),
+		index.Fields("expires_at"),
 	}
 }

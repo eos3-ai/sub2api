@@ -3,12 +3,16 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"sort"
+	"strings"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/proxy"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
+
+	entsql "entgo.io/ent/dialect/sql"
 )
 
 type sqlQuerier interface {
@@ -58,6 +62,25 @@ func (r *proxyRepository) GetByID(ctx context.Context, id int64) (*service.Proxy
 		return nil, err
 	}
 	return proxyEntityToService(m), nil
+}
+
+func (r *proxyRepository) ListByIDs(ctx context.Context, ids []int64) ([]service.Proxy, error) {
+	if len(ids) == 0 {
+		return []service.Proxy{}, nil
+	}
+
+	proxies, err := r.client.Proxy.Query().
+		Where(proxy.IDIn(ids...)).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]service.Proxy, 0, len(proxies))
+	for i := range proxies {
+		out = append(out, *proxyEntityToService(proxies[i]))
+	}
+	return out, nil
 }
 
 func (r *proxyRepository) Update(ctx context.Context, proxyIn *service.Proxy) error {
@@ -116,11 +139,14 @@ func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination
 		return nil, nil, err
 	}
 
-	proxies, err := q.
+	proxiesQuery := q.
 		Offset(params.Offset()).
-		Limit(params.Limit()).
-		Order(dbent.Desc(proxy.FieldID)).
-		All(ctx)
+		Limit(params.Limit())
+	for _, order := range proxyListOrder(params) {
+		proxiesQuery = proxiesQuery.Order(order)
+	}
+
+	proxies, err := proxiesQuery.All(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -131,6 +157,115 @@ func (r *proxyRepository) ListWithFilters(ctx context.Context, params pagination
 	}
 
 	return outProxies, paginationResultFromTotal(int64(total), params), nil
+}
+
+// ListWithFiltersAndAccountCount lists proxies with filters and includes account count per proxy
+func (r *proxyRepository) ListWithFiltersAndAccountCount(ctx context.Context, params pagination.PaginationParams, protocol, status, search string) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
+	q := r.client.Proxy.Query()
+	if protocol != "" {
+		q = q.Where(proxy.ProtocolEQ(protocol))
+	}
+	if status != "" {
+		q = q.Where(proxy.StatusEQ(status))
+	}
+	if search != "" {
+		q = q.Where(proxy.NameContainsFold(search))
+	}
+
+	total, err := q.Count(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if strings.EqualFold(strings.TrimSpace(params.SortBy), "account_count") {
+		return r.listWithAccountCountSort(ctx, q, params, total)
+	}
+
+	proxiesQuery := q.
+		Offset(params.Offset()).
+		Limit(params.Limit())
+	for _, order := range proxyListOrder(params) {
+		proxiesQuery = proxiesQuery.Order(order)
+	}
+
+	proxies, err := proxiesQuery.All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return r.buildProxyWithAccountCountResult(ctx, proxies, params, int64(total))
+}
+
+func (r *proxyRepository) listWithAccountCountSort(ctx context.Context, q *dbent.ProxyQuery, params pagination.PaginationParams, total int) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
+	proxies, err := q.
+		Order(dbent.Desc(proxy.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result, _, err := r.buildProxyWithAccountCountResult(ctx, proxies, params, int64(total))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	sortOrder := params.NormalizedSortOrder(pagination.SortOrderDesc)
+	sort.SliceStable(result, func(i, j int) bool {
+		if result[i].AccountCount == result[j].AccountCount {
+			return result[i].ID > result[j].ID
+		}
+		if sortOrder == pagination.SortOrderAsc {
+			return result[i].AccountCount < result[j].AccountCount
+		}
+		return result[i].AccountCount > result[j].AccountCount
+	})
+
+	return paginateSlice(result, params), paginationResultFromTotal(int64(total), params), nil
+}
+
+func (r *proxyRepository) buildProxyWithAccountCountResult(ctx context.Context, proxies []*dbent.Proxy, params pagination.PaginationParams, total int64) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
+	counts, err := r.GetAccountCountsForProxies(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	result := make([]service.ProxyWithAccountCount, 0, len(proxies))
+	for i := range proxies {
+		proxyOut := proxyEntityToService(proxies[i])
+		if proxyOut == nil {
+			continue
+		}
+		result = append(result, service.ProxyWithAccountCount{
+			Proxy:        *proxyOut,
+			AccountCount: counts[proxyOut.ID],
+		})
+	}
+
+	return result, paginationResultFromTotal(total, params), nil
+}
+
+func proxyListOrder(params pagination.PaginationParams) []func(*entsql.Selector) {
+	sortBy := strings.ToLower(strings.TrimSpace(params.SortBy))
+	sortOrder := params.NormalizedSortOrder(pagination.SortOrderDesc)
+
+	var field string
+	switch sortBy {
+	case "name":
+		field = proxy.FieldName
+	case "protocol":
+		field = proxy.FieldProtocol
+	case "status":
+		field = proxy.FieldStatus
+	case "created_at":
+		field = proxy.FieldCreatedAt
+	default:
+		field = proxy.FieldID
+	}
+
+	if sortOrder == pagination.SortOrderAsc {
+		return []func(*entsql.Selector){dbent.Asc(field), dbent.Asc(proxy.FieldID)}
+	}
+	return []func(*entsql.Selector){dbent.Desc(field), dbent.Desc(proxy.FieldID)}
 }
 
 func (r *proxyRepository) ListActive(ctx context.Context) ([]service.Proxy, error) {
@@ -170,10 +305,52 @@ func (r *proxyRepository) ExistsByHostPortAuth(ctx context.Context, host string,
 // CountAccountsByProxyID returns the number of accounts using a specific proxy
 func (r *proxyRepository) CountAccountsByProxyID(ctx context.Context, proxyID int64) (int64, error) {
 	var count int64
-	if err := scanSingleRow(ctx, r.sql, "SELECT COUNT(*) FROM accounts WHERE proxy_id = $1", []any{proxyID}, &count); err != nil {
+	if err := scanSingleRow(ctx, r.sql, "SELECT COUNT(*) FROM accounts WHERE proxy_id = $1 AND deleted_at IS NULL", []any{proxyID}, &count); err != nil {
 		return 0, err
 	}
 	return count, nil
+}
+
+func (r *proxyRepository) ListAccountSummariesByProxyID(ctx context.Context, proxyID int64) ([]service.ProxyAccountSummary, error) {
+	rows, err := r.sql.QueryContext(ctx, `
+		SELECT id, name, platform, type, notes
+		FROM accounts
+		WHERE proxy_id = $1 AND deleted_at IS NULL
+		ORDER BY id DESC
+	`, proxyID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]service.ProxyAccountSummary, 0)
+	for rows.Next() {
+		var (
+			id       int64
+			name     string
+			platform string
+			accType  string
+			notes    sql.NullString
+		)
+		if err := rows.Scan(&id, &name, &platform, &accType, &notes); err != nil {
+			return nil, err
+		}
+		var notesPtr *string
+		if notes.Valid {
+			notesPtr = &notes.String
+		}
+		out = append(out, service.ProxyAccountSummary{
+			ID:       id,
+			Name:     name,
+			Platform: platform,
+			Type:     accType,
+			Notes:    notesPtr,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // GetAccountCountsForProxies returns a map of proxy ID to account count for all proxies

@@ -37,7 +37,7 @@
         </p>
 
         <!-- Page size selector -->
-        <div class="flex items-center space-x-2">
+        <div v-if="showPageSizeSelector" class="flex items-center space-x-2">
           <span class="text-sm text-gray-700 dark:text-gray-300"
             >{{ t('pagination.perPage') }}:</span
           >
@@ -48,6 +48,22 @@
               @update:model-value="handlePageSizeChange"
             />
           </div>
+        </div>
+
+        <div v-if="showJump" class="flex items-center space-x-2">
+          <span class="text-sm text-gray-700 dark:text-gray-300">{{ t('pagination.jumpTo') }}</span>
+          <input
+            v-model="jumpPage"
+            type="number"
+            min="1"
+            :max="totalPages"
+            class="input w-20 text-sm"
+            :placeholder="t('pagination.jumpPlaceholder')"
+            @keyup.enter="submitJump"
+          />
+          <button type="button" class="btn btn-ghost btn-sm" @click="submitJump">
+            {{ t('pagination.jumpAction') }}
+          </button>
         </div>
       </div>
 
@@ -68,8 +84,8 @@
 
         <!-- Page numbers -->
         <button
-          v-for="pageNum in visiblePages"
-          :key="pageNum"
+          v-for="(pageNum, index) in visiblePages"
+          :key="`${pageNum}-${index}`"
           @click="typeof pageNum === 'number' && goToPage(pageNum)"
           :disabled="typeof pageNum !== 'number'"
           :class="[
@@ -102,10 +118,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import Select from './Select.vue'
+import { getConfiguredTablePageSizeOptions, normalizeTablePageSize } from '@/utils/tablePreferences'
+import { setPersistedPageSize } from '@/composables/usePersistedPageSize'
 
 const { t } = useI18n()
 
@@ -114,6 +132,8 @@ interface Props {
   page: number
   pageSize: number
   pageSizeOptions?: number[]
+  showPageSizeSelector?: boolean
+  showJump?: boolean
 }
 
 interface Emits {
@@ -122,7 +142,9 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  pageSizeOptions: () => [10, 20, 50, 100]
+  pageSizeOptions: () => getConfiguredTablePageSizeOptions(),
+  showPageSizeSelector: true,
+  showJump: false
 })
 
 const emit = defineEmits<Emits>()
@@ -140,11 +162,20 @@ const toItem = computed(() => {
 })
 
 const pageSizeSelectOptions = computed(() => {
-  return props.pageSizeOptions.map((size) => ({
+  const options = Array.from(
+    new Set([
+      ...getConfiguredTablePageSizeOptions(),
+      normalizeTablePageSize(props.pageSize)
+    ])
+  ).sort((a, b) => a - b)
+
+  return options.map((size) => ({
     value: size,
     label: String(size)
   }))
 })
+
+const jumpPage = ref('')
 
 const visiblePages = computed(() => {
   const pages: (number | string)[] = []
@@ -193,8 +224,19 @@ const goToPage = (newPage: number) => {
 
 const handlePageSizeChange = (value: string | number | boolean | null) => {
   if (value === null || typeof value === 'boolean') return
-  const newPageSize = typeof value === 'string' ? parseInt(value) : value
+  const newPageSize = normalizeTablePageSize(typeof value === 'string' ? parseInt(value, 10) : value)
+  setPersistedPageSize(newPageSize)
   emit('update:pageSize', newPageSize)
+}
+
+const submitJump = () => {
+  const value = jumpPage.value.trim()
+  if (!value) return
+  const pageNum = Number.parseInt(value, 10)
+  if (Number.isNaN(pageNum)) return
+  const nextPage = Math.min(Math.max(pageNum, 1), totalPages.value)
+  jumpPage.value = ''
+  goToPage(nextPage)
 }
 </script>
 

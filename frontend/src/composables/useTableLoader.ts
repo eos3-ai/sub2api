@@ -1,6 +1,7 @@
 import { ref, reactive, onUnmounted, toRaw } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import type { BasePaginationResponse, FetchOptions } from '@/types'
+import { getPersistedPageSize, setPersistedPageSize } from './usePersistedPageSize'
 
 interface PaginationState {
   page: number
@@ -21,14 +22,14 @@ interface TableLoaderOptions<T, P> {
  * 统一处理分页、筛选、搜索防抖和请求取消
  */
 export function useTableLoader<T, P extends Record<string, any>>(options: TableLoaderOptions<T, P>) {
-  const { fetchFn, initialParams, pageSize = 20, debounceMs = 300 } = options
+  const { fetchFn, initialParams, pageSize, debounceMs = 300 } = options
 
   const items = ref<T[]>([])
   const loading = ref(false)
   const params = reactive<P>({ ...(initialParams || {}) } as P)
   const pagination = reactive<PaginationState>({
     page: 1,
-    page_size: pageSize,
+    page_size: pageSize ?? getPersistedPageSize(),
     total: 0,
     pages: 0
   })
@@ -43,7 +44,8 @@ export function useTableLoader<T, P extends Record<string, any>>(options: TableL
     if (abortController) {
       abortController.abort()
     }
-    abortController = new AbortController()
+    const currentController = new AbortController()
+    abortController = currentController
     loading.value = true
 
     try {
@@ -51,9 +53,9 @@ export function useTableLoader<T, P extends Record<string, any>>(options: TableL
         pagination.page,
         pagination.page_size,
         toRaw(params) as P,
-        { signal: abortController.signal }
+        { signal: currentController.signal }
       )
-      
+
       items.value = response.items || []
       pagination.total = response.total || 0
       pagination.pages = response.pages || 0
@@ -63,7 +65,7 @@ export function useTableLoader<T, P extends Record<string, any>>(options: TableL
         throw error
       }
     } finally {
-      if (abortController && !abortController.signal.aborted) {
+      if (abortController === currentController) {
         loading.value = false
       }
     }
@@ -77,13 +79,16 @@ export function useTableLoader<T, P extends Record<string, any>>(options: TableL
   const debouncedReload = useDebounceFn(reload, debounceMs)
 
   const handlePageChange = (page: number) => {
-    pagination.page = page
+    // 确保页码在有效范围内
+    const validPage = Math.max(1, Math.min(page, pagination.pages || 1))
+    pagination.page = validPage
     load()
   }
 
   const handlePageSizeChange = (size: number) => {
     pagination.page_size = size
     pagination.page = 1
+    setPersistedPageSize(size)
     load()
   }
 

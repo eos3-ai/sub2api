@@ -1,12 +1,15 @@
 package service
 
 import (
-	"log"
+	"fmt"
 	"sync"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/zeromicro/go-zero/core/collection"
 )
+
+var newTimingWheel = collection.NewTimingWheel
 
 // TimingWheelService wraps go-zero's TimingWheel for task scheduling
 type TimingWheelService struct {
@@ -15,36 +18,38 @@ type TimingWheelService struct {
 }
 
 // NewTimingWheelService creates a new TimingWheelService instance
-func NewTimingWheelService() *TimingWheelService {
+func NewTimingWheelService() (*TimingWheelService, error) {
 	// 1 second tick, 3600 slots = supports up to 1 hour delay
 	// execute function: runs func() type tasks
-	tw, err := collection.NewTimingWheel(1*time.Second, 3600, func(key, value any) {
+	tw, err := newTimingWheel(1*time.Second, 3600, func(key, value any) {
 		if fn, ok := value.(func()); ok {
 			fn()
 		}
 	})
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("创建 timing wheel 失败: %w", err)
 	}
-	return &TimingWheelService{tw: tw}
+	return &TimingWheelService{tw: tw}, nil
 }
 
 // Start starts the timing wheel
 func (s *TimingWheelService) Start() {
-	log.Println("[TimingWheel] Started (auto-start by go-zero)")
+	logger.LegacyPrintf("service.timing_wheel", "%s", "[TimingWheel] Started (auto-start by go-zero)")
 }
 
 // Stop stops the timing wheel
 func (s *TimingWheelService) Stop() {
 	s.stopOnce.Do(func() {
 		s.tw.Stop()
-		log.Println("[TimingWheel] Stopped")
+		logger.LegacyPrintf("service.timing_wheel", "%s", "[TimingWheel] Stopped")
 	})
 }
 
 // Schedule schedules a one-time task
 func (s *TimingWheelService) Schedule(name string, delay time.Duration, fn func()) {
-	_ = s.tw.SetTimer(name, fn, delay)
+	if err := s.tw.SetTimer(name, fn, delay); err != nil {
+		logger.LegacyPrintf("service.timing_wheel", "[TimingWheel] SetTimer failed for %q: %v", name, err)
+	}
 }
 
 // ScheduleRecurring schedules a recurring task
@@ -52,9 +57,13 @@ func (s *TimingWheelService) ScheduleRecurring(name string, interval time.Durati
 	var schedule func()
 	schedule = func() {
 		fn()
-		_ = s.tw.SetTimer(name, schedule, interval)
+		if err := s.tw.SetTimer(name, schedule, interval); err != nil {
+			logger.LegacyPrintf("service.timing_wheel", "[TimingWheel] recurring SetTimer failed for %q: %v", name, err)
+		}
 	}
-	_ = s.tw.SetTimer(name, schedule, interval)
+	if err := s.tw.SetTimer(name, schedule, interval); err != nil {
+		logger.LegacyPrintf("service.timing_wheel", "[TimingWheel] initial SetTimer failed for %q: %v", name, err)
+	}
 }
 
 // Cancel cancels a scheduled task

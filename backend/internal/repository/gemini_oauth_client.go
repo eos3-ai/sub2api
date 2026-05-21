@@ -26,18 +26,22 @@ func NewGeminiOAuthClient(cfg *config.Config) service.GeminiOAuthClient {
 }
 
 func (c *geminiOAuthClient) ExchangeCode(ctx context.Context, oauthType, code, codeVerifier, redirectURI, proxyURL string) (*geminicli.TokenResponse, error) {
-	client := createGeminiReqClient(proxyURL)
+	client, err := createGeminiReqClient(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client: %w", err)
+	}
 
 	// Use different OAuth clients based on oauthType:
 	// - code_assist: always use built-in Gemini CLI OAuth client (public)
-	// - google_one: uses configured OAuth client when provided; otherwise falls back to built-in client
+	// - google_one: always use built-in Gemini CLI OAuth client (public)
 	// - ai_studio: requires a user-provided OAuth client
 	oauthCfgInput := geminicli.OAuthConfig{
 		ClientID:     c.cfg.Gemini.OAuth.ClientID,
 		ClientSecret: c.cfg.Gemini.OAuth.ClientSecret,
 		Scopes:       c.cfg.Gemini.OAuth.Scopes,
 	}
-	if oauthType == "code_assist" {
+	if oauthType == "code_assist" || oauthType == "google_one" {
+		// Force use of built-in Gemini CLI OAuth client
 		oauthCfgInput.ClientID = ""
 		oauthCfgInput.ClientSecret = ""
 	}
@@ -71,14 +75,18 @@ func (c *geminiOAuthClient) ExchangeCode(ctx context.Context, oauthType, code, c
 }
 
 func (c *geminiOAuthClient) RefreshToken(ctx context.Context, oauthType, refreshToken, proxyURL string) (*geminicli.TokenResponse, error) {
-	client := createGeminiReqClient(proxyURL)
+	client, err := createGeminiReqClient(proxyURL)
+	if err != nil {
+		return nil, fmt.Errorf("create HTTP client: %w", err)
+	}
 
 	oauthCfgInput := geminicli.OAuthConfig{
 		ClientID:     c.cfg.Gemini.OAuth.ClientID,
 		ClientSecret: c.cfg.Gemini.OAuth.ClientSecret,
 		Scopes:       c.cfg.Gemini.OAuth.Scopes,
 	}
-	if oauthType == "code_assist" {
+	if oauthType == "code_assist" || oauthType == "google_one" {
+		// Force use of built-in Gemini CLI OAuth client
 		oauthCfgInput.ClientID = ""
 		oauthCfgInput.ClientSecret = ""
 	}
@@ -109,7 +117,7 @@ func (c *geminiOAuthClient) RefreshToken(ctx context.Context, oauthType, refresh
 	return &tokenResp, nil
 }
 
-func createGeminiReqClient(proxyURL string) *req.Client {
+func createGeminiReqClient(proxyURL string) (*req.Client, error) {
 	return getSharedReqClient(reqClientOptions{
 		ProxyURL: proxyURL,
 		Timeout:  60 * time.Second,

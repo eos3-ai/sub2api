@@ -6,6 +6,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Toast, ToastType, PublicSettings } from '@/types'
+import { i18n } from '@/i18n'
 import {
   checkUpdates as checkUpdatesAPI,
   type VersionInfo,
@@ -30,6 +31,7 @@ export const useAppStore = defineStore('app', () => {
   const contactInfo = ref<string>('')
   const apiBaseUrl = ref<string>('')
   const docUrl = ref<string>('')
+  const cachedPublicSettings = ref<PublicSettings | null>(null)
 
   // Version cache state
   const versionLoaded = ref<boolean>(false)
@@ -46,6 +48,7 @@ export const useAppStore = defineStore('app', () => {
   // ==================== Computed ====================
 
   const hasActiveToasts = computed(() => toasts.value.length > 0)
+  const backendModeEnabled = computed(() => cachedPublicSettings.value?.backend_mode_enabled ?? false)
 
   const loadingCount = ref<number>(0)
 
@@ -207,7 +210,10 @@ export const useAppStore = defineStore('app', () => {
     try {
       return await operation()
     } catch (error) {
-      const message = errorMessage || (error as { message?: string }).message || 'An error occurred'
+      const message =
+        errorMessage ||
+        (error as { message?: string }).message ||
+        i18n.global.t('common.unknownError')
       showError(message)
       return null
     } finally {
@@ -279,15 +285,46 @@ export const useAppStore = defineStore('app', () => {
   // ==================== Public Settings Management ====================
 
   /**
+   * Apply settings to store state (internal helper to avoid code duplication)
+   */
+  function applySettings(config: PublicSettings): void {
+    if (typeof window !== 'undefined') {
+      window.__APP_CONFIG__ = { ...config }
+    }
+    cachedPublicSettings.value = config
+    siteName.value = config.site_name || 'Sub2API'
+    siteLogo.value = config.site_logo || ''
+    siteVersion.value = config.version || ''
+    contactInfo.value = config.contact_info || ''
+    apiBaseUrl.value = config.api_base_url || ''
+    docUrl.value = config.doc_url || ''
+    publicSettingsLoaded.value = true
+  }
+
+  /**
    * Fetch public settings (uses cache unless force=true)
    * @param force - Force refresh from API
    */
   async function fetchPublicSettings(force = false): Promise<PublicSettings | null> {
+    // Check for injected config from server (eliminates flash)
+    if (!publicSettingsLoaded.value && !force && window.__APP_CONFIG__) {
+      applySettings(window.__APP_CONFIG__)
+      return window.__APP_CONFIG__
+    }
+
     // Return cached data if available and not forcing refresh
     if (publicSettingsLoaded.value && !force) {
+      if (cachedPublicSettings.value) {
+        return { ...cachedPublicSettings.value }
+      }
       return {
         registration_enabled: false,
         email_verify_enabled: false,
+        force_email_on_third_party_signup: false,
+        registration_email_suffix_whitelist: [],
+        promo_code_enabled: true,
+        password_reset_enabled: false,
+        invitation_code_enabled: false,
         turnstile_enabled: false,
         turnstile_site_key: '',
         site_name: siteName.value,
@@ -296,7 +333,32 @@ export const useAppStore = defineStore('app', () => {
         api_base_url: apiBaseUrl.value,
         contact_info: contactInfo.value,
         doc_url: docUrl.value,
-        version: siteVersion.value
+        home_content: '',
+        hide_ccs_import_button: false,
+        payment_enabled: false,
+        table_default_page_size: 20,
+        table_page_size_options: [10, 20, 50, 100],
+        custom_menu_items: [],
+        custom_endpoints: [],
+        linuxdo_oauth_enabled: false,
+        wechat_oauth_enabled: false,
+        wechat_oauth_open_enabled: false,
+        wechat_oauth_mp_enabled: false,
+        wechat_oauth_mobile_enabled: false,
+        oidc_oauth_enabled: false,
+        oidc_oauth_provider_name: 'OIDC',
+        github_oauth_enabled: false,
+        google_oauth_enabled: false,
+        backend_mode_enabled: false,
+        version: siteVersion.value,
+        balance_low_notify_enabled: false,
+        account_quota_notify_enabled: false,
+        balance_low_notify_threshold: 0,
+        channel_monitor_enabled: true,
+        channel_monitor_default_interval_seconds: 60,
+        available_channels_enabled: false,
+        risk_control_enabled: false,
+        affiliate_enabled: false,
       }
     }
 
@@ -308,13 +370,7 @@ export const useAppStore = defineStore('app', () => {
     publicSettingsLoading.value = true
     try {
       const data = await fetchPublicSettingsAPI()
-      siteName.value = data.site_name || 'Sub2API'
-      siteLogo.value = data.site_logo || ''
-      siteVersion.value = data.version || ''
-      contactInfo.value = data.contact_info || ''
-      apiBaseUrl.value = data.api_base_url || ''
-      docUrl.value = data.doc_url || ''
-      publicSettingsLoaded.value = true
+      applySettings(data)
       return data
     } catch (error) {
       console.error('Failed to fetch public settings:', error)
@@ -329,6 +385,20 @@ export const useAppStore = defineStore('app', () => {
    */
   function clearPublicSettingsCache(): void {
     publicSettingsLoaded.value = false
+    cachedPublicSettings.value = null
+  }
+
+  /**
+   * Initialize settings from injected config (window.__APP_CONFIG__)
+   * This is called synchronously before Vue app mounts to prevent flash
+   * @returns true if config was found and applied, false otherwise
+   */
+  function initFromInjectedConfig(): boolean {
+    if (window.__APP_CONFIG__) {
+      applySettings(window.__APP_CONFIG__)
+      return true
+    }
+    return false
   }
 
   // ==================== Return Store API ====================
@@ -348,6 +418,7 @@ export const useAppStore = defineStore('app', () => {
     contactInfo,
     apiBaseUrl,
     docUrl,
+    cachedPublicSettings,
 
     // Version state
     versionLoaded,
@@ -360,6 +431,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Computed
     hasActiveToasts,
+    backendModeEnabled,
 
     // Actions
     toggleSidebar,
@@ -384,6 +456,7 @@ export const useAppStore = defineStore('app', () => {
 
     // Public settings actions
     fetchPublicSettings,
-    clearPublicSettingsCache
+    clearPublicSettingsCache,
+    initFromInjectedConfig
   }
 })

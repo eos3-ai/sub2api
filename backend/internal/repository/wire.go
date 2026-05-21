@@ -28,13 +28,38 @@ func ProvideConcurrencyCache(rdb *redis.Client, cfg *config.Config) service.Conc
 // ProvideGitHubReleaseClient 创建 GitHub Release 客户端
 // 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub
 func ProvideGitHubReleaseClient(cfg *config.Config) service.GitHubReleaseClient {
-	return NewGitHubReleaseClient(cfg.Update.ProxyURL)
+	return NewGitHubReleaseClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
 }
 
 // ProvidePricingRemoteClient 创建定价数据远程客户端
 // 从配置中读取代理设置，支持国内服务器通过代理访问 GitHub 上的定价数据
 func ProvidePricingRemoteClient(cfg *config.Config) service.PricingRemoteClient {
-	return NewPricingRemoteClient(cfg.Update.ProxyURL)
+	return NewPricingRemoteClient(cfg.Update.ProxyURL, cfg.Security.ProxyFallback.AllowDirectOnError)
+}
+
+// ProvideSessionLimitCache 创建会话限制缓存
+// 用于 Anthropic OAuth/SetupToken 账号的并发会话数量控制
+func ProvideSessionLimitCache(rdb *redis.Client, cfg *config.Config) service.SessionLimitCache {
+	defaultIdleTimeoutMinutes := 5 // 默认 5 分钟空闲超时
+	if cfg != nil && cfg.Gateway.SessionIdleTimeoutMinutes > 0 {
+		defaultIdleTimeoutMinutes = cfg.Gateway.SessionIdleTimeoutMinutes
+	}
+	return NewSessionLimitCache(rdb, defaultIdleTimeoutMinutes)
+}
+
+// ProvideSchedulerCache 创建调度快照缓存，并注入快照分块参数。
+func ProvideSchedulerCache(rdb *redis.Client, cfg *config.Config) service.SchedulerCache {
+	mgetChunkSize := defaultSchedulerSnapshotMGetChunkSize
+	writeChunkSize := defaultSchedulerSnapshotWriteChunkSize
+	if cfg != nil {
+		if cfg.Gateway.Scheduling.SnapshotMGetChunkSize > 0 {
+			mgetChunkSize = cfg.Gateway.Scheduling.SnapshotMGetChunkSize
+		}
+		if cfg.Gateway.Scheduling.SnapshotWriteChunkSize > 0 {
+			writeChunkSize = cfg.Gateway.Scheduling.SnapshotWriteChunkSize
+		}
+	}
+	return newSchedulerCacheWithChunkSizes(rdb, mgetChunkSize, writeChunkSize)
 }
 
 // ProviderSet is the Wire provider set for all repositories
@@ -43,25 +68,66 @@ var ProviderSet = wire.NewSet(
 	NewAPIKeyRepository,
 	NewGroupRepository,
 	NewAccountRepository,
+	NewScheduledTestPlanRepository,   // 定时测试计划仓储
+	NewScheduledTestResultRepository, // 定时测试结果仓储
 	NewProxyRepository,
 	NewRedeemCodeRepository,
+	NewPromoCodeRepository,
+	NewAnnouncementRepository,
+	NewAnnouncementReadRepository,
 	NewUsageLogRepository,
+	NewUsageBillingRepository,
+	NewIdempotencyRepository,
+	NewUsageCleanupRepository,
+	NewDashboardAggregationRepository,
 	NewSettingRepository,
+	NewOpsRepository,
 	NewUserSubscriptionRepository,
 	NewUserAttributeDefinitionRepository,
 	NewUserAttributeValueRepository,
+	NewUserGroupRateRepository,
+	NewErrorPassthroughRepository,
+	NewTLSFingerprintProfileRepository,
+	NewChannelRepository,
+	NewChannelMonitorRepository,
+	NewChannelMonitorRequestTemplateRepository,
+	NewContentModerationRepository,
+	NewAffiliateRepository,
 
 	// Cache implementations
 	NewGatewayCache,
 	NewBillingCache,
 	NewAPIKeyCache,
 	NewTempUnschedCache,
+	NewTimeoutCounterCache,
+	NewOpenAI403CounterCache,
+	NewInternal500CounterCache,
 	ProvideConcurrencyCache,
+	ProvideSessionLimitCache,
+	NewRPMCache,
+	NewUserRPMCache,
+	NewUserMsgQueueCache,
+	NewDashboardCache,
 	NewEmailCache,
 	NewIdentityCache,
 	NewRedeemCache,
 	NewUpdateCache,
 	NewGeminiTokenCache,
+	ProvideSchedulerCache,
+	NewSchedulerOutboxRepository,
+	NewProxyLatencyCache,
+	NewTotpCache,
+	NewRefreshTokenCache,
+	NewErrorPassthroughCache,
+	NewTLSFingerprintProfileCache,
+	NewContentModerationHashCache,
+
+	// Encryptors
+	NewAESEncryptor,
+
+	// Backup infrastructure
+	NewPgDumper,
+	NewS3BackupStoreFactory,
 
 	// HTTP service ports (DI Strategy A: return interface directly)
 	NewTurnstileVerifier,
@@ -74,6 +140,7 @@ var ProviderSet = wire.NewSet(
 	NewOpenAIOAuthClient,
 	NewGeminiOAuthClient,
 	NewGeminiCliCodeAssistClient,
+	NewGeminiDriveClient,
 
 	ProvideEnt,
 	ProvideSQLDB,

@@ -1,4 +1,5 @@
 docs/claude-relay-service/
+.codex
 
 # ===================
 # Go 后端
@@ -13,6 +14,9 @@ backend/bin/
 backend/server
 backend/sub2api
 backend/main
+
+# Go 测试二进制
+*.test
 
 # 测试覆盖率
 *.out
@@ -80,6 +84,8 @@ temp/
 *.log
 *.bak
 .cache/
+.dev/
+.serena/
 
 # ===================
 # 构建产物
@@ -111,18 +117,22 @@ backend/.installed
 # ===================
 tests
 CLAUDE.md
-AGENTS.md
 .claude
 scripts
 .code-review-state
-openspec/
-docs/
+#openspec/
 code-reviews/
 AGENTS.md
 backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
 vite.config.js
-!docs/
 docs/*
-!docs/dependency-security.md
+!docs/PAYMENT.md
+!docs/PAYMENT_CN.md
+!docs/ADMIN_PAYMENT_INTEGRATION_API.md
+.serena/
+.codex/
+frontend/coverage/
+aicodex
+output/

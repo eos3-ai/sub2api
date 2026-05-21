@@ -4,7 +4,16 @@
  */
 
 import { apiClient } from '../client'
-import type { Proxy, CreateProxyRequest, UpdateProxyRequest, PaginatedResponse } from '@/types'
+import type {
+  Proxy,
+  ProxyAccountSummary,
+  ProxyQualityCheckResult,
+  CreateProxyRequest,
+  UpdateProxyRequest,
+  PaginatedResponse,
+  AdminDataPayload,
+  AdminDataImportResult
+} from '@/types'
 
 /**
  * List all proxies with pagination
@@ -20,6 +29,8 @@ export async function list(
     protocol?: string
     status?: 'active' | 'inactive'
     search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
   },
   options?: {
     signal?: AbortSignal
@@ -120,6 +131,7 @@ export async function testProxy(id: number): Promise<{
   city?: string
   region?: string
   country?: string
+  country_code?: string
 }> {
   const { data } = await apiClient.post<{
     success: boolean
@@ -129,7 +141,18 @@ export async function testProxy(id: number): Promise<{
     city?: string
     region?: string
     country?: string
+    country_code?: string
   }>(`/admin/proxies/${id}/test`)
+  return data
+}
+
+/**
+ * Check proxy quality across common AI targets
+ * @param id - Proxy ID
+ * @returns Quality check result
+ */
+export async function checkProxyQuality(id: number): Promise<ProxyQualityCheckResult> {
+  const { data } = await apiClient.post<ProxyQualityCheckResult>(`/admin/proxies/${id}/quality-check`)
   return data
 }
 
@@ -160,8 +183,8 @@ export async function getStats(id: number): Promise<{
  * @param id - Proxy ID
  * @returns List of accounts using the proxy
  */
-export async function getProxyAccounts(id: number): Promise<PaginatedResponse<any>> {
-  const { data } = await apiClient.get<PaginatedResponse<any>>(`/admin/proxies/${id}/accounts`)
+export async function getProxyAccounts(id: number): Promise<ProxyAccountSummary[]> {
+  const { data } = await apiClient.get<ProxyAccountSummary[]>(`/admin/proxies/${id}/accounts`)
   return data
 }
 
@@ -189,6 +212,49 @@ export async function batchCreate(
   return data
 }
 
+export async function batchDelete(ids: number[]): Promise<{
+  deleted_ids: number[]
+  skipped: Array<{ id: number; reason: string }>
+}> {
+  const { data } = await apiClient.post<{
+    deleted_ids: number[]
+    skipped: Array<{ id: number; reason: string }>
+  }>('/admin/proxies/batch-delete', { ids })
+  return data
+}
+
+export async function exportData(options?: {
+  ids?: number[]
+  filters?: {
+    protocol?: string
+    status?: 'active' | 'inactive'
+    search?: string
+    sort_by?: string
+    sort_order?: 'asc' | 'desc'
+  }
+}): Promise<AdminDataPayload> {
+  const params: Record<string, string> = {}
+  if (options?.ids && options.ids.length > 0) {
+    params.ids = options.ids.join(',')
+  } else if (options?.filters) {
+    const { protocol, status, search, sort_by, sort_order } = options.filters
+    if (protocol) params.protocol = protocol
+    if (status) params.status = status
+    if (search) params.search = search
+    if (sort_by) params.sort_by = sort_by
+    if (sort_order) params.sort_order = sort_order
+  }
+  const { data } = await apiClient.get<AdminDataPayload>('/admin/proxies/data', { params })
+  return data
+}
+
+export async function importData(payload: {
+  data: AdminDataPayload
+}): Promise<AdminDataImportResult> {
+  const { data } = await apiClient.post<AdminDataImportResult>('/admin/proxies/data', payload)
+  return data
+}
+
 export const proxiesAPI = {
   list,
   getAll,
@@ -199,9 +265,13 @@ export const proxiesAPI = {
   delete: deleteProxy,
   toggleStatus,
   testProxy,
+  checkProxyQuality,
   getStats,
   getProxyAccounts,
-  batchCreate
+  batchCreate,
+  batchDelete,
+  exportData,
+  importData
 }
 
 export default proxiesAPI

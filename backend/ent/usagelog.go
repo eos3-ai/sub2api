@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,6 +33,18 @@ type UsageLog struct {
 	RequestID string `json:"request_id,omitempty"`
 	// Model holds the value of the "model" field.
 	Model string `json:"model,omitempty"`
+	// RequestedModel holds the value of the "requested_model" field.
+	RequestedModel *string `json:"requested_model,omitempty"`
+	// UpstreamModel holds the value of the "upstream_model" field.
+	UpstreamModel *string `json:"upstream_model,omitempty"`
+	// 渠道 ID
+	ChannelID *int64 `json:"channel_id,omitempty"`
+	// 模型映射链
+	ModelMappingChain *string `json:"model_mapping_chain,omitempty"`
+	// 计费层级标签
+	BillingTier *string `json:"billing_tier,omitempty"`
+	// 计费模式：token/per_request/image
+	BillingMode *string `json:"billing_mode,omitempty"`
 	// GroupID holds the value of the "group_id" field.
 	GroupID *int64 `json:"group_id,omitempty"`
 	// SubscriptionID holds the value of the "subscription_id" field.
@@ -62,6 +75,8 @@ type UsageLog struct {
 	ActualCost float64 `json:"actual_cost,omitempty"`
 	// RateMultiplier holds the value of the "rate_multiplier" field.
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
+	// AccountRateMultiplier holds the value of the "account_rate_multiplier" field.
+	AccountRateMultiplier *float64 `json:"account_rate_multiplier,omitempty"`
 	// BillingType holds the value of the "billing_type" field.
 	BillingType int8 `json:"billing_type,omitempty"`
 	// Stream holds the value of the "stream" field.
@@ -72,10 +87,22 @@ type UsageLog struct {
 	FirstTokenMs *int `json:"first_token_ms,omitempty"`
 	// UserAgent holds the value of the "user_agent" field.
 	UserAgent *string `json:"user_agent,omitempty"`
+	// IPAddress holds the value of the "ip_address" field.
+	IPAddress *string `json:"ip_address,omitempty"`
 	// ImageCount holds the value of the "image_count" field.
 	ImageCount int `json:"image_count,omitempty"`
 	// ImageSize holds the value of the "image_size" field.
 	ImageSize *string `json:"image_size,omitempty"`
+	// ImageInputSize holds the value of the "image_input_size" field.
+	ImageInputSize *string `json:"image_input_size,omitempty"`
+	// ImageOutputSize holds the value of the "image_output_size" field.
+	ImageOutputSize *string `json:"image_output_size,omitempty"`
+	// ImageSizeSource holds the value of the "image_size_source" field.
+	ImageSizeSource *string `json:"image_size_source,omitempty"`
+	// ImageSizeBreakdown holds the value of the "image_size_breakdown" field.
+	ImageSizeBreakdown map[string]int `json:"image_size_breakdown,omitempty"`
+	// CacheTTLOverridden holds the value of the "cache_ttl_overridden" field.
+	CacheTTLOverridden bool `json:"cache_ttl_overridden,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -161,13 +188,15 @@ func (*UsageLog) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case usagelog.FieldStream:
+		case usagelog.FieldImageSizeBreakdown:
+			values[i] = new([]byte)
+		case usagelog.FieldStream, usagelog.FieldCacheTTLOverridden:
 			values[i] = new(sql.NullBool)
-		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheCreationCost, usagelog.FieldCacheReadCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier:
+		case usagelog.FieldInputCost, usagelog.FieldOutputCost, usagelog.FieldCacheCreationCost, usagelog.FieldCacheReadCost, usagelog.FieldTotalCost, usagelog.FieldActualCost, usagelog.FieldRateMultiplier, usagelog.FieldAccountRateMultiplier:
 			values[i] = new(sql.NullFloat64)
-		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldAccountID, usagelog.FieldGroupID, usagelog.FieldSubscriptionID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheReadTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldBillingType, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldImageCount:
+		case usagelog.FieldID, usagelog.FieldUserID, usagelog.FieldAPIKeyID, usagelog.FieldAccountID, usagelog.FieldChannelID, usagelog.FieldGroupID, usagelog.FieldSubscriptionID, usagelog.FieldInputTokens, usagelog.FieldOutputTokens, usagelog.FieldCacheCreationTokens, usagelog.FieldCacheReadTokens, usagelog.FieldCacheCreation5mTokens, usagelog.FieldCacheCreation1hTokens, usagelog.FieldBillingType, usagelog.FieldDurationMs, usagelog.FieldFirstTokenMs, usagelog.FieldImageCount:
 			values[i] = new(sql.NullInt64)
-		case usagelog.FieldRequestID, usagelog.FieldModel, usagelog.FieldUserAgent, usagelog.FieldImageSize:
+		case usagelog.FieldRequestID, usagelog.FieldModel, usagelog.FieldRequestedModel, usagelog.FieldUpstreamModel, usagelog.FieldModelMappingChain, usagelog.FieldBillingTier, usagelog.FieldBillingMode, usagelog.FieldUserAgent, usagelog.FieldIPAddress, usagelog.FieldImageSize, usagelog.FieldImageInputSize, usagelog.FieldImageOutputSize, usagelog.FieldImageSizeSource:
 			values[i] = new(sql.NullString)
 		case usagelog.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -221,6 +250,48 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field model", values[i])
 			} else if value.Valid {
 				_m.Model = value.String
+			}
+		case usagelog.FieldRequestedModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_model", values[i])
+			} else if value.Valid {
+				_m.RequestedModel = new(string)
+				*_m.RequestedModel = value.String
+			}
+		case usagelog.FieldUpstreamModel:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field upstream_model", values[i])
+			} else if value.Valid {
+				_m.UpstreamModel = new(string)
+				*_m.UpstreamModel = value.String
+			}
+		case usagelog.FieldChannelID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field channel_id", values[i])
+			} else if value.Valid {
+				_m.ChannelID = new(int64)
+				*_m.ChannelID = value.Int64
+			}
+		case usagelog.FieldModelMappingChain:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field model_mapping_chain", values[i])
+			} else if value.Valid {
+				_m.ModelMappingChain = new(string)
+				*_m.ModelMappingChain = value.String
+			}
+		case usagelog.FieldBillingTier:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billing_tier", values[i])
+			} else if value.Valid {
+				_m.BillingTier = new(string)
+				*_m.BillingTier = value.String
+			}
+		case usagelog.FieldBillingMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field billing_mode", values[i])
+			} else if value.Valid {
+				_m.BillingMode = new(string)
+				*_m.BillingMode = value.String
 			}
 		case usagelog.FieldGroupID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -314,6 +385,13 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.RateMultiplier = value.Float64
 			}
+		case usagelog.FieldAccountRateMultiplier:
+			if value, ok := values[i].(*sql.NullFloat64); !ok {
+				return fmt.Errorf("unexpected type %T for field account_rate_multiplier", values[i])
+			} else if value.Valid {
+				_m.AccountRateMultiplier = new(float64)
+				*_m.AccountRateMultiplier = value.Float64
+			}
 		case usagelog.FieldBillingType:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field billing_type", values[i])
@@ -347,6 +425,13 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 				_m.UserAgent = new(string)
 				*_m.UserAgent = value.String
 			}
+		case usagelog.FieldIPAddress:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field ip_address", values[i])
+			} else if value.Valid {
+				_m.IPAddress = new(string)
+				*_m.IPAddress = value.String
+			}
 		case usagelog.FieldImageCount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field image_count", values[i])
@@ -359,6 +444,41 @@ func (_m *UsageLog) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ImageSize = new(string)
 				*_m.ImageSize = value.String
+			}
+		case usagelog.FieldImageInputSize:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_input_size", values[i])
+			} else if value.Valid {
+				_m.ImageInputSize = new(string)
+				*_m.ImageInputSize = value.String
+			}
+		case usagelog.FieldImageOutputSize:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_output_size", values[i])
+			} else if value.Valid {
+				_m.ImageOutputSize = new(string)
+				*_m.ImageOutputSize = value.String
+			}
+		case usagelog.FieldImageSizeSource:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field image_size_source", values[i])
+			} else if value.Valid {
+				_m.ImageSizeSource = new(string)
+				*_m.ImageSizeSource = value.String
+			}
+		case usagelog.FieldImageSizeBreakdown:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field image_size_breakdown", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.ImageSizeBreakdown); err != nil {
+					return fmt.Errorf("unmarshal field image_size_breakdown: %w", err)
+				}
+			}
+		case usagelog.FieldCacheTTLOverridden:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field cache_ttl_overridden", values[i])
+			} else if value.Valid {
+				_m.CacheTTLOverridden = value.Bool
 			}
 		case usagelog.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -442,6 +562,36 @@ func (_m *UsageLog) String() string {
 	builder.WriteString("model=")
 	builder.WriteString(_m.Model)
 	builder.WriteString(", ")
+	if v := _m.RequestedModel; v != nil {
+		builder.WriteString("requested_model=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.UpstreamModel; v != nil {
+		builder.WriteString("upstream_model=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ChannelID; v != nil {
+		builder.WriteString("channel_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ModelMappingChain; v != nil {
+		builder.WriteString("model_mapping_chain=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BillingTier; v != nil {
+		builder.WriteString("billing_tier=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.BillingMode; v != nil {
+		builder.WriteString("billing_mode=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	if v := _m.GroupID; v != nil {
 		builder.WriteString("group_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
@@ -491,6 +641,11 @@ func (_m *UsageLog) String() string {
 	builder.WriteString("rate_multiplier=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RateMultiplier))
 	builder.WriteString(", ")
+	if v := _m.AccountRateMultiplier; v != nil {
+		builder.WriteString("account_rate_multiplier=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
 	builder.WriteString("billing_type=")
 	builder.WriteString(fmt.Sprintf("%v", _m.BillingType))
 	builder.WriteString(", ")
@@ -512,6 +667,11 @@ func (_m *UsageLog) String() string {
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
+	if v := _m.IPAddress; v != nil {
+		builder.WriteString("ip_address=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	builder.WriteString("image_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ImageCount))
 	builder.WriteString(", ")
@@ -519,6 +679,27 @@ func (_m *UsageLog) String() string {
 		builder.WriteString("image_size=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	if v := _m.ImageInputSize; v != nil {
+		builder.WriteString("image_input_size=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ImageOutputSize; v != nil {
+		builder.WriteString("image_output_size=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ImageSizeSource; v != nil {
+		builder.WriteString("image_size_source=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("image_size_breakdown=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ImageSizeBreakdown))
+	builder.WriteString(", ")
+	builder.WriteString("cache_ttl_overridden=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CacheTTLOverridden))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

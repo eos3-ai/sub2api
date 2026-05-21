@@ -37,8 +37,12 @@ const (
 	FieldProxyID = "proxy_id"
 	// FieldConcurrency holds the string denoting the concurrency field in the database.
 	FieldConcurrency = "concurrency"
+	// FieldLoadFactor holds the string denoting the load_factor field in the database.
+	FieldLoadFactor = "load_factor"
 	// FieldPriority holds the string denoting the priority field in the database.
 	FieldPriority = "priority"
+	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
+	FieldRateMultiplier = "rate_multiplier"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldErrorMessage holds the string denoting the error_message field in the database.
@@ -57,6 +61,10 @@ const (
 	FieldRateLimitResetAt = "rate_limit_reset_at"
 	// FieldOverloadUntil holds the string denoting the overload_until field in the database.
 	FieldOverloadUntil = "overload_until"
+	// FieldTempUnschedulableUntil holds the string denoting the temp_unschedulable_until field in the database.
+	FieldTempUnschedulableUntil = "temp_unschedulable_until"
+	// FieldTempUnschedulableReason holds the string denoting the temp_unschedulable_reason field in the database.
+	FieldTempUnschedulableReason = "temp_unschedulable_reason"
 	// FieldSessionWindowStart holds the string denoting the session_window_start field in the database.
 	FieldSessionWindowStart = "session_window_start"
 	// FieldSessionWindowEnd holds the string denoting the session_window_end field in the database.
@@ -115,7 +123,9 @@ var Columns = []string{
 	FieldExtra,
 	FieldProxyID,
 	FieldConcurrency,
+	FieldLoadFactor,
 	FieldPriority,
+	FieldRateMultiplier,
 	FieldStatus,
 	FieldErrorMessage,
 	FieldLastUsedAt,
@@ -125,6 +135,8 @@ var Columns = []string{
 	FieldRateLimitedAt,
 	FieldRateLimitResetAt,
 	FieldOverloadUntil,
+	FieldTempUnschedulableUntil,
+	FieldTempUnschedulableReason,
 	FieldSessionWindowStart,
 	FieldSessionWindowEnd,
 	FieldSessionWindowStatus,
@@ -174,6 +186,8 @@ var (
 	DefaultConcurrency int
 	// DefaultPriority holds the default value on creation for the "priority" field.
 	DefaultPriority int
+	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
+	DefaultRateMultiplier float64
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -239,9 +253,19 @@ func ByConcurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldConcurrency, opts...).ToFunc()
 }
 
+// ByLoadFactor orders the results by the load_factor field.
+func ByLoadFactor(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLoadFactor, opts...).ToFunc()
+}
+
 // ByPriority orders the results by the priority field.
 func ByPriority(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPriority, opts...).ToFunc()
+}
+
+// ByRateMultiplier orders the results by the rate_multiplier field.
+func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRateMultiplier, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.
@@ -287,6 +311,16 @@ func ByRateLimitResetAt(opts ...sql.OrderTermOption) OrderOption {
 // ByOverloadUntil orders the results by the overload_until field.
 func ByOverloadUntil(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOverloadUntil, opts...).ToFunc()
+}
+
+// ByTempUnschedulableUntil orders the results by the temp_unschedulable_until field.
+func ByTempUnschedulableUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTempUnschedulableUntil, opts...).ToFunc()
+}
+
+// ByTempUnschedulableReason orders the results by the temp_unschedulable_reason field.
+func ByTempUnschedulableReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTempUnschedulableReason, opts...).ToFunc()
 }
 
 // BySessionWindowStart orders the results by the session_window_start field.

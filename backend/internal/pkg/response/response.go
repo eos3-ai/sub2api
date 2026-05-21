@@ -2,10 +2,12 @@
 package response
 
 import (
+	"log"
 	"math"
 	"net/http"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/Wei-Shaw/sub2api/internal/util/logredact"
 	"github.com/gin-gonic/gin"
 )
 
@@ -45,6 +47,15 @@ func Created(c *gin.Context, data any) {
 	})
 }
 
+// Accepted 返回异步接受响应 (HTTP 202)
+func Accepted(c *gin.Context, data any) {
+	c.JSON(http.StatusAccepted, Response{
+		Code:    0,
+		Message: "accepted",
+		Data:    data,
+	})
+}
+
 // Error 返回错误响应
 func Error(c *gin.Context, statusCode int, message string) {
 	c.JSON(statusCode, Response{
@@ -74,6 +85,12 @@ func ErrorFrom(c *gin.Context, err error) bool {
 	}
 
 	statusCode, status := infraerrors.ToHTTP(err)
+
+	// Log internal errors with full details for debugging
+	if statusCode >= 500 && c.Request != nil {
+		log.Printf("[ERROR] %s %s\n  Error: %s", c.Request.Method, c.Request.URL.Path, logredact.RedactText(err.Error()))
+	}
+
 	ErrorWithDetails(c, statusCode, status.Message, status.Reason, status.Metadata)
 	return true
 }
@@ -162,11 +179,11 @@ func ParsePagination(c *gin.Context) (page, pageSize int) {
 
 	// 支持 page_size 和 limit 两种参数名
 	if ps := c.Query("page_size"); ps != "" {
-		if val, err := parseInt(ps); err == nil && val > 0 && val <= 100 {
+		if val, err := parseInt(ps); err == nil && val > 0 && val <= 1000 {
 			pageSize = val
 		}
 	} else if l := c.Query("limit"); l != "" {
-		if val, err := parseInt(l); err == nil && val > 0 && val <= 100 {
+		if val, err := parseInt(l); err == nil && val > 0 && val <= 1000 {
 			pageSize = val
 		}
 	}

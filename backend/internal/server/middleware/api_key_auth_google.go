@@ -26,7 +26,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 400, "Query parameter api_key is deprecated. Use Authorization header or key instead.")
 			return
 		}
-		apiKeyString := extractAPIKeyFromRequest(c)
+		apiKeyString := extractAPIKeyForGoogle(c)
 		if apiKeyString == "" {
 			abortWithGoogleError(c, 401, "API key is required")
 			return
@@ -54,6 +54,10 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if _, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
+			abortWithGoogleError(c, 403, message)
+			return
+		}
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
@@ -63,6 +67,8 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				Concurrency: apiKey.User.Concurrency,
 			})
 			c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+			setGroupContext(c, apiKey.Group)
+			_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 			c.Next()
 			return
 		}
@@ -78,17 +84,25 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				abortWithGoogleError(c, 403, "No active subscription found for this group")
 				return
 			}
-			if err := subscriptionService.ValidateSubscription(c.Request.Context(), subscription); err != nil {
-				abortWithGoogleError(c, 403, err.Error())
+
+			needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+			if err != nil {
+				status := 403
+				if errors.Is(err, service.ErrDailyLimitExceeded) ||
+					errors.Is(err, service.ErrWeeklyLimitExceeded) ||
+					errors.Is(err, service.ErrMonthlyLimitExceeded) {
+					status = 429
+				}
+				abortWithGoogleError(c, status, err.Error())
 				return
 			}
-			_ = subscriptionService.CheckAndActivateWindow(c.Request.Context(), subscription)
-			_ = subscriptionService.CheckAndResetWindows(c.Request.Context(), subscription)
-			if err := subscriptionService.CheckUsageLimits(c.Request.Context(), subscription, apiKey.Group, 0); err != nil {
-				abortWithGoogleError(c, 429, err.Error())
-				return
-			}
+
 			c.Set(string(ContextKeySubscription), subscription)
+
+			if needsMaintenance {
+				maintenanceCopy := *subscription
+				subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+			}
 		} else {
 			if apiKey.User.Balance <= 0 {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
@@ -102,29 +116,44 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			Concurrency: apiKey.User.Concurrency,
 		})
 		c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+		setGroupContext(c, apiKey.Group)
+		_ = apiKeyService.TouchLastUsed(c.Request.Context(), apiKey.ID)
 		c.Next()
 	}
 }
 
-func extractAPIKeyFromRequest(c *gin.Context) string {
-	authHeader := c.GetHeader("Authorization")
-	if authHeader != "" {
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) == 2 && parts[0] == "Bearer" && strings.TrimSpace(parts[1]) != "" {
-			return strings.TrimSpace(parts[1])
+// extractAPIKeyForGoogle extracts API key for Google/Gemini endpoints.
+// Priority: x-goog-api-key > Authorization: Bearer > x-api-key > query key
+// This allows OpenClaw and other clients using Bearer auth to work with Gemini endpoints.
+func extractAPIKeyForGoogle(c *gin.Context) string {
+	// 1) preferred: Gemini native header
+	if k := strings.TrimSpace(c.GetHeader("x-goog-api-key")); k != "" {
+		return k
+	}
+
+	// 2) fallback: Authorization: Bearer <key>
+	auth := strings.TrimSpace(c.GetHeader("Authorization"))
+	if auth != "" {
+		parts := strings.SplitN(auth, " ", 2)
+		if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
+			if k := strings.TrimSpace(parts[1]); k != "" {
+				return k
+			}
 		}
 	}
-	if v := strings.TrimSpace(c.GetHeader("x-api-key")); v != "" {
-		return v
+
+	// 3) x-api-key header (backward compatibility)
+	if k := strings.TrimSpace(c.GetHeader("x-api-key")); k != "" {
+		return k
 	}
-	if v := strings.TrimSpace(c.GetHeader("x-goog-api-key")); v != "" {
-		return v
-	}
+
+	// 4) query parameter key (for specific paths)
 	if allowGoogleQueryKey(c.Request.URL.Path) {
 		if v := strings.TrimSpace(c.Query("key")); v != "" {
 			return v
 		}
 	}
+
 	return ""
 }
 

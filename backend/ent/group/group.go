@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/Wei-Shaw/sub2api/internal/domain"
 )
 
 const (
@@ -43,12 +44,46 @@ const (
 	FieldMonthlyLimitUsd = "monthly_limit_usd"
 	// FieldDefaultValidityDays holds the string denoting the default_validity_days field in the database.
 	FieldDefaultValidityDays = "default_validity_days"
+	// FieldAllowImageGeneration holds the string denoting the allow_image_generation field in the database.
+	FieldAllowImageGeneration = "allow_image_generation"
+	// FieldImageRateIndependent holds the string denoting the image_rate_independent field in the database.
+	FieldImageRateIndependent = "image_rate_independent"
+	// FieldImageRateMultiplier holds the string denoting the image_rate_multiplier field in the database.
+	FieldImageRateMultiplier = "image_rate_multiplier"
 	// FieldImagePrice1k holds the string denoting the image_price_1k field in the database.
 	FieldImagePrice1k = "image_price_1k"
 	// FieldImagePrice2k holds the string denoting the image_price_2k field in the database.
 	FieldImagePrice2k = "image_price_2k"
 	// FieldImagePrice4k holds the string denoting the image_price_4k field in the database.
 	FieldImagePrice4k = "image_price_4k"
+	// FieldClaudeCodeOnly holds the string denoting the claude_code_only field in the database.
+	FieldClaudeCodeOnly = "claude_code_only"
+	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
+	FieldFallbackGroupID = "fallback_group_id"
+	// FieldFallbackGroupIDOnInvalidRequest holds the string denoting the fallback_group_id_on_invalid_request field in the database.
+	FieldFallbackGroupIDOnInvalidRequest = "fallback_group_id_on_invalid_request"
+	// FieldModelRouting holds the string denoting the model_routing field in the database.
+	FieldModelRouting = "model_routing"
+	// FieldModelRoutingEnabled holds the string denoting the model_routing_enabled field in the database.
+	FieldModelRoutingEnabled = "model_routing_enabled"
+	// FieldMcpXMLInject holds the string denoting the mcp_xml_inject field in the database.
+	FieldMcpXMLInject = "mcp_xml_inject"
+	// FieldSupportedModelScopes holds the string denoting the supported_model_scopes field in the database.
+	FieldSupportedModelScopes = "supported_model_scopes"
+	// FieldSortOrder holds the string denoting the sort_order field in the database.
+	FieldSortOrder = "sort_order"
+	// FieldAllowMessagesDispatch holds the string denoting the allow_messages_dispatch field in the database.
+	FieldAllowMessagesDispatch = "allow_messages_dispatch"
+	// FieldRequireOauthOnly holds the string denoting the require_oauth_only field in the database.
+	FieldRequireOauthOnly = "require_oauth_only"
+	// FieldRequirePrivacySet holds the string denoting the require_privacy_set field in the database.
+	FieldRequirePrivacySet = "require_privacy_set"
+	// FieldDefaultMappedModel holds the string denoting the default_mapped_model field in the database.
+	FieldDefaultMappedModel = "default_mapped_model"
+	// FieldMessagesDispatchModelConfig holds the string denoting the messages_dispatch_model_config field in the database.
+	FieldMessagesDispatchModelConfig = "messages_dispatch_model_config"
+	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
+	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
 	EdgeAPIKeys = "api_keys"
 	// EdgeRedeemCodes holds the string denoting the redeem_codes edge name in mutations.
@@ -138,9 +173,26 @@ var Columns = []string{
 	FieldWeeklyLimitUsd,
 	FieldMonthlyLimitUsd,
 	FieldDefaultValidityDays,
+	FieldAllowImageGeneration,
+	FieldImageRateIndependent,
+	FieldImageRateMultiplier,
 	FieldImagePrice1k,
 	FieldImagePrice2k,
 	FieldImagePrice4k,
+	FieldClaudeCodeOnly,
+	FieldFallbackGroupID,
+	FieldFallbackGroupIDOnInvalidRequest,
+	FieldModelRouting,
+	FieldModelRoutingEnabled,
+	FieldMcpXMLInject,
+	FieldSupportedModelScopes,
+	FieldSortOrder,
+	FieldAllowMessagesDispatch,
+	FieldRequireOauthOnly,
+	FieldRequirePrivacySet,
+	FieldDefaultMappedModel,
+	FieldMessagesDispatchModelConfig,
+	FieldRpmLimit,
 }
 
 var (
@@ -196,6 +248,36 @@ var (
 	SubscriptionTypeValidator func(string) error
 	// DefaultDefaultValidityDays holds the default value on creation for the "default_validity_days" field.
 	DefaultDefaultValidityDays int
+	// DefaultAllowImageGeneration holds the default value on creation for the "allow_image_generation" field.
+	DefaultAllowImageGeneration bool
+	// DefaultImageRateIndependent holds the default value on creation for the "image_rate_independent" field.
+	DefaultImageRateIndependent bool
+	// DefaultImageRateMultiplier holds the default value on creation for the "image_rate_multiplier" field.
+	DefaultImageRateMultiplier float64
+	// DefaultClaudeCodeOnly holds the default value on creation for the "claude_code_only" field.
+	DefaultClaudeCodeOnly bool
+	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.
+	DefaultModelRoutingEnabled bool
+	// DefaultMcpXMLInject holds the default value on creation for the "mcp_xml_inject" field.
+	DefaultMcpXMLInject bool
+	// DefaultSupportedModelScopes holds the default value on creation for the "supported_model_scopes" field.
+	DefaultSupportedModelScopes []string
+	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
+	DefaultSortOrder int
+	// DefaultAllowMessagesDispatch holds the default value on creation for the "allow_messages_dispatch" field.
+	DefaultAllowMessagesDispatch bool
+	// DefaultRequireOauthOnly holds the default value on creation for the "require_oauth_only" field.
+	DefaultRequireOauthOnly bool
+	// DefaultRequirePrivacySet holds the default value on creation for the "require_privacy_set" field.
+	DefaultRequirePrivacySet bool
+	// DefaultDefaultMappedModel holds the default value on creation for the "default_mapped_model" field.
+	DefaultDefaultMappedModel string
+	// DefaultMappedModelValidator is a validator for the "default_mapped_model" field. It is called by the builders before save.
+	DefaultMappedModelValidator func(string) error
+	// DefaultMessagesDispatchModelConfig holds the default value on creation for the "messages_dispatch_model_config" field.
+	DefaultMessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig
+	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
+	DefaultRpmLimit int
 )
 
 // OrderOption defines the ordering options for the Group queries.
@@ -276,6 +358,21 @@ func ByDefaultValidityDays(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultValidityDays, opts...).ToFunc()
 }
 
+// ByAllowImageGeneration orders the results by the allow_image_generation field.
+func ByAllowImageGeneration(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowImageGeneration, opts...).ToFunc()
+}
+
+// ByImageRateIndependent orders the results by the image_rate_independent field.
+func ByImageRateIndependent(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageRateIndependent, opts...).ToFunc()
+}
+
+// ByImageRateMultiplier orders the results by the image_rate_multiplier field.
+func ByImageRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldImageRateMultiplier, opts...).ToFunc()
+}
+
 // ByImagePrice1k orders the results by the image_price_1k field.
 func ByImagePrice1k(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldImagePrice1k, opts...).ToFunc()
@@ -289,6 +386,61 @@ func ByImagePrice2k(opts ...sql.OrderTermOption) OrderOption {
 // ByImagePrice4k orders the results by the image_price_4k field.
 func ByImagePrice4k(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldImagePrice4k, opts...).ToFunc()
+}
+
+// ByClaudeCodeOnly orders the results by the claude_code_only field.
+func ByClaudeCodeOnly(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldClaudeCodeOnly, opts...).ToFunc()
+}
+
+// ByFallbackGroupID orders the results by the fallback_group_id field.
+func ByFallbackGroupID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackGroupID, opts...).ToFunc()
+}
+
+// ByFallbackGroupIDOnInvalidRequest orders the results by the fallback_group_id_on_invalid_request field.
+func ByFallbackGroupIDOnInvalidRequest(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFallbackGroupIDOnInvalidRequest, opts...).ToFunc()
+}
+
+// ByModelRoutingEnabled orders the results by the model_routing_enabled field.
+func ByModelRoutingEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldModelRoutingEnabled, opts...).ToFunc()
+}
+
+// ByMcpXMLInject orders the results by the mcp_xml_inject field.
+func ByMcpXMLInject(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMcpXMLInject, opts...).ToFunc()
+}
+
+// BySortOrder orders the results by the sort_order field.
+func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
+}
+
+// ByAllowMessagesDispatch orders the results by the allow_messages_dispatch field.
+func ByAllowMessagesDispatch(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowMessagesDispatch, opts...).ToFunc()
+}
+
+// ByRequireOauthOnly orders the results by the require_oauth_only field.
+func ByRequireOauthOnly(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequireOauthOnly, opts...).ToFunc()
+}
+
+// ByRequirePrivacySet orders the results by the require_privacy_set field.
+func ByRequirePrivacySet(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequirePrivacySet, opts...).ToFunc()
+}
+
+// ByDefaultMappedModel orders the results by the default_mapped_model field.
+func ByDefaultMappedModel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefaultMappedModel, opts...).ToFunc()
+}
+
+// ByRpmLimit orders the results by the rpm_limit field.
+func ByRpmLimit(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRpmLimit, opts...).ToFunc()
 }
 
 // ByAPIKeysCount orders the results by api_keys count.

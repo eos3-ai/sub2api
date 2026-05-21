@@ -139,6 +139,20 @@ func (_c *AccountCreate) SetNillableConcurrency(v *int) *AccountCreate {
 	return _c
 }
 
+// SetLoadFactor sets the "load_factor" field.
+func (_c *AccountCreate) SetLoadFactor(v int) *AccountCreate {
+	_c.mutation.SetLoadFactor(v)
+	return _c
+}
+
+// SetNillableLoadFactor sets the "load_factor" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableLoadFactor(v *int) *AccountCreate {
+	if v != nil {
+		_c.SetLoadFactor(*v)
+	}
+	return _c
+}
+
 // SetPriority sets the "priority" field.
 func (_c *AccountCreate) SetPriority(v int) *AccountCreate {
 	_c.mutation.SetPriority(v)
@@ -149,6 +163,20 @@ func (_c *AccountCreate) SetPriority(v int) *AccountCreate {
 func (_c *AccountCreate) SetNillablePriority(v *int) *AccountCreate {
 	if v != nil {
 		_c.SetPriority(*v)
+	}
+	return _c
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (_c *AccountCreate) SetRateMultiplier(v float64) *AccountCreate {
+	_c.mutation.SetRateMultiplier(v)
+	return _c
+}
+
+// SetNillableRateMultiplier sets the "rate_multiplier" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableRateMultiplier(v *float64) *AccountCreate {
+	if v != nil {
+		_c.SetRateMultiplier(*v)
 	}
 	return _c
 }
@@ -275,6 +303,34 @@ func (_c *AccountCreate) SetOverloadUntil(v time.Time) *AccountCreate {
 func (_c *AccountCreate) SetNillableOverloadUntil(v *time.Time) *AccountCreate {
 	if v != nil {
 		_c.SetOverloadUntil(*v)
+	}
+	return _c
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (_c *AccountCreate) SetTempUnschedulableUntil(v time.Time) *AccountCreate {
+	_c.mutation.SetTempUnschedulableUntil(v)
+	return _c
+}
+
+// SetNillableTempUnschedulableUntil sets the "temp_unschedulable_until" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableTempUnschedulableUntil(v *time.Time) *AccountCreate {
+	if v != nil {
+		_c.SetTempUnschedulableUntil(*v)
+	}
+	return _c
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (_c *AccountCreate) SetTempUnschedulableReason(v string) *AccountCreate {
+	_c.mutation.SetTempUnschedulableReason(v)
+	return _c
+}
+
+// SetNillableTempUnschedulableReason sets the "temp_unschedulable_reason" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableTempUnschedulableReason(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetTempUnschedulableReason(*v)
 	}
 	return _c
 }
@@ -429,6 +485,10 @@ func (_c *AccountCreate) defaults() error {
 		v := account.DefaultPriority
 		_c.mutation.SetPriority(v)
 	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		v := account.DefaultRateMultiplier
+		_c.mutation.SetRateMultiplier(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := account.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -487,6 +547,9 @@ func (_c *AccountCreate) check() error {
 	}
 	if _, ok := _c.mutation.Priority(); !ok {
 		return &ValidationError{Name: "priority", err: errors.New(`ent: missing required field "Account.priority"`)}
+	}
+	if _, ok := _c.mutation.RateMultiplier(); !ok {
+		return &ValidationError{Name: "rate_multiplier", err: errors.New(`ent: missing required field "Account.rate_multiplier"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Account.status"`)}
@@ -574,9 +637,17 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 		_spec.SetField(account.FieldConcurrency, field.TypeInt, value)
 		_node.Concurrency = value
 	}
+	if value, ok := _c.mutation.LoadFactor(); ok {
+		_spec.SetField(account.FieldLoadFactor, field.TypeInt, value)
+		_node.LoadFactor = &value
+	}
 	if value, ok := _c.mutation.Priority(); ok {
 		_spec.SetField(account.FieldPriority, field.TypeInt, value)
 		_node.Priority = value
+	}
+	if value, ok := _c.mutation.RateMultiplier(); ok {
+		_spec.SetField(account.FieldRateMultiplier, field.TypeFloat64, value)
+		_node.RateMultiplier = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(account.FieldStatus, field.TypeString, value)
@@ -613,6 +684,14 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.OverloadUntil(); ok {
 		_spec.SetField(account.FieldOverloadUntil, field.TypeTime, value)
 		_node.OverloadUntil = &value
+	}
+	if value, ok := _c.mutation.TempUnschedulableUntil(); ok {
+		_spec.SetField(account.FieldTempUnschedulableUntil, field.TypeTime, value)
+		_node.TempUnschedulableUntil = &value
+	}
+	if value, ok := _c.mutation.TempUnschedulableReason(); ok {
+		_spec.SetField(account.FieldTempUnschedulableReason, field.TypeString, value)
+		_node.TempUnschedulableReason = &value
 	}
 	if value, ok := _c.mutation.SessionWindowStart(); ok {
 		_spec.SetField(account.FieldSessionWindowStart, field.TypeTime, value)
@@ -875,6 +954,30 @@ func (u *AccountUpsert) AddConcurrency(v int) *AccountUpsert {
 	return u
 }
 
+// SetLoadFactor sets the "load_factor" field.
+func (u *AccountUpsert) SetLoadFactor(v int) *AccountUpsert {
+	u.Set(account.FieldLoadFactor, v)
+	return u
+}
+
+// UpdateLoadFactor sets the "load_factor" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateLoadFactor() *AccountUpsert {
+	u.SetExcluded(account.FieldLoadFactor)
+	return u
+}
+
+// AddLoadFactor adds v to the "load_factor" field.
+func (u *AccountUpsert) AddLoadFactor(v int) *AccountUpsert {
+	u.Add(account.FieldLoadFactor, v)
+	return u
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (u *AccountUpsert) ClearLoadFactor() *AccountUpsert {
+	u.SetNull(account.FieldLoadFactor)
+	return u
+}
+
 // SetPriority sets the "priority" field.
 func (u *AccountUpsert) SetPriority(v int) *AccountUpsert {
 	u.Set(account.FieldPriority, v)
@@ -890,6 +993,24 @@ func (u *AccountUpsert) UpdatePriority() *AccountUpsert {
 // AddPriority adds v to the "priority" field.
 func (u *AccountUpsert) AddPriority(v int) *AccountUpsert {
 	u.Add(account.FieldPriority, v)
+	return u
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *AccountUpsert) SetRateMultiplier(v float64) *AccountUpsert {
+	u.Set(account.FieldRateMultiplier, v)
+	return u
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateRateMultiplier() *AccountUpsert {
+	u.SetExcluded(account.FieldRateMultiplier)
+	return u
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *AccountUpsert) AddRateMultiplier(v float64) *AccountUpsert {
+	u.Add(account.FieldRateMultiplier, v)
 	return u
 }
 
@@ -1034,6 +1155,42 @@ func (u *AccountUpsert) UpdateOverloadUntil() *AccountUpsert {
 // ClearOverloadUntil clears the value of the "overload_until" field.
 func (u *AccountUpsert) ClearOverloadUntil() *AccountUpsert {
 	u.SetNull(account.FieldOverloadUntil)
+	return u
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (u *AccountUpsert) SetTempUnschedulableUntil(v time.Time) *AccountUpsert {
+	u.Set(account.FieldTempUnschedulableUntil, v)
+	return u
+}
+
+// UpdateTempUnschedulableUntil sets the "temp_unschedulable_until" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateTempUnschedulableUntil() *AccountUpsert {
+	u.SetExcluded(account.FieldTempUnschedulableUntil)
+	return u
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (u *AccountUpsert) ClearTempUnschedulableUntil() *AccountUpsert {
+	u.SetNull(account.FieldTempUnschedulableUntil)
+	return u
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (u *AccountUpsert) SetTempUnschedulableReason(v string) *AccountUpsert {
+	u.Set(account.FieldTempUnschedulableReason, v)
+	return u
+}
+
+// UpdateTempUnschedulableReason sets the "temp_unschedulable_reason" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateTempUnschedulableReason() *AccountUpsert {
+	u.SetExcluded(account.FieldTempUnschedulableReason)
+	return u
+}
+
+// ClearTempUnschedulableReason clears the value of the "temp_unschedulable_reason" field.
+func (u *AccountUpsert) ClearTempUnschedulableReason() *AccountUpsert {
+	u.SetNull(account.FieldTempUnschedulableReason)
 	return u
 }
 
@@ -1304,6 +1461,34 @@ func (u *AccountUpsertOne) UpdateConcurrency() *AccountUpsertOne {
 	})
 }
 
+// SetLoadFactor sets the "load_factor" field.
+func (u *AccountUpsertOne) SetLoadFactor(v int) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetLoadFactor(v)
+	})
+}
+
+// AddLoadFactor adds v to the "load_factor" field.
+func (u *AccountUpsertOne) AddLoadFactor(v int) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddLoadFactor(v)
+	})
+}
+
+// UpdateLoadFactor sets the "load_factor" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateLoadFactor() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateLoadFactor()
+	})
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (u *AccountUpsertOne) ClearLoadFactor() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearLoadFactor()
+	})
+}
+
 // SetPriority sets the "priority" field.
 func (u *AccountUpsertOne) SetPriority(v int) *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
@@ -1322,6 +1507,27 @@ func (u *AccountUpsertOne) AddPriority(v int) *AccountUpsertOne {
 func (u *AccountUpsertOne) UpdatePriority() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *AccountUpsertOne) SetRateMultiplier(v float64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *AccountUpsertOne) AddRateMultiplier(v float64) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateRateMultiplier() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateRateMultiplier()
 	})
 }
 
@@ -1490,6 +1696,48 @@ func (u *AccountUpsertOne) UpdateOverloadUntil() *AccountUpsertOne {
 func (u *AccountUpsertOne) ClearOverloadUntil() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearOverloadUntil()
+	})
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (u *AccountUpsertOne) SetTempUnschedulableUntil(v time.Time) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetTempUnschedulableUntil(v)
+	})
+}
+
+// UpdateTempUnschedulableUntil sets the "temp_unschedulable_until" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateTempUnschedulableUntil() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateTempUnschedulableUntil()
+	})
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (u *AccountUpsertOne) ClearTempUnschedulableUntil() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearTempUnschedulableUntil()
+	})
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (u *AccountUpsertOne) SetTempUnschedulableReason(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetTempUnschedulableReason(v)
+	})
+}
+
+// UpdateTempUnschedulableReason sets the "temp_unschedulable_reason" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateTempUnschedulableReason() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateTempUnschedulableReason()
+	})
+}
+
+// ClearTempUnschedulableReason clears the value of the "temp_unschedulable_reason" field.
+func (u *AccountUpsertOne) ClearTempUnschedulableReason() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearTempUnschedulableReason()
 	})
 }
 
@@ -1935,6 +2183,34 @@ func (u *AccountUpsertBulk) UpdateConcurrency() *AccountUpsertBulk {
 	})
 }
 
+// SetLoadFactor sets the "load_factor" field.
+func (u *AccountUpsertBulk) SetLoadFactor(v int) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetLoadFactor(v)
+	})
+}
+
+// AddLoadFactor adds v to the "load_factor" field.
+func (u *AccountUpsertBulk) AddLoadFactor(v int) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddLoadFactor(v)
+	})
+}
+
+// UpdateLoadFactor sets the "load_factor" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateLoadFactor() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateLoadFactor()
+	})
+}
+
+// ClearLoadFactor clears the value of the "load_factor" field.
+func (u *AccountUpsertBulk) ClearLoadFactor() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearLoadFactor()
+	})
+}
+
 // SetPriority sets the "priority" field.
 func (u *AccountUpsertBulk) SetPriority(v int) *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
@@ -1953,6 +2229,27 @@ func (u *AccountUpsertBulk) AddPriority(v int) *AccountUpsertBulk {
 func (u *AccountUpsertBulk) UpdatePriority() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdatePriority()
+	})
+}
+
+// SetRateMultiplier sets the "rate_multiplier" field.
+func (u *AccountUpsertBulk) SetRateMultiplier(v float64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetRateMultiplier(v)
+	})
+}
+
+// AddRateMultiplier adds v to the "rate_multiplier" field.
+func (u *AccountUpsertBulk) AddRateMultiplier(v float64) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.AddRateMultiplier(v)
+	})
+}
+
+// UpdateRateMultiplier sets the "rate_multiplier" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateRateMultiplier() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateRateMultiplier()
 	})
 }
 
@@ -2121,6 +2418,48 @@ func (u *AccountUpsertBulk) UpdateOverloadUntil() *AccountUpsertBulk {
 func (u *AccountUpsertBulk) ClearOverloadUntil() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.ClearOverloadUntil()
+	})
+}
+
+// SetTempUnschedulableUntil sets the "temp_unschedulable_until" field.
+func (u *AccountUpsertBulk) SetTempUnschedulableUntil(v time.Time) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetTempUnschedulableUntil(v)
+	})
+}
+
+// UpdateTempUnschedulableUntil sets the "temp_unschedulable_until" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateTempUnschedulableUntil() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateTempUnschedulableUntil()
+	})
+}
+
+// ClearTempUnschedulableUntil clears the value of the "temp_unschedulable_until" field.
+func (u *AccountUpsertBulk) ClearTempUnschedulableUntil() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearTempUnschedulableUntil()
+	})
+}
+
+// SetTempUnschedulableReason sets the "temp_unschedulable_reason" field.
+func (u *AccountUpsertBulk) SetTempUnschedulableReason(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetTempUnschedulableReason(v)
+	})
+}
+
+// UpdateTempUnschedulableReason sets the "temp_unschedulable_reason" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateTempUnschedulableReason() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateTempUnschedulableReason()
+	})
+}
+
+// ClearTempUnschedulableReason clears the value of the "temp_unschedulable_reason" field.
+func (u *AccountUpsertBulk) ClearTempUnschedulableReason() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearTempUnschedulableReason()
 	})
 }
 

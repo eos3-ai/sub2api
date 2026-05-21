@@ -4,6 +4,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -17,6 +19,20 @@ type GroupRepoSuite struct {
 	ctx  context.Context
 	tx   *dbent.Tx
 	repo *groupRepository
+}
+
+type forbidSQLExecutor struct {
+	called bool
+}
+
+func (s *forbidSQLExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	s.called = true
+	return nil, errors.New("unexpected sql exec")
+}
+
+func (s *forbidSQLExecutor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	s.called = true
+	return nil, errors.New("unexpected sql query")
 }
 
 func (s *GroupRepoSuite) SetupTest() {
@@ -57,6 +73,26 @@ func (s *GroupRepoSuite) TestGetByID_NotFound() {
 	s.Require().ErrorIs(err, service.ErrGroupNotFound)
 }
 
+func (s *GroupRepoSuite) TestGetByIDLite_DoesNotUseAccountCount() {
+	group := &service.Group{
+		Name:             "lite-group",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, group))
+
+	spy := &forbidSQLExecutor{}
+	repo := newGroupRepositoryWithSQL(s.tx.Client(), spy)
+
+	got, err := repo.GetByIDLite(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(group.ID, got.ID)
+	s.Require().False(spy.called, "expected no direct sql executor usage")
+}
+
 func (s *GroupRepoSuite) TestUpdate() {
 	group := &service.Group{
 		Name:             "original",
@@ -75,6 +111,33 @@ func (s *GroupRepoSuite) TestUpdate() {
 	got, err := s.repo.GetByID(s.ctx, group.ID)
 	s.Require().NoError(err, "GetByID after update")
 	s.Require().Equal("updated", got.Name)
+}
+
+func (s *GroupRepoSuite) TestGetByID_PreservesMessagesDispatchModelConfig() {
+	group := &service.Group{
+		Name:                  "openai-dispatch",
+		Platform:              service.PlatformOpenAI,
+		RateMultiplier:        1.0,
+		IsExclusive:           false,
+		Status:                service.StatusActive,
+		SubscriptionType:      service.SubscriptionTypeStandard,
+		AllowMessagesDispatch: true,
+		DefaultMappedModel:    "gpt-5.4",
+		MessagesDispatchModelConfig: service.OpenAIMessagesDispatchModelConfig{
+			OpusMappedModel:   "gpt-5.4",
+			SonnetMappedModel: "gpt-5.3-codex",
+			HaikuMappedModel:  "gpt-5.4-mini",
+			ExactModelMappings: map[string]string{
+				"claude-sonnet-4.5": "gpt-5.4-nano",
+			},
+		},
+	}
+
+	s.Require().NoError(s.repo.Create(s.ctx, group))
+
+	got, err := s.repo.GetByID(s.ctx, group.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(group.MessagesDispatchModelConfig, got.MessagesDispatchModelConfig)
 }
 
 func (s *GroupRepoSuite) TestDelete() {
@@ -131,6 +194,7 @@ func (s *GroupRepoSuite) TestListWithFilters_Platform() {
 		pagination.PaginationParams{Page: 1, PageSize: 10},
 		service.PlatformOpenAI,
 		"",
+		"",
 		nil,
 	)
 	s.Require().NoError(err, "ListWithFilters base")
@@ -152,7 +216,7 @@ func (s *GroupRepoSuite) TestListWithFilters_Platform() {
 		SubscriptionType: service.SubscriptionTypeStandard,
 	}))
 
-	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.PlatformOpenAI, "", nil)
+	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.PlatformOpenAI, "", "", nil)
 	s.Require().NoError(err)
 	s.Require().Len(groups, len(baseGroups)+1)
 	// Verify all groups are OpenAI platform
@@ -179,7 +243,7 @@ func (s *GroupRepoSuite) TestListWithFilters_Status() {
 		SubscriptionType: service.SubscriptionTypeStandard,
 	}))
 
-	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", service.StatusDisabled, nil)
+	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", service.StatusDisabled, "", nil)
 	s.Require().NoError(err)
 	s.Require().Len(groups, 1)
 	s.Require().Equal(service.StatusDisabled, groups[0].Status)
@@ -204,10 +268,190 @@ func (s *GroupRepoSuite) TestListWithFilters_IsExclusive() {
 	}))
 
 	isExclusive := true
-	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", "", &isExclusive)
+	groups, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, "", "", "", &isExclusive)
 	s.Require().NoError(err)
 	s.Require().Len(groups, 1)
 	s.Require().True(groups[0].IsExclusive)
+}
+
+func (s *GroupRepoSuite) TestListWithFilters_Search() {
+	newRepo := func() (*groupRepository, context.Context) {
+		tx := testEntTx(s.T())
+		return newGroupRepositoryWithSQL(tx.Client(), tx), context.Background()
+	}
+
+	containsID := func(groups []service.Group, id int64) bool {
+		for i := range groups {
+			if groups[i].ID == id {
+				return true
+			}
+		}
+		return false
+	}
+
+	mustCreate := func(repo *groupRepository, ctx context.Context, g *service.Group) *service.Group {
+		s.Require().NoError(repo.Create(ctx, g))
+		s.Require().NotZero(g.ID)
+		return g
+	}
+
+	newGroup := func(name string) *service.Group {
+		return &service.Group{
+			Name:             name,
+			Platform:         service.PlatformAnthropic,
+			RateMultiplier:   1.0,
+			IsExclusive:      false,
+			Status:           service.StatusActive,
+			SubscriptionType: service.SubscriptionTypeStandard,
+		}
+	}
+
+	s.Run("search_name_should_match", func() {
+		repo, ctx := newRepo()
+
+		target := mustCreate(repo, ctx, newGroup("it-group-search-name-target"))
+		other := mustCreate(repo, ctx, newGroup("it-group-search-name-other"))
+
+		groups, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", "name-target", nil)
+		s.Require().NoError(err)
+		s.Require().True(containsID(groups, target.ID), "expected target group to match by name")
+		s.Require().False(containsID(groups, other.ID), "expected other group to be filtered out")
+	})
+
+	s.Run("search_description_should_match", func() {
+		repo, ctx := newRepo()
+
+		target := newGroup("it-group-search-desc-target")
+		target.Description = "something about desc-needle in here"
+		target = mustCreate(repo, ctx, target)
+
+		other := newGroup("it-group-search-desc-other")
+		other.Description = "nothing to see here"
+		other = mustCreate(repo, ctx, other)
+
+		groups, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", "desc-needle", nil)
+		s.Require().NoError(err)
+		s.Require().True(containsID(groups, target.ID), "expected target group to match by description")
+		s.Require().False(containsID(groups, other.ID), "expected other group to be filtered out")
+	})
+
+	s.Run("search_nonexistent_should_return_empty", func() {
+		repo, ctx := newRepo()
+
+		_ = mustCreate(repo, ctx, newGroup("it-group-search-nonexistent-baseline"))
+
+		search := s.T().Name() + "__no_such_group__"
+		groups, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", search, nil)
+		s.Require().NoError(err)
+		s.Require().Empty(groups)
+	})
+
+	s.Run("search_should_be_case_insensitive", func() {
+		repo, ctx := newRepo()
+
+		target := mustCreate(repo, ctx, newGroup("MiXeDCaSe-Needle"))
+		other := mustCreate(repo, ctx, newGroup("it-group-search-case-other"))
+
+		groups, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", "mixedcase-needle", nil)
+		s.Require().NoError(err)
+		s.Require().True(containsID(groups, target.ID), "expected case-insensitive match")
+		s.Require().False(containsID(groups, other.ID), "expected other group to be filtered out")
+	})
+
+	s.Run("search_should_escape_like_wildcards", func() {
+		repo, ctx := newRepo()
+
+		percentTarget := mustCreate(repo, ctx, newGroup("it-group-search-100%-target"))
+		percentOther := mustCreate(repo, ctx, newGroup("it-group-search-100X-other"))
+
+		groups, _, err := repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", "100%", nil)
+		s.Require().NoError(err)
+		s.Require().True(containsID(groups, percentTarget.ID), "expected literal %% match")
+		s.Require().False(containsID(groups, percentOther.ID), "expected %% not to act as wildcard")
+
+		underscoreTarget := mustCreate(repo, ctx, newGroup("it-group-search-ab_cd-target"))
+		underscoreOther := mustCreate(repo, ctx, newGroup("it-group-search-abXcd-other"))
+
+		groups, _, err = repo.ListWithFilters(ctx, pagination.PaginationParams{Page: 1, PageSize: 50}, "", "", "ab_cd", nil)
+		s.Require().NoError(err)
+		s.Require().True(containsID(groups, underscoreTarget.ID), "expected literal _ match")
+		s.Require().False(containsID(groups, underscoreOther.ID), "expected _ not to act as wildcard")
+	})
+}
+
+func (s *GroupRepoSuite) TestUpdateSortOrders_BatchCaseWhen() {
+	g1 := &service.Group{
+		Name:             "sort-g1",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	g2 := &service.Group{
+		Name:             "sort-g2",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	g3 := &service.Group{
+		Name:             "sort-g3",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, g1))
+	s.Require().NoError(s.repo.Create(s.ctx, g2))
+	s.Require().NoError(s.repo.Create(s.ctx, g3))
+
+	err := s.repo.UpdateSortOrders(s.ctx, []service.GroupSortOrderUpdate{
+		{ID: g1.ID, SortOrder: 30},
+		{ID: g2.ID, SortOrder: 10},
+		{ID: g3.ID, SortOrder: 20},
+		{ID: g2.ID, SortOrder: 15}, // 重复 ID 应以最后一次为准
+	})
+	s.Require().NoError(err)
+
+	got1, err := s.repo.GetByID(s.ctx, g1.ID)
+	s.Require().NoError(err)
+	got2, err := s.repo.GetByID(s.ctx, g2.ID)
+	s.Require().NoError(err)
+	got3, err := s.repo.GetByID(s.ctx, g3.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(30, got1.SortOrder)
+	s.Require().Equal(15, got2.SortOrder)
+	s.Require().Equal(20, got3.SortOrder)
+}
+
+func (s *GroupRepoSuite) TestUpdateSortOrders_MissingGroupNoPartialUpdate() {
+	g1 := &service.Group{
+		Name:             "sort-no-partial",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, g1))
+
+	before, err := s.repo.GetByID(s.ctx, g1.ID)
+	s.Require().NoError(err)
+	beforeSort := before.SortOrder
+
+	err = s.repo.UpdateSortOrders(s.ctx, []service.GroupSortOrderUpdate{
+		{ID: g1.ID, SortOrder: 99},
+		{ID: 99999999, SortOrder: 1},
+	})
+	s.Require().Error(err)
+	s.Require().ErrorIs(err, service.ErrGroupNotFound)
+
+	after, err := s.repo.GetByID(s.ctx, g1.ID)
+	s.Require().NoError(err)
+	s.Require().Equal(beforeSort, after.SortOrder)
 }
 
 func (s *GroupRepoSuite) TestListWithFilters_AccountCount() {
@@ -244,7 +488,7 @@ func (s *GroupRepoSuite) TestListWithFilters_AccountCount() {
 	s.Require().NoError(err)
 
 	isExclusive := true
-	groups, page, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.PlatformAnthropic, service.StatusActive, &isExclusive)
+	groups, page, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.PlatformAnthropic, service.StatusActive, "", &isExclusive)
 	s.Require().NoError(err, "ListWithFilters")
 	s.Require().Equal(int64(1), page.Total)
 	s.Require().Len(groups, 1)
@@ -386,7 +630,7 @@ func (s *GroupRepoSuite) TestGetAccountCount() {
 	_, err = s.tx.ExecContext(s.ctx, "INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())", a2, group.ID, 2)
 	s.Require().NoError(err)
 
-	count, err := s.repo.GetAccountCount(s.ctx, group.ID)
+	count, _, err := s.repo.GetAccountCount(s.ctx, group.ID)
 	s.Require().NoError(err, "GetAccountCount")
 	s.Require().Equal(int64(2), count)
 }
@@ -402,9 +646,167 @@ func (s *GroupRepoSuite) TestGetAccountCount_Empty() {
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, group))
 
-	count, err := s.repo.GetAccountCount(s.ctx, group.ID)
+	count, _, err := s.repo.GetAccountCount(s.ctx, group.ID)
 	s.Require().NoError(err)
 	s.Require().Zero(count)
+}
+
+// TestListWithFilters_ActiveAccountCount_LessThanTotal 验证 ActiveAccountCount 正确区分可用与不可用账号。
+// 当分组内存在 disabled 或 schedulable=false 的账号时，ActiveAccountCount 必须小于 AccountCount，
+// 且与 GetAccountCount 返回的 active 值一致。
+func (s *GroupRepoSuite) TestListWithFilters_ActiveAccountCount_LessThanTotal() {
+	g := &service.Group{
+		Name:             "g-mixed-status",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, g))
+
+	insertAccount := func(name, status string, schedulable bool) int64 {
+		var id int64
+		s.Require().NoError(scanSingleRow(
+			s.ctx, s.tx,
+			"INSERT INTO accounts (name, platform, type, status, schedulable) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+			[]any{name, service.PlatformAnthropic, service.AccountTypeOAuth, status, schedulable},
+			&id,
+		))
+		return id
+	}
+	link := func(accountID int64, priority int) {
+		_, err := s.tx.ExecContext(s.ctx,
+			"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+			accountID, g.ID, priority)
+		s.Require().NoError(err)
+	}
+
+	// account 1: active + schedulable → counts toward both total and active
+	link(insertAccount("acc-active-sched", service.StatusActive, true), 1)
+	// account 2: disabled → counts toward total only
+	link(insertAccount("acc-disabled", service.StatusDisabled, true), 2)
+	// account 3: active + not schedulable → counts toward total only
+	link(insertAccount("acc-unschedulable", service.StatusActive, false), 3)
+
+	// --- ListWithFilters path ---
+	isExclusive := false
+	groups, _, err := s.repo.ListWithFilters(s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 100},
+		service.PlatformAnthropic, service.StatusActive, "", &isExclusive)
+	s.Require().NoError(err)
+
+	var found *service.Group
+	for i := range groups {
+		if groups[i].ID == g.ID {
+			found = &groups[i]
+			break
+		}
+	}
+	s.Require().NotNil(found, "created group must appear in ListWithFilters result")
+	s.Assert().Equal(int64(3), found.AccountCount, "AccountCount must count all 3 accounts")
+	s.Assert().Equal(int64(1), found.ActiveAccountCount, "ActiveAccountCount must count only the active+schedulable account")
+
+	// --- GetAccountCount must return identical values ---
+	total, active, err := s.repo.GetAccountCount(s.ctx, g.ID)
+	s.Require().NoError(err)
+	s.Assert().Equal(found.AccountCount, total, "GetAccountCount total must match ListWithFilters AccountCount")
+	s.Assert().Equal(found.ActiveAccountCount, active, "GetAccountCount active must match ListWithFilters ActiveAccountCount")
+}
+
+// TestListWithFilters_RateLimitedAccountCount 验证临时受限账号不会计入可用账号数。
+// rate_limit / overload / temp_unschedulable 都会让账号退出当前调度池，
+// 因此 ActiveAccountCount 必须与真实调度查询口径一致。
+func (s *GroupRepoSuite) TestListWithFilters_RateLimitedAccountCount() {
+	g := &service.Group{
+		Name:             "g-rate-limited",
+		Platform:         service.PlatformAnthropic,
+		RateMultiplier:   1.0,
+		IsExclusive:      false,
+		Status:           service.StatusActive,
+		SubscriptionType: service.SubscriptionTypeStandard,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, g))
+
+	var normalID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		"INSERT INTO accounts (name, platform, type) VALUES ($1, $2, $3) RETURNING id",
+		[]any{"acc-normal", service.PlatformAnthropic, service.AccountTypeOAuth},
+		&normalID))
+
+	var rateLimitedID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		"INSERT INTO accounts (name, platform, type, rate_limit_reset_at) VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour') RETURNING id",
+		[]any{"acc-rate-limited", service.PlatformAnthropic, service.AccountTypeOAuth},
+		&rateLimitedID))
+
+	var overloadedID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		"INSERT INTO accounts (name, platform, type, overload_until) VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour') RETURNING id",
+		[]any{"acc-overloaded", service.PlatformAnthropic, service.AccountTypeOAuth},
+		&overloadedID))
+
+	var tempUnschedulableID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		"INSERT INTO accounts (name, platform, type, temp_unschedulable_until) VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour') RETURNING id",
+		[]any{"acc-temp-unschedulable", service.PlatformAnthropic, service.AccountTypeOAuth},
+		&tempUnschedulableID))
+
+	var expiredID int64
+	s.Require().NoError(scanSingleRow(s.ctx, s.tx,
+		"INSERT INTO accounts (name, platform, type, expires_at, auto_pause_on_expired) VALUES ($1, $2, $3, NOW() - INTERVAL '1 hour', TRUE) RETURNING id",
+		[]any{"acc-expired", service.PlatformAnthropic, service.AccountTypeOAuth},
+		&expiredID))
+
+	_, err := s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		normalID, g.ID, 1)
+	s.Require().NoError(err)
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		rateLimitedID, g.ID, 2)
+	s.Require().NoError(err)
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		overloadedID, g.ID, 3)
+	s.Require().NoError(err)
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		tempUnschedulableID, g.ID, 4)
+	s.Require().NoError(err)
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO account_groups (account_id, group_id, priority, created_at) VALUES ($1, $2, $3, NOW())",
+		expiredID, g.ID, 5)
+	s.Require().NoError(err)
+
+	isExclusive := false
+	groups, _, err := s.repo.ListWithFilters(s.ctx,
+		pagination.PaginationParams{Page: 1, PageSize: 100},
+		service.PlatformAnthropic, service.StatusActive, "", &isExclusive)
+	s.Require().NoError(err)
+
+	var found *service.Group
+	for i := range groups {
+		if groups[i].ID == g.ID {
+			found = &groups[i]
+			break
+		}
+	}
+	s.Require().NotNil(found, "created group must appear in ListWithFilters result")
+	s.Assert().Equal(int64(5), found.AccountCount, "AccountCount must include all linked accounts")
+	s.Assert().Equal(int64(1), found.ActiveAccountCount, "ActiveAccountCount must include only currently schedulable accounts")
+	s.Assert().Equal(int64(3), found.RateLimitedAccountCount, "RateLimitedAccountCount must include temporarily limited accounts")
+
+	total, active, err := s.repo.GetAccountCount(s.ctx, g.ID)
+	s.Require().NoError(err)
+	s.Assert().Equal(found.AccountCount, total, "GetAccountCount total must match ListWithFilters AccountCount")
+	s.Assert().Equal(found.ActiveAccountCount, active, "GetAccountCount active must match ListWithFilters ActiveAccountCount")
+
+	detail, err := s.repo.GetByID(s.ctx, g.ID)
+	s.Require().NoError(err)
+	s.Assert().Equal(found.AccountCount, detail.AccountCount, "GetByID AccountCount must match ListWithFilters")
+	s.Assert().Equal(found.ActiveAccountCount, detail.ActiveAccountCount, "GetByID ActiveAccountCount must match ListWithFilters")
+	s.Assert().Equal(found.RateLimitedAccountCount, detail.RateLimitedAccountCount, "GetByID RateLimitedAccountCount must match ListWithFilters")
 }
 
 // --- DeleteAccountGroupsByGroupID ---
@@ -434,7 +836,7 @@ func (s *GroupRepoSuite) TestDeleteAccountGroupsByGroupID() {
 	s.Require().NoError(err, "DeleteAccountGroupsByGroupID")
 	s.Require().Equal(int64(1), affected, "expected 1 affected row")
 
-	count, err := s.repo.GetAccountCount(s.ctx, g.ID)
+	count, _, err := s.repo.GetAccountCount(s.ctx, g.ID)
 	s.Require().NoError(err, "GetAccountCount")
 	s.Require().Equal(int64(0), count, "expected 0 account groups")
 }
@@ -475,7 +877,7 @@ func (s *GroupRepoSuite) TestDeleteAccountGroupsByGroupID_MultipleAccounts() {
 	s.Require().NoError(err)
 	s.Require().Equal(int64(3), affected)
 
-	count, _ := s.repo.GetAccountCount(s.ctx, g.ID)
+	count, _, _ := s.repo.GetAccountCount(s.ctx, g.ID)
 	s.Require().Zero(count)
 }
 

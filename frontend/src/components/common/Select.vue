@@ -46,7 +46,7 @@
           @keydown="onDropdownKeyDown"
         >
           <!-- Search input -->
-          <div v-if="searchable" class="select-search">
+          <div v-if="isSearchable" class="select-search">
             <Icon name="search" size="sm" class="text-gray-400" />
             <input
               ref="searchInputRef"
@@ -67,16 +67,23 @@
               :aria-selected="isSelected(option)"
               :aria-disabled="isOptionDisabled(option)"
               @click.stop="!isOptionDisabled(option) && selectOption(option)"
-              @mouseenter="focusedIndex = index"
+              @mouseenter="handleOptionMouseEnter(option, index)"
               :class="[
                 'select-option',
+                isGroupHeaderOption(option) && 'select-option-group',
                 isSelected(option) && 'select-option-selected',
-                isOptionDisabled(option) && 'select-option-disabled',
-                focusedIndex === index && 'select-option-focused'
+                isOptionDisabled(option) && !isGroupHeaderOption(option) && 'select-option-disabled',
+                focusedIndex === index && !isGroupHeaderOption(option) && 'select-option-focused'
               ]"
             >
               <slot name="option" :option="option" :selected="isSelected(option)">
-                <span class="select-option-label">{{ getOptionLabel(option) }}</span>
+                <Icon
+                  v-if="option._creatable"
+                  name="search"
+                  size="sm"
+                  class="flex-shrink-0 text-gray-400"
+                />
+                <span class="select-option-label" :class="option._creatable && 'italic text-gray-500 dark:text-dark-300'">{{ getOptionLabel(option) }}</span>
                 <Icon
                   v-if="isSelected(option)"
                   name="check"
@@ -121,11 +128,13 @@ interface Props {
   placeholder?: string
   disabled?: boolean
   error?: boolean
-  searchable?: boolean
+  searchable?: boolean | 'auto'
   searchPlaceholder?: string
   emptyText?: string
   valueKey?: string
   labelKey?: string
+  creatable?: boolean
+  creatablePrefix?: string
 }
 
 interface Emits {
@@ -136,7 +145,9 @@ interface Emits {
 const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   error: false,
-  searchable: false,
+  searchable: 'auto',
+  creatable: false,
+  creatablePrefix: '',
   valueKey: 'value',
   labelKey: 'label'
 })
@@ -158,6 +169,11 @@ const triggerRect = ref<DOMRect | null>(null)
 const placeholderText = computed(() => props.placeholder ?? t('common.selectOption'))
 const searchPlaceholderText = computed(() => props.searchPlaceholder ?? t('common.searchPlaceholder'))
 const emptyTextDisplay = computed(() => props.emptyText ?? t('common.noOptionsFound'))
+
+const isSearchable = computed(() => {
+  if (props.searchable === 'auto') return props.options.length > 5
+  return props.searchable
+})
 
 // Computed style for teleported dropdown
 const dropdownStyle = computed(() => {
@@ -201,6 +217,13 @@ const isOptionDisabled = (option: any): boolean => {
   return false
 }
 
+const isGroupHeaderOption = (option: any): boolean => {
+  if (typeof option === 'object' && option !== null) {
+    return option.kind === 'group'
+  }
+  return false
+}
+
 const selectedOption = computed(() => {
   return props.options.find((opt) => getOptionValue(opt) === props.modelValue) || null
 })
@@ -209,20 +232,61 @@ const selectedLabel = computed(() => {
   if (selectedOption.value) {
     return getOptionLabel(selectedOption.value)
   }
+  // In creatable mode, show the raw value if no matching option
+  if (props.creatable && props.modelValue) {
+    return String(props.modelValue)
+  }
   return placeholderText.value
 })
 
 const filteredOptions = computed(() => {
   let opts = props.options as any[]
-  if (props.searchable && searchQuery.value) {
+  if (isSearchable.value && searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    opts = opts.filter((opt) => getOptionLabel(opt).toLowerCase().includes(query))
+    opts = opts.filter((opt) => {
+      // Match label
+      if (getOptionLabel(opt).toLowerCase().includes(query)) return true
+      // Also match description if present
+      if (opt.description && String(opt.description).toLowerCase().includes(query)) return true
+      return false
+    })
+    // In creatable mode, always prepend a fuzzy search option
+    if (props.creatable && searchQuery.value.trim()) {
+      const trimmed = searchQuery.value.trim()
+      const prefix = props.creatablePrefix || t('common.search')
+      opts = [{ [props.valueKey]: trimmed, [props.labelKey]: `${prefix} "${trimmed}"`, _creatable: true }, ...opts]
+    }
   }
   return opts
 })
 
 const isSelected = (option: any): boolean => {
   return getOptionValue(option) === props.modelValue
+}
+
+const findNextEnabledIndex = (startIndex: number): number => {
+  const opts = filteredOptions.value
+  if (opts.length === 0) return -1
+  for (let offset = 0; offset < opts.length; offset++) {
+    const idx = (startIndex + offset) % opts.length
+    if (!isOptionDisabled(opts[idx])) return idx
+  }
+  return -1
+}
+
+const findPrevEnabledIndex = (startIndex: number): number => {
+  const opts = filteredOptions.value
+  if (opts.length === 0) return -1
+  for (let offset = 0; offset < opts.length; offset++) {
+    const idx = (startIndex - offset + opts.length) % opts.length
+    if (!isOptionDisabled(opts[idx])) return idx
+  }
+  return -1
+}
+
+const handleOptionMouseEnter = (option: any, index: number) => {
+  if (isOptionDisabled(option) || isGroupHeaderOption(option)) return
+  focusedIndex.value = index
 }
 
 // Update trigger rect periodically while open to follow scroll/resize
@@ -259,10 +323,17 @@ watch(isOpen, (open) => {
   if (open) {
     calculateDropdownPosition()
     // Reset focused index to current selection or first item
-    const selectedIdx = filteredOptions.value.findIndex(isSelected)
-    focusedIndex.value = selectedIdx >= 0 ? selectedIdx : 0
+    if (filteredOptions.value.length === 0) {
+      focusedIndex.value = -1
+    } else {
+      const selectedIdx = filteredOptions.value.findIndex(isSelected)
+      const initialIdx = selectedIdx >= 0 ? selectedIdx : 0
+      focusedIndex.value = isOptionDisabled(filteredOptions.value[initialIdx])
+        ? findNextEnabledIndex(initialIdx + 1)
+        : initialIdx
+    }
 
-    if (props.searchable) {
+    if (isSearchable.value) {
       nextTick(() => searchInputRef.value?.focus())
     }
     // Add scroll listener to update position
@@ -295,13 +366,13 @@ const onDropdownKeyDown = (e: KeyboardEvent) => {
   switch (e.key) {
     case 'ArrowDown':
       e.preventDefault()
-      focusedIndex.value = (focusedIndex.value + 1) % filteredOptions.value.length
-      scrollToFocused()
+      focusedIndex.value = findNextEnabledIndex(focusedIndex.value + 1)
+      if (focusedIndex.value >= 0) scrollToFocused()
       break
     case 'ArrowUp':
       e.preventDefault()
-      focusedIndex.value = (focusedIndex.value - 1 + filteredOptions.value.length) % filteredOptions.value.length
-      scrollToFocused()
+      focusedIndex.value = findPrevEnabledIndex(focusedIndex.value - 1)
+      if (focusedIndex.value >= 0) scrollToFocused()
       break
     case 'Enter':
       e.preventDefault()
@@ -394,7 +465,7 @@ onUnmounted(() => {
 
 <style>
 .select-dropdown-portal {
-  @apply w-max min-w-[160px] max-w-[320px];
+  @apply w-max min-w-[200px];
   @apply bg-white dark:bg-dark-800;
   @apply rounded-xl;
   @apply border border-gray-200 dark:border-dark-700;
@@ -439,6 +510,17 @@ onUnmounted(() => {
 
 .select-dropdown-portal .select-option-disabled {
   @apply cursor-not-allowed opacity-40;
+}
+
+.select-dropdown-portal .select-option-group {
+  @apply cursor-default select-none;
+  @apply bg-gray-50 dark:bg-dark-900;
+  @apply text-[11px] font-bold uppercase tracking-wider;
+  @apply text-gray-500 dark:text-gray-400;
+}
+
+.select-dropdown-portal .select-option-group:hover {
+  @apply bg-gray-50 dark:bg-dark-900;
 }
 
 .select-dropdown-portal .select-option-label {

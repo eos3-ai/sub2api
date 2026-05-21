@@ -1,9 +1,12 @@
 package repository
 
 import (
+	"compress/flate"
+	"compress/gzip"
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -12,8 +15,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/andybalholm/brotli"
+
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyutil"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 )
@@ -140,6 +147,9 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 		return nil, err
 	}
 
+	// 如果上游返回了压缩内容，解压后再交给业务层
+	decompressResponseBody(resp)
+
 	// 包装响应体，在关闭时自动减少计数并更新时间戳
 	// 这确保了流式响应（如 SSE）在完全读取前不会被淘汰
 	resp.Body = wrapTrackedBody(resp.Body, func() {
@@ -148,6 +158,148 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 	})
 
 	return resp, nil
+}
+
+// DoWithTLS 执行带 TLS 指纹伪装的 HTTP 请求
+//
+// profile 为 nil 时不启用 TLS 指纹，行为与 Do 方法相同。
+// profile 非 nil 时使用指定的 Profile 进行 TLS 指纹伪装。
+func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	if profile == nil {
+		return s.Do(req, proxyURL, accountID, accountConcurrency)
+	}
+
+	targetHost := ""
+	if req != nil && req.URL != nil {
+		targetHost = req.URL.Host
+	}
+	proxyInfo := "direct"
+	if proxyURL != "" {
+		proxyInfo = proxyURL
+	}
+	slog.Debug("tls_fingerprint_enabled", "account_id", accountID, "target", targetHost, "proxy", proxyInfo, "profile", profile.Name)
+
+	if err := s.validateRequestHost(req); err != nil {
+		return nil, err
+	}
+
+	entry, err := s.acquireClientWithTLS(proxyURL, accountID, accountConcurrency, profile)
+	if err != nil {
+		slog.Debug("tls_fingerprint_acquire_client_failed", "account_id", accountID, "error", err)
+		return nil, err
+	}
+
+	resp, err := entry.client.Do(req)
+	if err != nil {
+		atomic.AddInt64(&entry.inFlight, -1)
+		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+		slog.Debug("tls_fingerprint_request_failed", "account_id", accountID, "error", err)
+		return nil, err
+	}
+
+	decompressResponseBody(resp)
+
+	resp.Body = wrapTrackedBody(resp.Body, func() {
+		atomic.AddInt64(&entry.inFlight, -1)
+		atomic.StoreInt64(&entry.lastUsed, time.Now().UnixNano())
+	})
+
+	return resp, nil
+}
+
+// acquireClientWithTLS 获取或创建带 TLS 指纹的客户端
+func (s *httpUpstreamService) acquireClientWithTLS(proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*upstreamClientEntry, error) {
+	return s.getClientEntryWithTLS(proxyURL, accountID, accountConcurrency, profile, true, true)
+}
+
+// getClientEntryWithTLS 获取或创建带 TLS 指纹的客户端条目
+// TLS 指纹客户端使用独立的缓存键，与普通客户端隔离
+func (s *httpUpstreamService) getClientEntryWithTLS(proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile, markInFlight bool, enforceLimit bool) (*upstreamClientEntry, error) {
+	isolation := s.getIsolationMode()
+	proxyKey, parsedProxy, err := normalizeProxyURL(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+	// TLS 指纹客户端使用独立的缓存键，加 "tls:" 前缀
+	cacheKey := "tls:" + buildCacheKey(isolation, proxyKey, accountID)
+	poolKey := s.buildPoolKey(isolation, accountConcurrency) + ":tls"
+
+	now := time.Now()
+	nowUnix := now.UnixNano()
+
+	// 读锁快速路径
+	s.mu.RLock()
+	if entry, ok := s.clients[cacheKey]; ok && s.shouldReuseEntry(entry, isolation, proxyKey, poolKey) {
+		atomic.StoreInt64(&entry.lastUsed, nowUnix)
+		if markInFlight {
+			atomic.AddInt64(&entry.inFlight, 1)
+		}
+		s.mu.RUnlock()
+		slog.Debug("tls_fingerprint_reusing_client", "account_id", accountID, "cache_key", cacheKey)
+		return entry, nil
+	}
+	s.mu.RUnlock()
+
+	// 写锁慢路径
+	s.mu.Lock()
+	if entry, ok := s.clients[cacheKey]; ok {
+		if s.shouldReuseEntry(entry, isolation, proxyKey, poolKey) {
+			atomic.StoreInt64(&entry.lastUsed, nowUnix)
+			if markInFlight {
+				atomic.AddInt64(&entry.inFlight, 1)
+			}
+			s.mu.Unlock()
+			slog.Debug("tls_fingerprint_reusing_client", "account_id", accountID, "cache_key", cacheKey)
+			return entry, nil
+		}
+		slog.Debug("tls_fingerprint_evicting_stale_client",
+			"account_id", accountID,
+			"cache_key", cacheKey,
+			"proxy_changed", entry.proxyKey != proxyKey,
+			"pool_changed", entry.poolKey != poolKey)
+		s.removeClientLocked(cacheKey, entry)
+	}
+
+	// 超出缓存上限时尝试淘汰
+	if enforceLimit && s.maxUpstreamClients() > 0 {
+		s.evictIdleLocked(now)
+		if len(s.clients) >= s.maxUpstreamClients() {
+			if !s.evictOldestIdleLocked() {
+				s.mu.Unlock()
+				return nil, errUpstreamClientLimitReached
+			}
+		}
+	}
+
+	// 创建带 TLS 指纹的 Transport
+	slog.Debug("tls_fingerprint_creating_new_client", "account_id", accountID, "cache_key", cacheKey, "proxy", proxyKey)
+	settings := s.resolvePoolSettings(isolation, accountConcurrency)
+	transport, err := buildUpstreamTransportWithTLSFingerprint(settings, parsedProxy, profile)
+	if err != nil {
+		s.mu.Unlock()
+		return nil, fmt.Errorf("build TLS fingerprint transport: %w", err)
+	}
+
+	client := &http.Client{Transport: transport}
+	if s.shouldValidateResolvedIP() {
+		client.CheckRedirect = s.redirectChecker
+	}
+
+	entry := &upstreamClientEntry{
+		client:   client,
+		proxyKey: proxyKey,
+		poolKey:  poolKey,
+	}
+	atomic.StoreInt64(&entry.lastUsed, nowUnix)
+	if markInFlight {
+		atomic.StoreInt64(&entry.inFlight, 1)
+	}
+	s.clients[cacheKey] = entry
+
+	s.evictIdleLocked(now)
+	s.evictOverLimitLocked()
+	s.mu.Unlock()
+	return entry, nil
 }
 
 func (s *httpUpstreamService) shouldValidateResolvedIP() bool {
@@ -205,9 +357,8 @@ func (s *httpUpstreamService) acquireClient(proxyURL string, accountID int64, ac
 //   - proxy: 按代理地址隔离，同一代理共享客户端
 //   - account: 按账户隔离，同一账户共享客户端（代理变更时重建）
 //   - account_proxy: 按账户+代理组合隔离，最细粒度
-func (s *httpUpstreamService) getOrCreateClient(proxyURL string, accountID int64, accountConcurrency int) *upstreamClientEntry {
-	entry, _ := s.getClientEntry(proxyURL, accountID, accountConcurrency, false, false)
-	return entry
+func (s *httpUpstreamService) getOrCreateClient(proxyURL string, accountID int64, accountConcurrency int) (*upstreamClientEntry, error) {
+	return s.getClientEntry(proxyURL, accountID, accountConcurrency, false, false)
 }
 
 // getClientEntry 获取或创建客户端条目
@@ -217,7 +368,10 @@ func (s *httpUpstreamService) getClientEntry(proxyURL string, accountID int64, a
 	// 获取隔离模式
 	isolation := s.getIsolationMode()
 	// 标准化代理 URL 并解析
-	proxyKey, parsedProxy := normalizeProxyURL(proxyURL)
+	proxyKey, parsedProxy, err := normalizeProxyURL(proxyURL)
+	if err != nil {
+		return nil, err
+	}
 	// 构建缓存键（根据隔离策略不同）
 	cacheKey := buildCacheKey(isolation, proxyKey, accountID)
 	// 构建连接池配置键（用于检测配置变更）
@@ -512,17 +666,18 @@ func buildCacheKey(isolation, proxyKey string, accountID int64) string {
 //   - raw: 原始代理 URL 字符串
 //
 // 返回:
-//   - string: 标准化的代理键（空或解析失败返回 "direct"）
-//   - *url.URL: 解析后的 URL（空或解析失败返回 nil）
-func normalizeProxyURL(raw string) (string, *url.URL) {
-	proxyURL := strings.TrimSpace(raw)
-	if proxyURL == "" {
-		return directProxyKey, nil
-	}
-	parsed, err := url.Parse(proxyURL)
+//   - string: 标准化的代理键（空返回 "direct"）
+//   - *url.URL: 解析后的 URL（空返回 nil）
+//   - error: 非空代理 URL 解析失败时返回错误（禁止回退到直连）
+func normalizeProxyURL(raw string) (string, *url.URL, error) {
+	_, parsed, err := proxyurl.Parse(raw)
 	if err != nil {
-		return directProxyKey, nil
+		return "", nil, err
 	}
+	if parsed == nil {
+		return directProxyKey, nil, nil
+	}
+	// 规范化：小写 scheme/host，去除路径和查询参数
 	parsed.Scheme = strings.ToLower(parsed.Scheme)
 	parsed.Host = strings.ToLower(parsed.Host)
 	parsed.Path = ""
@@ -542,7 +697,7 @@ func normalizeProxyURL(raw string) (string, *url.URL) {
 			parsed.Host = hostname
 		}
 	}
-	return parsed.String(), parsed
+	return parsed.String(), parsed, nil
 }
 
 // defaultPoolSettings 获取默认连接池配置
@@ -618,6 +773,64 @@ func buildUpstreamTransport(settings poolSettings, proxyURL *url.URL) (*http.Tra
 	return transport, nil
 }
 
+// buildUpstreamTransportWithTLSFingerprint 构建带 TLS 指纹伪装的 Transport
+// 使用 utls 库模拟 Claude CLI 的 TLS 指纹
+//
+// 参数:
+//   - settings: 连接池配置
+//   - proxyURL: 代理 URL（nil 表示直连）
+//   - profile: TLS 指纹配置
+//
+// 返回:
+//   - *http.Transport: 配置好的 Transport 实例
+//   - error: 配置错误
+//
+// 代理类型处理:
+//   - nil/空: 直连，使用 TLSFingerprintDialer
+//   - http/https: HTTP 代理，使用 HTTPProxyDialer（CONNECT 隧道 + utls 握手）
+//   - socks5: SOCKS5 代理，使用 SOCKS5ProxyDialer（SOCKS5 隧道 + utls 握手）
+func buildUpstreamTransportWithTLSFingerprint(settings poolSettings, proxyURL *url.URL, profile *tlsfingerprint.Profile) (*http.Transport, error) {
+	transport := &http.Transport{
+		MaxIdleConns:          settings.maxIdleConns,
+		MaxIdleConnsPerHost:   settings.maxIdleConnsPerHost,
+		MaxConnsPerHost:       settings.maxConnsPerHost,
+		IdleConnTimeout:       settings.idleConnTimeout,
+		ResponseHeaderTimeout: settings.responseHeaderTimeout,
+		// 禁用默认的 TLS，我们使用自定义的 DialTLSContext
+		ForceAttemptHTTP2: false,
+	}
+
+	// 根据代理类型选择合适的 TLS 指纹 Dialer
+	if proxyURL == nil {
+		// 直连：使用 TLSFingerprintDialer
+		slog.Debug("tls_fingerprint_transport_direct")
+		dialer := tlsfingerprint.NewDialer(profile, nil)
+		transport.DialTLSContext = dialer.DialTLSContext
+	} else {
+		scheme := strings.ToLower(proxyURL.Scheme)
+		switch scheme {
+		case "socks5", "socks5h":
+			// SOCKS5 代理：使用 SOCKS5ProxyDialer
+			slog.Debug("tls_fingerprint_transport_socks5", "proxy", proxyURL.Host)
+			socks5Dialer := tlsfingerprint.NewSOCKS5ProxyDialer(profile, proxyURL)
+			transport.DialTLSContext = socks5Dialer.DialTLSContext
+		case "http", "https":
+			// HTTP/HTTPS 代理：使用 HTTPProxyDialer（CONNECT 隧道）
+			slog.Debug("tls_fingerprint_transport_http_connect", "proxy", proxyURL.Host)
+			httpDialer := tlsfingerprint.NewHTTPProxyDialer(profile, proxyURL)
+			transport.DialTLSContext = httpDialer.DialTLSContext
+		default:
+			// 未知代理类型，回退到普通代理配置（无 TLS 指纹）
+			slog.Debug("tls_fingerprint_transport_unknown_scheme_fallback", "scheme", scheme)
+			if err := proxyutil.ConfigureTransportProxy(transport, proxyURL); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return transport, nil
+}
+
 // trackedBody 带跟踪功能的响应体包装器
 // 在 Close 时执行回调，用于更新请求计数
 type trackedBody struct {
@@ -650,4 +863,57 @@ func wrapTrackedBody(body io.ReadCloser, onClose func()) io.ReadCloser {
 		return body
 	}
 	return &trackedBody{ReadCloser: body, onClose: onClose}
+}
+
+// decompressResponseBody 根据 Content-Encoding 解压响应体。
+// 当请求显式设置了 accept-encoding 时，Go 的 Transport 不会自动解压，需要手动处理。
+// 解压成功后会删除 Content-Encoding 和 Content-Length header（长度已不准确）。
+func decompressResponseBody(resp *http.Response) {
+	if resp == nil || resp.Body == nil {
+		return
+	}
+	ce := strings.ToLower(strings.TrimSpace(resp.Header.Get("Content-Encoding")))
+	if ce == "" {
+		return
+	}
+
+	var reader io.Reader
+	switch ce {
+	case "gzip":
+		gr, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			return // 解压失败，保持原样
+		}
+		reader = gr
+	case "br":
+		reader = brotli.NewReader(resp.Body)
+	case "deflate":
+		reader = flate.NewReader(resp.Body)
+	default:
+		return
+	}
+
+	originalBody := resp.Body
+	resp.Body = &decompressedBody{reader: reader, closer: originalBody}
+	resp.Header.Del("Content-Encoding")
+	resp.Header.Del("Content-Length") // 解压后长度不确定
+	resp.ContentLength = -1
+}
+
+// decompressedBody 组合解压 reader 和原始 body 的 close。
+type decompressedBody struct {
+	reader io.Reader
+	closer io.Closer
+}
+
+func (d *decompressedBody) Read(p []byte) (int, error) {
+	return d.reader.Read(p)
+}
+
+func (d *decompressedBody) Close() error {
+	// 如果 reader 本身也是 Closer（如 gzip.Reader），先关闭它
+	if rc, ok := d.reader.(io.Closer); ok {
+		_ = rc.Close()
+	}
+	return d.closer.Close()
 }
