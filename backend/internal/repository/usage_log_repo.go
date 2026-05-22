@@ -2769,6 +2769,84 @@ type UsageLogFilters = usagestats.UsageLogFilters
 
 // ListWithFilters lists usage logs with optional filters (for admin)
 func (r *usageLogRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, filters UsageLogFilters) ([]service.UsageLog, *pagination.PaginationResult, error) {
+	conditions, args := buildUsageLogFilterConditions(filters)
+	whereClause := buildWhere(conditions)
+	var (
+		logs []service.UsageLog
+		page *pagination.PaginationResult
+		err  error
+	)
+	if shouldUseFastUsageLogTotal(filters) {
+		logs, page, err = r.listUsageLogsWithFastPagination(ctx, whereClause, args, params)
+	} else {
+		logs, page, err = r.listUsageLogsWithPagination(ctx, whereClause, args, params)
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
+		return nil, nil, err
+	}
+	return logs, page, nil
+}
+
+// ExportWithFilters streams usage logs in created_at/id keyset order.
+// It intentionally avoids COUNT(*) and OFFSET so long exports do not get slower page by page.
+func (r *usageLogRepository) ExportWithFilters(ctx context.Context, filters UsageLogFilters, batchSize int, handle func([]service.UsageLog) error) error {
+	if handle == nil {
+		return nil
+	}
+	if batchSize <= 0 {
+		batchSize = 1000
+	}
+
+	baseConditions, baseArgs := buildUsageLogFilterConditions(filters)
+	hasCursor := false
+	var cursorCreatedAt time.Time
+	var cursorID int64
+
+	for {
+		conditions := append([]string{}, baseConditions...)
+		args := append([]any{}, baseArgs...)
+		if hasCursor {
+			posCreatedAt := len(args) + 1
+			posID := len(args) + 2
+			conditions = append(conditions, fmt.Sprintf("(created_at < $%d OR (created_at = $%d AND id < $%d))", posCreatedAt, posCreatedAt, posID))
+			args = append(args, cursorCreatedAt, cursorID)
+		}
+
+		whereClause := buildWhere(conditions)
+		limitPos := len(args) + 1
+		queryArgs := append(args, batchSize)
+		query := fmt.Sprintf("SELECT %s FROM usage_logs %s ORDER BY created_at DESC, id DESC LIMIT $%d", usageLogSelectColumns, whereClause, limitPos)
+		logs, err := r.queryUsageLogs(ctx, query, queryArgs...)
+		if err != nil {
+			return err
+		}
+		if len(logs) == 0 {
+			return nil
+		}
+
+		if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
+			return err
+		}
+		if err := handle(logs); err != nil {
+			return err
+		}
+
+		last := logs[len(logs)-1]
+		cursorCreatedAt = last.CreatedAt
+		cursorID = last.ID
+		hasCursor = true
+
+		if len(logs) < batchSize {
+			return nil
+		}
+	}
+}
+
+func buildUsageLogFilterConditions(filters UsageLogFilters) ([]string, []any) {
 	conditions := make([]string, 0, 9)
 	args := make([]any, 0, 9)
 
@@ -2804,25 +2882,7 @@ func (r *usageLogRepository) ListWithFilters(ctx context.Context, params paginat
 		args = append(args, *filters.EndTime)
 	}
 
-	whereClause := buildWhere(conditions)
-	var (
-		logs []service.UsageLog
-		page *pagination.PaginationResult
-		err  error
-	)
-	if shouldUseFastUsageLogTotal(filters) {
-		logs, page, err = r.listUsageLogsWithFastPagination(ctx, whereClause, args, params)
-	} else {
-		logs, page, err = r.listUsageLogsWithPagination(ctx, whereClause, args, params)
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if err := r.hydrateUsageLogAssociations(ctx, logs); err != nil {
-		return nil, nil, err
-	}
-	return logs, page, nil
+	return conditions, args
 }
 
 func shouldUseFastUsageLogTotal(filters UsageLogFilters) bool {

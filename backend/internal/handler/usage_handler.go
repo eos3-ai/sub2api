@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"encoding/csv"
+	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
@@ -40,83 +44,9 @@ func (h *UsageHandler) List(c *gin.Context) {
 	}
 
 	page, pageSize := response.ParsePagination(c)
-
-	var apiKeyID int64
-	if apiKeyIDStr := c.Query("api_key_id"); apiKeyIDStr != "" {
-		id, err := strconv.ParseInt(apiKeyIDStr, 10, 64)
-		if err != nil {
-			response.BadRequest(c, "Invalid api_key_id")
-			return
-		}
-
-		// [Security Fix] Verify API Key ownership to prevent horizontal privilege escalation
-		apiKey, err := h.apiKeyService.GetByID(c.Request.Context(), id)
-		if err != nil {
-			response.ErrorFrom(c, err)
-			return
-		}
-		if apiKey.UserID != subject.UserID {
-			response.Forbidden(c, "Not authorized to access this API key's usage records")
-			return
-		}
-
-		apiKeyID = id
-	}
-
-	// Parse additional filters
-	model := c.Query("model")
-
-	var requestType *int16
-	var stream *bool
-	if requestTypeStr := strings.TrimSpace(c.Query("request_type")); requestTypeStr != "" {
-		parsed, err := service.ParseUsageRequestType(requestTypeStr)
-		if err != nil {
-			response.BadRequest(c, err.Error())
-			return
-		}
-		value := int16(parsed)
-		requestType = &value
-	} else if streamStr := c.Query("stream"); streamStr != "" {
-		val, err := strconv.ParseBool(streamStr)
-		if err != nil {
-			response.BadRequest(c, "Invalid stream value, use true or false")
-			return
-		}
-		stream = &val
-	}
-
-	var billingType *int8
-	if billingTypeStr := c.Query("billing_type"); billingTypeStr != "" {
-		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
-		if err != nil {
-			response.BadRequest(c, "Invalid billing_type")
-			return
-		}
-		bt := int8(val)
-		billingType = &bt
-	}
-
-	// Parse date range
-	var startTime, endTime *time.Time
-	userTZ := c.Query("timezone") // Get user's timezone from request
-	if startDateStr := c.Query("start_date"); startDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
-			return
-		}
-		startTime = &t
-	}
-
-	if endDateStr := c.Query("end_date"); endDateStr != "" {
-		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
-		if err != nil {
-			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
-			return
-		}
-		// Use half-open range [start, end), move to next calendar day start (DST-safe).
-		t = t.AddDate(0, 0, 1)
-		endTime = &t
+	filters, ok := h.parseUserUsageFilters(c, subject.UserID)
+	if !ok {
+		return
 	}
 
 	params := pagination.PaginationParams{
@@ -125,17 +55,6 @@ func (h *UsageHandler) List(c *gin.Context) {
 		SortBy:    c.DefaultQuery("sort_by", "created_at"),
 		SortOrder: c.DefaultQuery("sort_order", "desc"),
 	}
-	filters := usagestats.UsageLogFilters{
-		UserID:      subject.UserID, // Always filter by current user for security
-		APIKeyID:    apiKeyID,
-		Model:       model,
-		RequestType: requestType,
-		Stream:      stream,
-		BillingType: billingType,
-		StartTime:   startTime,
-		EndTime:     endTime,
-	}
-
 	records, result, err := h.usageService.ListWithFilters(c.Request.Context(), params, filters)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -438,6 +357,214 @@ func (h *UsageHandler) DashboardAPIKeysUsage(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"stats": stats})
+}
+
+// Export streams the current user's filtered usage records as CSV.
+// GET /api/v1/usage/export
+func (h *UsageHandler) Export(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+
+	filters, ok := h.parseUserUsageFilters(c, subject.UserID)
+	if !ok {
+		return
+	}
+
+	c.Header("Content-Type", "text/csv; charset=utf-8")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", userUsageExportFilename(filters)))
+	c.Status(http.StatusOK)
+
+	writer := csv.NewWriter(c.Writer)
+	if err := writer.Write(userUsageExportHeaders()); err != nil {
+		return
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		return
+	}
+	c.Writer.Flush()
+
+	err := h.usageService.ExportWithFilters(c.Request.Context(), filters, 5000, func(records []service.UsageLog) error {
+		for i := range records {
+			if err := writer.Write(userUsageExportRow(&records[i])); err != nil {
+				return err
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return err
+		}
+		c.Writer.Flush()
+		return nil
+	})
+	if err != nil {
+		logger.LegacyPrintf("handler.usage", "[UsageExport] export failed: user_id=%d err=%v", subject.UserID, err)
+	}
+}
+
+func (h *UsageHandler) parseUserUsageFilters(c *gin.Context, userID int64) (usagestats.UsageLogFilters, bool) {
+	filters := usagestats.UsageLogFilters{
+		UserID: userID,
+	}
+
+	if apiKeyIDStr := c.Query("api_key_id"); apiKeyIDStr != "" {
+		id, err := strconv.ParseInt(apiKeyIDStr, 10, 64)
+		if err != nil {
+			response.BadRequest(c, "Invalid api_key_id")
+			return filters, false
+		}
+		if h.apiKeyService == nil {
+			response.InternalError(c, "API key service unavailable")
+			return filters, false
+		}
+		apiKey, err := h.apiKeyService.GetByID(c.Request.Context(), id)
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return filters, false
+		}
+		if apiKey.UserID != userID {
+			response.Forbidden(c, "Not authorized to access this API key's usage records")
+			return filters, false
+		}
+		filters.APIKeyID = id
+	}
+
+	filters.Model = c.Query("model")
+
+	if requestTypeStr := strings.TrimSpace(c.Query("request_type")); requestTypeStr != "" {
+		parsed, err := service.ParseUsageRequestType(requestTypeStr)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			return filters, false
+		}
+		value := int16(parsed)
+		filters.RequestType = &value
+	} else if streamStr := c.Query("stream"); streamStr != "" {
+		val, err := strconv.ParseBool(streamStr)
+		if err != nil {
+			response.BadRequest(c, "Invalid stream value, use true or false")
+			return filters, false
+		}
+		filters.Stream = &val
+	}
+
+	if billingTypeStr := c.Query("billing_type"); billingTypeStr != "" {
+		val, err := strconv.ParseInt(billingTypeStr, 10, 8)
+		if err != nil {
+			response.BadRequest(c, "Invalid billing_type")
+			return filters, false
+		}
+		bt := int8(val)
+		filters.BillingType = &bt
+	}
+
+	userTZ := c.Query("timezone")
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", startDateStr, userTZ)
+		if err != nil {
+			response.BadRequest(c, "Invalid start_date format, use YYYY-MM-DD")
+			return filters, false
+		}
+		filters.StartTime = &t
+	}
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		t, err := timezone.ParseInUserLocation("2006-01-02", endDateStr, userTZ)
+		if err != nil {
+			response.BadRequest(c, "Invalid end_date format, use YYYY-MM-DD")
+			return filters, false
+		}
+		t = t.AddDate(0, 0, 1)
+		filters.EndTime = &t
+	}
+
+	return filters, true
+}
+
+func userUsageExportFilename(filters usagestats.UsageLogFilters) string {
+	filename := "usage.csv"
+	if filters.StartTime != nil && filters.EndTime != nil {
+		filename = fmt.Sprintf("usage_%s_to_%s.csv",
+			filters.StartTime.Format("2006-01-02"),
+			filters.EndTime.AddDate(0, 0, -1).Format("2006-01-02"))
+	}
+	return filename
+}
+
+func userUsageExportHeaders() []string {
+	return []string{
+		"time",
+		"api_key_name",
+		"model",
+		"reasoning_effort",
+		"inbound_endpoint",
+		"request_type",
+		"billing_mode",
+		"input_tokens",
+		"output_tokens",
+		"cache_read_tokens",
+		"cache_creation_tokens",
+		"rate_multiplier",
+		"billed_cost",
+		"original_cost",
+		"first_token_ms",
+		"duration_ms",
+	}
+}
+
+func userUsageExportRow(log *service.UsageLog) []string {
+	apiKeyName := ""
+	if log.APIKey != nil {
+		apiKeyName = log.APIKey.Name
+	}
+	displayModel := log.RequestedModel
+	if displayModel == "" {
+		displayModel = log.Model
+	}
+	reasoningEffort := ""
+	if log.ReasoningEffort != nil {
+		reasoningEffort = *log.ReasoningEffort
+	}
+	inboundEndpoint := ""
+	if log.InboundEndpoint != nil {
+		inboundEndpoint = *log.InboundEndpoint
+	}
+	billingMode := ""
+	if log.BillingMode != nil {
+		billingMode = *log.BillingMode
+	}
+	if log.ImageCount > 0 {
+		billingMode = string(service.BillingModeImage)
+	}
+	firstTokenMs := ""
+	if log.FirstTokenMs != nil {
+		firstTokenMs = strconv.Itoa(*log.FirstTokenMs)
+	}
+	durationMs := ""
+	if log.DurationMs != nil {
+		durationMs = strconv.Itoa(*log.DurationMs)
+	}
+
+	return []string{
+		log.CreatedAt.Format(time.RFC3339),
+		sanitizeCSVCell(apiKeyName),
+		sanitizeCSVCell(displayModel),
+		sanitizeCSVCell(reasoningEffort),
+		sanitizeCSVCell(inboundEndpoint),
+		log.EffectiveRequestType().String(),
+		sanitizeCSVCell(billingMode),
+		strconv.Itoa(log.InputTokens),
+		strconv.Itoa(log.OutputTokens),
+		strconv.Itoa(log.CacheReadTokens),
+		strconv.Itoa(log.CacheCreationTokens),
+		fmt.Sprintf("%.8f", log.RateMultiplier),
+		fmt.Sprintf("%.8f", log.ActualCost),
+		fmt.Sprintf("%.8f", log.TotalCost),
+		firstTokenMs,
+		durationMs,
+	}
 }
 
 // GetMyAPIKeyDailyUsage handles getting daily usage details for the current user's API key.

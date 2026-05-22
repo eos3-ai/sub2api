@@ -710,14 +710,6 @@ const getRequestTypeBadgeClass = (log: UsageLog): string => {
 }
 
 
-const getRequestTypeExportText = (log: UsageLog): string => {
-  const requestType = resolveUsageRequestType(log)
-  if (requestType === 'ws_v2') return 'WS'
-  if (requestType === 'stream') return 'Stream'
-  if (requestType === 'sync') return 'Sync'
-  return 'Unknown'
-}
-
 const formatUsageEndpoints = (log: UsageLog): string => {
   const inbound = log.inbound_endpoint?.trim()
   return inbound || '-'
@@ -848,28 +840,6 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   loadUsageLogs()
 }
 
-/**
- * Escape CSV value to prevent injection and handle special characters
- */
-const escapeCSVValue = (value: unknown): string => {
-  if (value == null) return ''
-
-  const str = String(value)
-  const escaped = str.replace(/"/g, '""')
-
-  // Prevent formula injection by prefixing dangerous characters with single quote
-  if (/^[=+\-@\t\r]/.test(str)) {
-    return `"\'${escaped}"`
-  }
-
-  // Escape values containing comma, quote, or newline
-  if (/[,"\n\r]/.test(str)) {
-    return `"${escaped}"`
-  }
-
-  return str
-}
-
 const exportToCSV = async () => {
   if (pagination.total === 0) {
     appStore.showWarning(t('usage.noDataToExport'))
@@ -878,71 +848,14 @@ const exportToCSV = async () => {
 
   exporting.value = true
   appStore.showInfo(t('usage.preparingExport'))
+  const currentFilters = { ...filters.value }
 
   try {
-    const allLogs: UsageLog[] = []
-    const pageSize = 100 // Use a larger page size for export to reduce requests
-    const totalRequests = Math.ceil(pagination.total / pageSize)
-
-    for (let page = 1; page <= totalRequests; page++) {
-      const response = await usageAPI.query(buildUsageQueryParams(page, pageSize))
-      allLogs.push(...response.items)
-    }
-
-    if (allLogs.length === 0) {
-      appStore.showWarning(t('usage.noDataToExport'))
-      return
-    }
-
-    const headers = [
-      'Time',
-      'API Key Name',
-      'Model',
-      'Reasoning Effort',
-      'Inbound Endpoint',
-      'Type',
-      'Billing Mode',
-      'Input Tokens',
-      'Output Tokens',
-      'Cache Read Tokens',
-      'Cache Creation Tokens',
-      'Rate Multiplier',
-      'Billed Cost',
-      'Original Cost',
-      'First Token (ms)',
-      'Duration (ms)'
-    ]
-    const rows = allLogs.map((log) =>
-      [
-        log.created_at,
-        log.api_key?.name || '',
-        log.model,
-        formatReasoningEffort(log.reasoning_effort),
-        log.inbound_endpoint || '',
-        getRequestTypeExportText(log),
-        getBillingModeLabel(getDisplayBillingMode(log), t),
-        log.input_tokens,
-        log.output_tokens,
-        log.cache_read_tokens,
-        log.cache_creation_tokens,
-        log.rate_multiplier,
-        log.actual_cost.toFixed(8),
-        log.total_cost.toFixed(8),
-        log.first_token_ms ?? '',
-        log.duration_ms
-      ].map(escapeCSVValue)
-    )
-
-    const csvContent = [
-      headers.map(escapeCSVValue).join(','),
-      ...rows.map((row) => row.join(','))
-    ].join('\n')
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const blob = await usageAPI.exportCsv(currentFilters)
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `usage_${filters.value.start_date}_to_${filters.value.end_date}.csv`
+    link.download = `usage_${currentFilters.start_date}_to_${currentFilters.end_date}.csv`
     link.click()
     window.URL.revokeObjectURL(url)
 

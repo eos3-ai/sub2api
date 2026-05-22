@@ -132,6 +132,22 @@ export async function query(
 }
 
 /**
+ * Export filtered usage logs as a CSV Blob.
+ * The backend streams the export server-side, avoiding frontend pagination loops.
+ */
+export async function exportCsv(
+  params: UsageQueryParams,
+  options?: { signal?: AbortSignal }
+): Promise<Blob> {
+  const { data } = await apiClient.get('/usage/export', {
+    params,
+    responseType: 'blob',
+    signal: options?.signal
+  })
+  return data as Blob
+}
+
+/**
  * Get usage statistics for a specific period
  * @param period - Time period ('today', 'week', 'month', 'year')
  * @param apiKeyId - Optional API key ID filter
@@ -307,6 +323,7 @@ export async function getDashboardApiKeysUsage(
 export const usageAPI = {
   list,
   query,
+  exportCsv,
   getStats,
   getStatsByDateRange,
   getByDateRange,

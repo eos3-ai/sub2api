@@ -61,7 +61,7 @@
           <TokenUsageTrend :trend-data="trendData" :loading="chartsLoading" />
         </div>
       </div>
-      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToExcel">
+      <UsageFilters v-model="filters" :start-date="startDate" :end-date="endDate" :exporting="exporting" @change="applyFilters" @refresh="refreshData" @reset="resetFilters" @cleanup="openCleanupDialog" @export="exportToCSV">
         <template #after-reset>
           <div class="relative" ref="columnDropdownRef">
             <button
@@ -110,7 +110,6 @@
       <Pagination v-if="pagination.total > 0" :page="pagination.page" :total="pagination.total" :page-size="pagination.page_size" @update:page="handlePageChange" @update:pageSize="handlePageSizeChange" />
     </div>
   </AppLayout>
-  <UsageExportProgress :show="exportProgress.show" :progress="exportProgress.progress" :current="exportProgress.current" :total="exportProgress.total" :estimated-time="exportProgress.estimatedTime" @cancel="cancelExport" />
   <UsageCleanupDialog
     :show="cleanupDialogVisible"
     :filters="filters"
@@ -134,11 +133,10 @@ import { saveAs } from 'file-saver'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'; import { adminAPI } from '@/api/admin'; import { adminUsageAPI } from '@/api/admin/usage'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
-import { formatReasoningEffort } from '@/utils/format'
-import { resolveUsageRequestType, requestTypeToLegacyStream } from '@/utils/usageRequestType'
+import { requestTypeToLegacyStream } from '@/utils/usageRequestType'
 import AppLayout from '@/components/layout/AppLayout.vue'; import Pagination from '@/components/common/Pagination.vue'; import Select from '@/components/common/Select.vue'; import DateRangePicker from '@/components/common/DateRangePicker.vue'
 import UsageStatsCards from '@/components/admin/usage/UsageStatsCards.vue'; import UsageFilters from '@/components/admin/usage/UsageFilters.vue'
-import UsageTable from '@/components/admin/usage/UsageTable.vue'; import UsageExportProgress from '@/components/admin/usage/UsageExportProgress.vue'
+import UsageTable from '@/components/admin/usage/UsageTable.vue'
 import UsageCleanupDialog from '@/components/admin/usage/UsageCleanupDialog.vue'
 import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryModal.vue'
 import ModelDistributionChart from '@/components/charts/ModelDistributionChart.vue'; import GroupDistributionChart from '@/components/charts/GroupDistributionChart.vue'; import TokenUsageTrend from '@/components/charts/TokenUsageTrend.vue'
@@ -172,7 +170,6 @@ let abortController: AbortController | null = null; let exportAbortController: A
 let chartReqSeq = 0
 let statsReqSeq = 0
 let modelStatsReqSeq = 0
-const exportProgress = reactive({ show: false, progress: 0, current: 0, total: 0, estimatedTime: '' })
 const cleanupDialogVisible = ref(false)
 // Balance history modal state
 const showBalanceHistoryModal = ref(false)
@@ -447,70 +444,27 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
   pagination.page = 1
   loadLogs()
 }
-const cancelExport = () => exportAbortController?.abort()
 const openCleanupDialog = () => { cleanupDialogVisible.value = true }
-const getRequestTypeLabel = (log: AdminUsageLog): string => {
-  const requestType = resolveUsageRequestType(log)
-  if (requestType === 'ws_v2') return t('usage.ws')
-  if (requestType === 'stream') return t('usage.stream')
-  if (requestType === 'sync') return t('usage.sync')
-  return t('usage.unknown')
-}
 
-const exportToExcel = async () => {
-  if (exporting.value) return; exporting.value = true; exportProgress.show = true
+const exportToCSV = async () => {
+  if (exporting.value) return; exporting.value = true
   const c = new AbortController(); exportAbortController = c
+  const exportFilters = { ...filters.value }
   try {
-    let p = 1; let total = pagination.total; let exportedCount = 0
-    const XLSX = await import('xlsx')
-    const headers = [
-      t('usage.time'), t('admin.usage.user'), t('usage.apiKeyFilter'),
-      t('admin.usage.account'), t('usage.model'), t('usage.upstreamModel'), t('usage.reasoningEffort'), t('admin.usage.group'),
-      t('usage.inboundEndpoint'), t('usage.upstreamEndpoint'),
-      t('usage.type'),
-      t('admin.usage.inputTokens'), t('admin.usage.outputTokens'),
-      t('admin.usage.cacheReadTokens'), t('admin.usage.cacheCreationTokens'),
-      t('admin.usage.inputCost'), t('admin.usage.outputCost'),
-      t('admin.usage.cacheReadCost'), t('admin.usage.cacheCreationCost'),
-      t('usage.rate'), t('usage.accountMultiplier'), t('usage.original'), t('usage.userBilled'), t('usage.accountBilled'),
-      t('usage.firstToken'), t('usage.duration'),
-      t('admin.usage.requestId'), t('usage.userAgent'), t('admin.usage.ipAddress')
-    ]
-    const ws = XLSX.utils.aoa_to_sheet([headers])
-    while (true) {
-      const res = await adminUsageAPI.list(
-        buildUsageListParams(p, 100, true),
-        { signal: c.signal }
-      )
-      if (c.signal.aborted) break; if (p === 1) { total = res.total; exportProgress.total = total }
-      const rows = (res.items || []).map((log: AdminUsageLog) => [
-        log.created_at, log.user?.email || '', log.api_key?.name || '', log.account?.name || '', log.model,
-        log.upstream_model || '', formatReasoningEffort(log.reasoning_effort), log.group?.name || '',
-        log.inbound_endpoint || '', log.upstream_endpoint || '', getRequestTypeLabel(log),
-        log.input_tokens, log.output_tokens, log.cache_read_tokens, log.cache_creation_tokens,
-        log.input_cost?.toFixed(6) || '0.000000', log.output_cost?.toFixed(6) || '0.000000',
-        log.cache_read_cost?.toFixed(6) || '0.000000', log.cache_creation_cost?.toFixed(6) || '0.000000',
-        log.rate_multiplier?.toPrecision(4) || '1.00', (log.account_rate_multiplier ?? 1).toPrecision(4),
-        log.total_cost?.toFixed(6) || '0.000000', log.actual_cost?.toFixed(6) || '0.000000',
-        ((log.account_stats_cost ?? log.total_cost) * (log.account_rate_multiplier ?? 1)).toFixed(6), log.first_token_ms ?? '', log.duration_ms,
-        log.request_id || '', log.user_agent || '', log.ip_address || ''
-      ])
-      if (rows.length) {
-        XLSX.utils.sheet_add_aoa(ws, rows, { origin: -1 })
-      }
-      exportedCount += rows.length
-      exportProgress.current = exportedCount
-      exportProgress.progress = total > 0 ? Math.min(100, Math.round(exportedCount / total * 100)) : 0
-      if (exportedCount >= total || res.items.length < 100) break; p++
-    }
-    if(!c.signal.aborted) {
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, 'Usage')
-      saveAs(new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), `usage_${filters.value.start_date}_to_${filters.value.end_date}.xlsx`)
+    const blob = await adminUsageAPI.exportCsv(exportFilters, { signal: c.signal })
+    if (!c.signal.aborted) {
+      const from = exportFilters.start_date || startDate.value
+      const to = exportFilters.end_date || endDate.value
+      saveAs(blob, `usage_${from}_to_${to}.csv`)
       appStore.showSuccess(t('usage.exportSuccess'))
     }
-  } catch (error) { console.error('Failed to export:', error); appStore.showError('Export Failed') }
-  finally { if(exportAbortController === c) { exportAbortController = null; exporting.value = false; exportProgress.show = false } }
+  } catch (error: any) {
+    if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
+      console.error('Failed to export:', error)
+      appStore.showError(t('usage.exportFailed'))
+    }
+  }
+  finally { if(exportAbortController === c) { exportAbortController = null; exporting.value = false } }
 }
 
 // Column visibility
