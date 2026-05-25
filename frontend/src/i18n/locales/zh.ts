@@ -6824,6 +6824,7 @@ export default {
     methods: {
       easypay: '易支付',
       admin: '管理员调整',
+      admin_adjustment: '管理员调整',
       alipay: '支付宝',
       wechat: '微信支付',
       wxpay: '微信支付',
@@ -6833,6 +6834,12 @@ export default {
       link: 'Link',
       alipay_direct: '支付宝（直连）',
       wxpay_direct: '微信支付（直连）',
+      redeem_code: '兑换码',
+      promo_code: '优惠码',
+      affiliate_transfer: '返利转账',
+      oauth_first_bind: '首次绑定赠送',
+      signup_grant: '注册赠送',
+      refund_rollback: '退款回滚',
     },
     status: {
       pending: '待支付',
@@ -6959,6 +6966,7 @@ export default {
       INVALID_STATUS: '当前订单状态不允许此操作',
       BALANCE_NOT_ENOUGH: '退款金额超过余额',
       REFUND_AMOUNT_EXCEEDED: '退款金额超过充值金额',
+      REFUND_DISABLED: '该订单不支持退款',
       REFUND_FAILED: '退款失败',
     },
     airwallexPay: 'Airwallex 支付',

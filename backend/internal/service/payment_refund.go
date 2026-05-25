@@ -184,6 +184,9 @@ func (s *PaymentService) validateRefundRequest(ctx context.Context, oid, uid int
 	if o.OrderType != payment.OrderTypeBalance {
 		return nil, infraerrors.BadRequest("INVALID_ORDER_TYPE", "only balance orders can request refund")
 	}
+	if IsInternalBalanceOrderPaymentType(o.PaymentType) {
+		return nil, infraerrors.Forbidden("REFUND_DISABLED", "refund is not available for internal balance orders")
+	}
 	if o.Status != OrderStatusCompleted {
 		return nil, infraerrors.BadRequest("INVALID_STATUS", "only completed orders can request refund")
 	}
@@ -206,6 +209,9 @@ func (s *PaymentService) PrepareRefund(ctx context.Context, oid int64, amt float
 	ok := []string{OrderStatusCompleted, OrderStatusRefundRequested, OrderStatusRefundFailed}
 	if !psSliceContains(ok, o.Status) {
 		return nil, nil, infraerrors.BadRequest("INVALID_STATUS", "order status does not allow refund")
+	}
+	if IsInternalBalanceOrderPaymentType(o.PaymentType) {
+		return nil, nil, infraerrors.Forbidden("REFUND_DISABLED", "refund is not available for internal balance orders")
 	}
 	// Check provider instance allows admin refund
 	inst, instErr := s.getRefundOrderProviderInstance(ctx, o)
@@ -416,6 +422,21 @@ func (s *PaymentService) RollbackRefund(ctx context.Context, p *RefundPlan, gErr
 			slog.Error("[CRITICAL] rollback failed", "orderID", p.OrderID, "amount", p.BalanceToDeduct, "error", err)
 			s.writeAuditLog(ctx, p.OrderID, "REFUND_ROLLBACK_FAILED", "admin", map[string]any{"gatewayError": psErrMsg(gErr), "rollbackError": psErrMsg(err), "balanceDeducted": p.BalanceToDeduct})
 			return false
+		}
+		if _, err := s.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+			UserID:      p.Order.UserID,
+			Amount:      p.BalanceToDeduct,
+			SourceType:  PaymentTypeRefundRollback,
+			SourceRef:   fmt.Sprintf("refund_rollback:%d", p.OrderID),
+			PaymentType: PaymentTypeRefundRollback,
+			Operator:    "system",
+			Metadata: map[string]any{
+				"order_id":         p.OrderID,
+				"gateway_error":    psErrMsg(gErr),
+				"balance_deducted": p.BalanceToDeduct,
+			},
+		}); err != nil {
+			slog.Error("refund rollback order creation failed", "orderID", p.OrderID, "amount", p.BalanceToDeduct, "error", err)
 		}
 	}
 	if p.DeductionType == payment.DeductionTypeSubscription && p.SubDaysToDeduct > 0 && p.SubscriptionID > 0 {

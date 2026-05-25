@@ -84,14 +84,15 @@ type RedeemCodeResponse struct {
 
 // RedeemService 兑换码服务
 type RedeemService struct {
-	redeemRepo           RedeemCodeRepository
-	userRepo             UserRepository
-	subscriptionService  *SubscriptionService
-	cache                RedeemCache
-	billingCacheService  *BillingCacheService
-	entClient            *dbent.Client
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	affiliateService     *AffiliateService
+	redeemRepo            RedeemCodeRepository
+	userRepo              UserRepository
+	subscriptionService   *SubscriptionService
+	cache                 RedeemCache
+	billingCacheService   *BillingCacheService
+	entClient             *dbent.Client
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	affiliateService      *AffiliateService
+	internalOrderRecorder InternalBalanceOrderRecorder
 }
 
 // NewRedeemService 创建兑换码服务实例
@@ -115,6 +116,10 @@ func NewRedeemService(
 		authCacheInvalidator: authCacheInvalidator,
 		affiliateService:     affiliateService,
 	}
+}
+
+func (s *RedeemService) SetInternalBalanceOrderRecorder(recorder InternalBalanceOrderRecorder) {
+	s.internalOrderRecorder = recorder
 }
 
 // GenerateRandomCode 生成随机兑换码
@@ -393,6 +398,23 @@ func (s *RedeemService) Redeem(ctx context.Context, userID int64, code string) (
 	// 余额类正数兑换码触发邀请返利（best-effort，失败不影响兑换结果）
 	if redeemCode.Type == RedeemTypeBalance && redeemCode.Value > 0 {
 		s.tryAccrueAffiliateRebateForRedeem(ctx, userID, redeemCode.Value)
+	}
+
+	if redeemCode.Type == RedeemTypeBalance && redeemCode.Value > 0 && s.internalOrderRecorder != nil {
+		if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+			UserID:      userID,
+			Amount:      redeemCode.Value,
+			SourceType:  PaymentTypeRedeemCode,
+			SourceRef:   "redeem_code:" + redeemCode.Code,
+			PaymentType: PaymentTypeRedeemCode,
+			Operator:    fmt.Sprintf("user:%d", userID),
+			Metadata: map[string]any{
+				"redeem_code_id": redeemCode.ID,
+				"code":           redeemCode.Code,
+			},
+		}); err != nil {
+			logger.LegacyPrintf("service.redeem", "failed to create redeem balance order: user_id=%d code=%s amount=%.8f err=%v", userID, redeemCode.Code, redeemCode.Value, err)
+		}
 	}
 
 	// 重新获取更新后的兑换码

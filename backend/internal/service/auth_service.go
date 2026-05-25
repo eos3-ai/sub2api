@@ -62,22 +62,46 @@ type JWTClaims struct {
 
 // AuthService 认证服务
 type AuthService struct {
-	entClient          *dbent.Client
-	userRepo           UserRepository
-	redeemRepo         RedeemCodeRepository
-	refreshTokenCache  RefreshTokenCache
-	cfg                *config.Config
-	settingService     *SettingService
-	emailService       *EmailService
-	turnstileService   *TurnstileService
-	emailQueueService  *EmailQueueService
-	promoService       *PromoService
-	affiliateService   *AffiliateService
-	defaultSubAssigner DefaultSubscriptionAssigner
+	entClient             *dbent.Client
+	userRepo              UserRepository
+	redeemRepo            RedeemCodeRepository
+	refreshTokenCache     RefreshTokenCache
+	cfg                   *config.Config
+	settingService        *SettingService
+	emailService          *EmailService
+	turnstileService      *TurnstileService
+	emailQueueService     *EmailQueueService
+	promoService          *PromoService
+	affiliateService      *AffiliateService
+	defaultSubAssigner    DefaultSubscriptionAssigner
+	internalOrderRecorder InternalBalanceOrderRecorder
 }
 
 type DefaultSubscriptionAssigner interface {
 	AssignOrExtendSubscription(ctx context.Context, input *AssignSubscriptionInput) (*UserSubscription, bool, error)
+}
+
+func (s *AuthService) SetInternalBalanceOrderRecorder(recorder InternalBalanceOrderRecorder) {
+	s.internalOrderRecorder = recorder
+}
+
+func (s *AuthService) recordSignupGrantOrder(ctx context.Context, user *User, signupSource string, balance float64) {
+	if s == nil || s.internalOrderRecorder == nil || user == nil || user.ID <= 0 || balance <= 0 {
+		return
+	}
+	if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+		UserID:      user.ID,
+		Amount:      balance,
+		SourceType:  PaymentTypeSignupGrant,
+		SourceRef:   fmt.Sprintf("signup_grant:%s:%d", normalizeOAuthSignupSource(signupSource), user.ID),
+		PaymentType: PaymentTypeSignupGrant,
+		Operator:    "system",
+		Metadata: map[string]any{
+			"signup_source": normalizeOAuthSignupSource(signupSource),
+		},
+	}); err != nil {
+		logger.LegacyPrintf("service.auth", "[Auth] Failed to create signup grant order: user_id=%d source=%s amount=%.8f err=%v", user.ID, signupSource, balance, err)
+	}
 }
 
 type signupGrantPlan struct {
@@ -225,6 +249,7 @@ func (s *AuthService) RegisterWithVerification(ctx context.Context, email, passw
 		return "", nil, ErrServiceUnavailable
 	}
 	s.postAuthUserBootstrap(ctx, user, "email", true)
+	s.recordSignupGrantOrder(ctx, user, "email", grantPlan.Balance)
 	s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 	if s.affiliateService != nil {
 		if _, err := s.affiliateService.EnsureUserAffiliate(ctx, user.ID); err != nil {
@@ -534,6 +559,7 @@ func (s *AuthService) LoginOrRegisterOAuth(ctx context.Context, email, username 
 			} else {
 				user = newUser
 				s.postAuthUserBootstrap(ctx, user, signupSource, false)
+				s.recordSignupGrantOrder(ctx, user, signupSource, grantPlan.Balance)
 				s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 			}
 		} else {
@@ -684,6 +710,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 					}
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
+					s.recordSignupGrantOrder(ctx, user, signupSource, grantPlan.Balance)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
 				}
@@ -702,6 +729,7 @@ func (s *AuthService) LoginOrRegisterOAuthWithTokenPair(ctx context.Context, ema
 				} else {
 					user = newUser
 					s.postAuthUserBootstrap(ctx, user, signupSource, false)
+					s.recordSignupGrantOrder(ctx, user, signupSource, grantPlan.Balance)
 					s.assignSubscriptions(ctx, user.ID, grantPlan.Subscriptions, "auto assigned by signup defaults")
 					s.bindOAuthAffiliate(ctx, user.ID, affiliateCode)
 					if invitationRedeemCode != nil {

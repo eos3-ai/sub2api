@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -205,10 +207,11 @@ type AffiliateUserOverview struct {
 }
 
 type AffiliateService struct {
-	repo                 AffiliateRepository
-	settingService       *SettingService
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	billingCacheService  *BillingCacheService
+	repo                  AffiliateRepository
+	settingService        *SettingService
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	billingCacheService   *BillingCacheService
+	internalOrderRecorder InternalBalanceOrderRecorder
 }
 
 func NewAffiliateService(repo AffiliateRepository, settingService *SettingService, authCacheInvalidator APIKeyAuthCacheInvalidator, billingCacheService *BillingCacheService) *AffiliateService {
@@ -218,6 +221,10 @@ func NewAffiliateService(repo AffiliateRepository, settingService *SettingServic
 		authCacheInvalidator: authCacheInvalidator,
 		billingCacheService:  billingCacheService,
 	}
+}
+
+func (s *AffiliateService) SetInternalBalanceOrderRecorder(recorder InternalBalanceOrderRecorder) {
+	s.internalOrderRecorder = recorder
 }
 
 // IsEnabled reports whether the affiliate (邀请返利) feature is turned on.
@@ -419,6 +426,24 @@ func (s *AffiliateService) TransferAffiliateQuota(ctx context.Context, userID in
 	}
 	if transferred > 0 {
 		s.invalidateAffiliateCaches(ctx, userID)
+		if s.internalOrderRecorder != nil {
+			recordedAt := time.Now()
+			if _, orderErr := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+				UserID:      userID,
+				Amount:      transferred,
+				SourceType:  PaymentTypeAffiliateTransfer,
+				SourceRef:   fmt.Sprintf("affiliate_transfer:%d:%d", userID, recordedAt.UnixNano()),
+				PaymentType: PaymentTypeAffiliateTransfer,
+				Operator:    fmt.Sprintf("user:%d", userID),
+				CreatedAt:   &recordedAt,
+				Metadata: map[string]any{
+					"new_balance":        balance,
+					"transferred_amount": strconv.FormatFloat(transferred, 'f', 8, 64),
+				},
+			}); orderErr != nil {
+				logger.LegacyPrintf("service.affiliate", "[Affiliate] Failed to create transfer balance order: user_id=%d amount=%.8f err=%v", userID, transferred, orderErr)
+			}
+		}
 	}
 	return transferred, balance, nil
 }

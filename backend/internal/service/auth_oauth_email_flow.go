@@ -166,6 +166,7 @@ func (s *AuthService) RegisterOAuthEmailAccount(
 		slog.Error("oauth email register: userRepo.Create failed", "email", email, "signup_source", signupSource, "error", err.Error())
 		return nil, nil, ErrServiceUnavailable
 	}
+	s.recordSignupGrantOrder(ctx, user, signupSource, grantPlan.Balance)
 
 	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
 	if err != nil {
@@ -247,6 +248,7 @@ func (s *AuthService) RegisterVerifiedOAuthEmailAccount(
 		}
 		return nil, nil, ErrServiceUnavailable
 	}
+	s.recordSignupGrantOrder(ctx, user, signupSource, grantPlan.Balance)
 
 	tokenPair, err := s.GenerateTokenPair(ctx, user, "")
 	if err != nil {

@@ -24,11 +24,12 @@ var (
 
 // PromoService 优惠码服务
 type PromoService struct {
-	promoRepo            PromoCodeRepository
-	userRepo             UserRepository
-	billingCacheService  *BillingCacheService
-	entClient            *dbent.Client
-	authCacheInvalidator APIKeyAuthCacheInvalidator
+	promoRepo             PromoCodeRepository
+	userRepo              UserRepository
+	billingCacheService   *BillingCacheService
+	entClient             *dbent.Client
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	internalOrderRecorder InternalBalanceOrderRecorder
 }
 
 // NewPromoService 创建优惠码服务实例
@@ -46,6 +47,10 @@ func NewPromoService(
 		entClient:            entClient,
 		authCacheInvalidator: authCacheInvalidator,
 	}
+}
+
+func (s *PromoService) SetInternalBalanceOrderRecorder(recorder InternalBalanceOrderRecorder) {
+	s.internalOrderRecorder = recorder
 }
 
 // ValidatePromoCode 验证优惠码（注册前调用）
@@ -142,6 +147,26 @@ func (s *PromoService) ApplyPromoCode(ctx context.Context, userID int64, code st
 	// 增加使用次数
 	if err := s.promoRepo.IncrementUsedCount(txCtx, promoCode.ID); err != nil {
 		return fmt.Errorf("increment used count: %w", err)
+	}
+
+	if promoCode.BonusAmount > 0 && s.internalOrderRecorder != nil {
+		if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(txCtx, InternalBalanceOrderInput{
+			UserID:      userID,
+			Amount:      promoCode.BonusAmount,
+			SourceType:  PaymentTypePromoCode,
+			SourceRef:   fmt.Sprintf("promo_usage:%d", usage.ID),
+			PaymentType: PaymentTypePromoCode,
+			Operator:    fmt.Sprintf("user:%d", userID),
+			CreatedAt:   &usage.UsedAt,
+			Metadata: map[string]any{
+				"promo_code_id":    promoCode.ID,
+				"promo_code":       promoCode.Code,
+				"promo_usage_id":   usage.ID,
+				"promo_code_notes": promoCode.Notes,
+			},
+		}); err != nil {
+			return fmt.Errorf("create promo balance order: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {

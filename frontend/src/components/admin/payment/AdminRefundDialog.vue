@@ -168,7 +168,7 @@ import { reactive, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PaymentOrder } from '@/types/payment'
-import { formatOrderDateTime } from '@/components/payment/orderUtils'
+import { formatOrderDateTime, isInternalBalancePaymentType } from '@/components/payment/orderUtils'
 
 const { t } = useI18n()
 
@@ -204,7 +204,13 @@ const actuallyRefunded = computed(() => {
 
 const maxRefundable = computed(() => {
   if (!props.order) return 0
+  if (isInternalPaymentType.value) return 0
   return props.order.amount - actuallyRefunded.value
+})
+
+const isInternalPaymentType = computed(() => {
+  if (!props.order) return false
+  return isInternalBalancePaymentType(props.order.payment_type)
 })
 
 const balanceInsufficient = computed(() => {

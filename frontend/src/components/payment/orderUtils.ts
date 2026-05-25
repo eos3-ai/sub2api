@@ -20,12 +20,30 @@ const STATUS_BADGE_MAP: Record<string, string> = {
 
 const REFUNDABLE_STATUSES = ['COMPLETED', 'PARTIALLY_REFUNDED', 'REFUND_REQUESTED', 'REFUND_FAILED']
 
+export const INTERNAL_BALANCE_PAYMENT_TYPES = [
+  'admin_adjustment',
+  'redeem_code',
+  'promo_code',
+  'affiliate_transfer',
+  'oauth_first_bind',
+  'signup_grant',
+  'refund_rollback',
+]
+
 export function statusBadgeClass(status: string): string {
   return STATUS_BADGE_MAP[status] || 'badge-secondary'
 }
 
 export function canRefund(status: string): boolean {
   return REFUNDABLE_STATUSES.includes(status)
+}
+
+export function isInternalBalancePaymentType(paymentType?: string | null): boolean {
+  return INTERNAL_BALANCE_PAYMENT_TYPES.includes(String(paymentType || '').trim())
+}
+
+export function canRefundOrder(status: string, paymentType?: string | null): boolean {
+  return canRefund(status) && !isInternalBalancePaymentType(paymentType)
 }
 
 export function toFiniteOrderNumber(value: unknown, fallback = 0): number {

@@ -7,9 +7,19 @@ import (
 	"errors"
 	"testing"
 
+	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
+
+type internalBalanceOrderRecorderStub struct {
+	calls []InternalBalanceOrderInput
+}
+
+func (s *internalBalanceOrderRecorderStub) RecordInternalBalanceOrder(ctx context.Context, input InternalBalanceOrderInput) (*dbent.PaymentOrder, error) {
+	s.calls = append(s.calls, input)
+	return nil, nil
+}
 
 func TestAdminService_CreateUser_Success(t *testing.T) {
 	repo := &userRepoStub{nextID: 10}
@@ -40,6 +50,52 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	require.True(t, user.CheckPassword(input.Password))
 	require.Len(t, repo.created, 1)
 	require.Equal(t, user, repo.created[0])
+}
+
+func TestAdminService_CreateUser_RecordsInitialBalanceOrder(t *testing.T) {
+	repo := &userRepoStub{nextID: 10}
+	redeemRepo := &balanceRedeemRepoStub{redeemRepoStub: &redeemRepoStub{}}
+	recorder := &internalBalanceOrderRecorderStub{}
+	svc := &adminServiceImpl{
+		userRepo:              repo,
+		redeemCodeRepo:        redeemRepo,
+		internalOrderRecorder: recorder,
+	}
+
+	input := &CreateUserInput{
+		Email:    "balance@test.com",
+		Password: "strong-pass",
+		Balance:  12.5,
+		Notes:    "initial grant",
+	}
+
+	user, err := svc.CreateUser(context.Background(), input)
+	require.NoError(t, err)
+	require.NotNil(t, user)
+	require.Len(t, recorder.calls, 1)
+	call := recorder.calls[0]
+	require.Equal(t, user.ID, call.UserID)
+	require.Equal(t, input.Balance, call.Amount)
+	require.Equal(t, PaymentTypeAdminAdjustment, call.SourceType)
+	require.Equal(t, PaymentTypeAdminAdjustment, call.PaymentType)
+	require.Equal(t, "admin_user_create:10", call.SourceRef)
+	require.Equal(t, input.Notes, call.Notes)
+	require.Equal(t, "admin", call.Operator)
+	require.NotNil(t, call.CreatedAt)
+	require.Equal(t, "create_user", call.Metadata["operation"])
+	require.Equal(t, 0, call.Metadata["old_balance"])
+	require.Equal(t, input.Balance, call.Metadata["new_balance"])
+	require.NotEmpty(t, call.Metadata["history_code"])
+
+	require.Len(t, redeemRepo.created, 1)
+	history := redeemRepo.created[0]
+	require.Equal(t, AdjustmentTypeAdminBalance, history.Type)
+	require.Equal(t, input.Balance, history.Value)
+	require.Equal(t, StatusUsed, history.Status)
+	require.NotNil(t, history.UsedBy)
+	require.Equal(t, user.ID, *history.UsedBy)
+	require.Equal(t, input.Notes, history.Notes)
+	require.NotNil(t, history.UsedAt)
 }
 
 func TestAdminService_CreateUser_EmailExists(t *testing.T) {

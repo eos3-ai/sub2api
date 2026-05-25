@@ -81,6 +81,22 @@ ON CONFLICT (user_id, provider_type, grant_reason) DO NOTHING`,
 		if err := client.User.UpdateOneID(userID).AddBalance(providerDefaults.Balance).Exec(ctx); err != nil {
 			return fmt.Errorf("apply first bind balance default: %w", err)
 		}
+		if providerDefaults.Balance > 0 && s.internalOrderRecorder != nil {
+			normalizedProviderType := strings.TrimSpace(providerType)
+			if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+				UserID:      userID,
+				Amount:      providerDefaults.Balance,
+				SourceType:  PaymentTypeOAuthFirstBind,
+				SourceRef:   fmt.Sprintf("oauth_first_bind:%s:%d", normalizedProviderType, userID),
+				PaymentType: PaymentTypeOAuthFirstBind,
+				Operator:    "system",
+				Metadata: map[string]any{
+					"provider_type": normalizedProviderType,
+				},
+			}); err != nil {
+				return fmt.Errorf("create first bind balance order: %w", err)
+			}
+		}
 	}
 	if providerDefaults.Concurrency != 0 {
 		if err := client.User.UpdateOneID(userID).AddConcurrency(providerDefaults.Concurrency).Exec(ctx); err != nil {

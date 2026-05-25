@@ -143,8 +143,10 @@ import Pagination from '@/components/common/Pagination.vue'
 import Select from '@/components/common/Select.vue'
 import Icon from '@/components/icons/Icon.vue'
 import {
+  INTERNAL_BALANCE_PAYMENT_TYPES,
   statusBadgeClass,
-  canRefund,
+  canRefundOrder,
+  isInternalBalancePaymentType,
   formatOrderDateTime,
   formatOrderAmount,
   orderAmountsDiffer,
@@ -220,6 +222,7 @@ const paymentTypeFilterOptions = computed(() => [
   { value: 'wxpay', label: t('payment.methods.wxpay') },
   { value: 'stripe', label: t('payment.methods.stripe') },
   { value: 'airwallex', label: t('payment.methods.airwallex') },
+  ...INTERNAL_BALANCE_PAYMENT_TYPES.map((value) => ({ value, label: t(`payment.methods.${value}`) })),
 ])
 
 const orderTypeFilterOptions = computed(() => [
@@ -229,7 +232,7 @@ const orderTypeFilterOptions = computed(() => [
 ])
 
 function canRefundRow(order: PaymentOrder): boolean {
-  return canRefund(order.status)
+  return canRefundOrder(order.status, order.payment_type) && !isInternalBalancePaymentType(order.payment_type)
 }
 
 function formatDateTime(dateStr: string): string {

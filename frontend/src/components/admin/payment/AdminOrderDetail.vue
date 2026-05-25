@@ -118,7 +118,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import type { PaymentOrder } from '@/types/payment'
-import { statusBadgeClass, canRefund as canRefundStatus, formatOrderDateTime } from '@/components/payment/orderUtils'
+import { statusBadgeClass, canRefundOrder, formatOrderDateTime } from '@/components/payment/orderUtils'
 
 const { t } = useI18n()
 
@@ -151,7 +151,7 @@ const emit = defineEmits<{
 }>()
 
 function canRefund(order: PaymentOrder): boolean {
-  return canRefundStatus(order.status)
+  return canRefundOrder(order.status, order.payment_type)
 }
 
 function formatDateTime(dateStr: string): string {

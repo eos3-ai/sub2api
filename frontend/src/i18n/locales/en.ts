@@ -6640,6 +6640,7 @@ export default {
     methods: {
       easypay: 'EasyPay',
       admin: 'Admin Adjustment',
+      admin_adjustment: 'Admin Adjustment',
       alipay: 'Alipay',
       wechat: 'WeChat Pay',
       wxpay: 'WeChat Pay',
@@ -6649,6 +6650,12 @@ export default {
       link: 'Link',
       alipay_direct: 'Alipay (Direct)',
       wxpay_direct: 'WeChat Pay (Direct)',
+      redeem_code: 'Redeem Code',
+      promo_code: 'Promo Code',
+      affiliate_transfer: 'Affiliate Transfer',
+      oauth_first_bind: 'First Bind Grant',
+      signup_grant: 'Signup Grant',
+      refund_rollback: 'Refund Rollback',
     },
     status: {
       pending: 'Pending',
@@ -6775,6 +6782,7 @@ export default {
       INVALID_STATUS: 'The current order status does not allow this operation.',
       BALANCE_NOT_ENOUGH: 'Refund amount exceeds balance.',
       REFUND_AMOUNT_EXCEEDED: 'Refund amount exceeds the recharge amount.',
+      REFUND_DISABLED: 'Refund is not available for this order.',
       REFUND_FAILED: 'Refund failed.',
     },
     airwallexPay: 'Airwallex Payment',

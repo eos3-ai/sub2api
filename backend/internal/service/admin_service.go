@@ -514,27 +514,32 @@ var ErrRPMStatusUnavailable = infraerrors.New(http.StatusNotImplemented, "RPM_ST
 
 // adminServiceImpl implements AdminService
 type adminServiceImpl struct {
-	userRepo             UserRepository
-	groupRepo            GroupRepository
-	accountRepo          AccountRepository
-	proxyRepo            ProxyRepository
-	apiKeyRepo           APIKeyRepository
-	redeemCodeRepo       RedeemCodeRepository
-	userGroupRateRepo    UserGroupRateRepository
-	userRPMCache         UserRPMCache
-	billingCacheService  *BillingCacheService
-	proxyProber          ProxyExitInfoProber
-	proxyLatencyCache    ProxyLatencyCache
-	authCacheInvalidator APIKeyAuthCacheInvalidator
-	entClient            *dbent.Client // 用于开启数据库事务
-	settingService       *SettingService
-	defaultSubAssigner   DefaultSubscriptionAssigner
-	userSubRepo          UserSubscriptionRepository
-	privacyClientFactory PrivacyClientFactory
+	userRepo              UserRepository
+	groupRepo             GroupRepository
+	accountRepo           AccountRepository
+	proxyRepo             ProxyRepository
+	apiKeyRepo            APIKeyRepository
+	redeemCodeRepo        RedeemCodeRepository
+	userGroupRateRepo     UserGroupRateRepository
+	userRPMCache          UserRPMCache
+	billingCacheService   *BillingCacheService
+	proxyProber           ProxyExitInfoProber
+	proxyLatencyCache     ProxyLatencyCache
+	authCacheInvalidator  APIKeyAuthCacheInvalidator
+	entClient             *dbent.Client // 用于开启数据库事务
+	settingService        *SettingService
+	defaultSubAssigner    DefaultSubscriptionAssigner
+	userSubRepo           UserSubscriptionRepository
+	privacyClientFactory  PrivacyClientFactory
+	internalOrderRecorder InternalBalanceOrderRecorder
 }
 
 type userGroupRateBatchReader interface {
 	GetByUserIDs(ctx context.Context, userIDs []int64) (map[int64]map[int64]float64, error)
+}
+
+func (s *adminServiceImpl) SetInternalBalanceOrderRecorder(recorder InternalBalanceOrderRecorder) {
+	s.internalOrderRecorder = recorder
 }
 
 // NewAdminService creates a new AdminService
@@ -680,6 +685,53 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		return nil, err
 	}
 	s.assignDefaultSubscriptions(ctx, user.ID)
+	if input.Balance > 0 {
+		now := time.Now()
+		historyCode := ""
+		if s.redeemCodeRepo != nil {
+			code, err := GenerateRedeemCode()
+			if err != nil {
+				logger.LegacyPrintf("service.admin", "failed to generate admin initial balance history code: %v", err)
+			} else {
+				historyCode = code
+				adjustmentRecord := &RedeemCode{
+					Code:   code,
+					Type:   AdjustmentTypeAdminBalance,
+					Value:  input.Balance,
+					Status: StatusUsed,
+					UsedBy: &user.ID,
+					Notes:  input.Notes,
+				}
+				adjustmentRecord.UsedAt = &now
+				if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
+					logger.LegacyPrintf("service.admin", "failed to create admin initial balance history: user_id=%d amount=%.8f err=%v", user.ID, input.Balance, err)
+				}
+			}
+		}
+		if s.internalOrderRecorder != nil {
+			metadata := map[string]any{
+				"operation":   "create_user",
+				"old_balance": 0,
+				"new_balance": user.Balance,
+			}
+			if historyCode != "" {
+				metadata["history_code"] = historyCode
+			}
+			if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+				UserID:      user.ID,
+				Amount:      input.Balance,
+				SourceType:  PaymentTypeAdminAdjustment,
+				SourceRef:   fmt.Sprintf("admin_user_create:%d", user.ID),
+				PaymentType: PaymentTypeAdminAdjustment,
+				Notes:       input.Notes,
+				Operator:    "admin",
+				CreatedAt:   &now,
+				Metadata:    metadata,
+			}); err != nil {
+				logger.LegacyPrintf("service.admin", "failed to create admin initial balance order: user_id=%d amount=%.8f err=%v", user.ID, input.Balance, err)
+			}
+		}
+	}
 	return user, nil
 }
 
@@ -911,6 +963,28 @@ func (s *adminServiceImpl) UpdateUserBalance(ctx context.Context, userID int64, 
 
 		if err := s.redeemCodeRepo.Create(ctx, adjustmentRecord); err != nil {
 			logger.LegacyPrintf("service.admin", "failed to create balance adjustment redeem code: %v", err)
+		}
+
+		if balanceDiff > 0 && s.internalOrderRecorder != nil {
+			sourceRef := fmt.Sprintf("admin_balance:%s", code)
+			if _, err := s.internalOrderRecorder.RecordInternalBalanceOrder(ctx, InternalBalanceOrderInput{
+				UserID:      user.ID,
+				Amount:      balanceDiff,
+				SourceType:  PaymentTypeAdminAdjustment,
+				SourceRef:   sourceRef,
+				PaymentType: PaymentTypeAdminAdjustment,
+				Notes:       notes,
+				Operator:    "admin",
+				CreatedAt:   &now,
+				Metadata: map[string]any{
+					"operation":    operation,
+					"old_balance":  oldBalance,
+					"new_balance":  user.Balance,
+					"history_code": code,
+				},
+			}); err != nil {
+				logger.LegacyPrintf("service.admin", "failed to create admin balance order: user_id=%d amount=%.8f err=%v", user.ID, balanceDiff, err)
+			}
 		}
 	}
 
