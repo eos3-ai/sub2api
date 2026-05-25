@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
+	"github.com/klauspost/compress/zstd"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/proxyurl"
@@ -889,6 +890,12 @@ func decompressResponseBody(resp *http.Response) {
 		reader = brotli.NewReader(resp.Body)
 	case "deflate":
 		reader = flate.NewReader(resp.Body)
+	case "zstd":
+		zr, err := zstd.NewReader(resp.Body)
+		if err != nil {
+			return // 解压失败，保持原样
+		}
+		reader = &zstdReadCloser{Decoder: zr}
 	default:
 		return
 	}
@@ -916,4 +923,15 @@ func (d *decompressedBody) Close() error {
 		_ = rc.Close()
 	}
 	return d.closer.Close()
+}
+
+// zstdReadCloser 适配 zstd.Decoder：其 Close() 无返回值，不满足 io.Closer 接口。
+// 包装后供 decompressedBody 在关闭时一并释放 zstd 解码器。
+type zstdReadCloser struct {
+	*zstd.Decoder
+}
+
+func (z *zstdReadCloser) Close() error {
+	z.Decoder.Close()
+	return nil
 }
