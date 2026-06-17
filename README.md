@@ -1,5 +1,5 @@
 # Sub2API
-abx
+
 <div align="center">
 
 [![Go](https://img.shields.io/badge/Go-1.25.7-00ADD8.svg)](https://golang.org/)
