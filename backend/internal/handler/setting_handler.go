@@ -7,6 +7,7 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/handler/dto"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/timezone"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -113,6 +114,8 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		BaiduTongjiID:                    settings.BaiduTongjiID,
 		BaiduOcpcLandingNewType:          settings.BaiduOcpcLandingNewType,
 		Version:                          h.version,
+		ServerTimezone:                   timezone.Name(),
+		ServerUTCOffset:                  timezone.UTCOffset(),
 		BalanceLowNotifyEnabled:          settings.BalanceLowNotifyEnabled,
 		AccountQuotaNotifyEnabled:        settings.AccountQuotaNotifyEnabled,
 		BalanceLowNotifyThreshold:        settings.BalanceLowNotifyThreshold,
@@ -126,6 +129,8 @@ func (h *SettingHandler) GetPublicSettings(c *gin.Context) {
 		AffiliateEnabled: settings.AffiliateEnabled,
 
 		RiskControlEnabled: settings.RiskControlEnabled,
+
+		AllowUserViewErrorRequests: settings.AllowUserViewErrorRequests,
 	})
 }
 

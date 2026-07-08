@@ -20,6 +20,7 @@ func ProvideAdminHandlers(
 	openaiOAuthHandler *admin.OpenAIOAuthHandler,
 	geminiOAuthHandler *admin.GeminiOAuthHandler,
 	antigravityOAuthHandler *admin.AntigravityOAuthHandler,
+	grokOAuthHandler *admin.GrokOAuthHandler,
 	proxyHandler *admin.ProxyHandler,
 	redeemHandler *admin.RedeemHandler,
 	promoHandler *admin.PromoHandler,
@@ -40,6 +41,7 @@ func ProvideAdminHandlers(
 	paymentHandler *admin.PaymentHandler,
 	invoiceHandler *admin.InvoiceHandler,
 	affiliateHandler *admin.AffiliateHandler,
+	complianceHandler *admin.ComplianceHandler,
 ) *AdminHandlers {
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
@@ -53,6 +55,7 @@ func ProvideAdminHandlers(
 		OpenAIOAuth:            openaiOAuthHandler,
 		GeminiOAuth:            geminiOAuthHandler,
 		AntigravityOAuth:       antigravityOAuthHandler,
+		GrokOAuth:              grokOAuthHandler,
 		Proxy:                  proxyHandler,
 		Redeem:                 redeemHandler,
 		Promo:                  promoHandler,
@@ -73,6 +76,7 @@ func ProvideAdminHandlers(
 		Payment:                paymentHandler,
 		Invoice:                invoiceHandler,
 		Affiliate:              affiliateHandler,
+		Compliance:             complianceHandler,
 	}
 }
 
@@ -170,6 +174,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewOpenAIOAuthHandler,
 	admin.NewGeminiOAuthHandler,
 	admin.NewAntigravityOAuthHandler,
+	admin.NewGrokOAuthHandler,
 	admin.NewProxyHandler,
 	admin.NewRedeemHandler,
 	admin.NewPromoHandler,
@@ -190,6 +195,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewPaymentHandler,
 	admin.NewInvoiceHandler,
 	admin.NewAffiliateHandler,
+	admin.NewComplianceHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

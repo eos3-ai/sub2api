@@ -69,6 +69,7 @@ func RegisterPaymentRoutes(
 	adminGroup := v1.Group("/admin/payment")
 	adminGroup.Use(gin.HandlerFunc(adminAuth))
 	adminGroup.Use(middleware.RequireAdminPermission())
+	adminGroup.Use(middleware.AdminComplianceGuard(settingService))
 	{
 		// Dashboard
 		adminGroup.GET("/dashboard", adminPaymentHandler.GetDashboard)
@@ -87,6 +88,7 @@ func RegisterPaymentRoutes(
 			adminOrders.POST("/:id/cancel", adminPaymentHandler.CancelOrder)
 			adminOrders.POST("/:id/retry", adminPaymentHandler.RetryFulfillment)
 			adminOrders.POST("/:id/refund", adminPaymentHandler.ProcessRefund)
+			adminOrders.POST("/:id/refund/query", adminPaymentHandler.QueryAndFinalizeRefund)
 		}
 
 		// Subscription Plans

@@ -53,12 +53,12 @@
 
       <template #cell-pay_amount="{ value, row }">
         <div class="text-sm">
-          <span class="font-medium text-gray-900 dark:text-white">¥{{ formatOrderAmount(value) }}</span>
+          <span class="font-medium text-gray-900 dark:text-white">{{ paymentAmountSymbol(row) }}{{ formatOrderAmount(value) }}</span>
           <span v-if="hasFee(row)" class="ml-1 text-xs text-gray-400" :title="t('payment.orders.fee') + ': ' + formatFeeRate(row.fee_rate) + '%'">
             ({{ formatFeeRate(row.fee_rate) }}%)
           </span>
           <div v-if="orderAmountsDiffer(row.amount, row.pay_amount)" class="text-xs text-gray-500">
-            {{ t('payment.orders.creditedAmount') }}: {{ row.order_type === 'balance' ? '$' : '¥' }}{{ formatOrderAmount(row.amount) }}
+            {{ t('payment.orders.creditedAmount') }}: {{ creditedAmountSymbol }}{{ formatOrderAmount(row.amount) }}
           </div>
         </div>
       </template>
@@ -152,6 +152,7 @@ import {
   orderAmountsDiffer,
   toFiniteOrderNumber
 } from '@/components/payment/orderUtils'
+import { currencySymbol } from '@/components/payment/currency'
 
 const { t } = useI18n()
 
@@ -176,6 +177,11 @@ const emit = defineEmits<{
 
 const searchQuery = ref('')
 const filters = reactive({ status: '', payment_type: '', order_type: '' })
+const creditedAmountSymbol = currencySymbol('USD')
+
+function paymentAmountSymbol(order: PaymentOrder): string {
+  return currencySymbol(order.currency)
+}
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function handleSearch() {
@@ -213,6 +219,7 @@ const statusFilterOptions = computed(() => [
   { value: 'FAILED', label: t('payment.status.failed') },
   { value: 'REFUNDED', label: t('payment.status.refunded') },
   { value: 'REFUND_REQUESTED', label: t('payment.status.refund_requested') },
+  { value: 'REFUND_PENDING', label: t('payment.status.refund_pending') },
   { value: 'REFUND_FAILED', label: t('payment.status.refund_failed') },
 ])
 
