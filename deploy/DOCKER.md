@@ -31,7 +31,7 @@ services:
       - redis
 
   db:
-    image: postgres:15-alpine
+    image: docker.m.daocloud.io/library/postgres:15-alpine
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -40,7 +40,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   redis:
-    image: redis:7-alpine
+    image: docker.m.daocloud.io/library/redis:7-alpine
     volumes:
       - redis_data:/data
 
