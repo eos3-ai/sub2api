@@ -447,12 +447,16 @@ type ChatStreamOptions struct {
 
 // ChatMessage is a single message in the Chat Completions conversation.
 type ChatMessage struct {
-	Role             string          `json:"role"` // "system" | "user" | "assistant" | "tool" | "function"
-	Content          json.RawMessage `json:"content,omitempty"`
-	ReasoningContent string          `json:"reasoning_content,omitempty"`
-	Name             string          `json:"name,omitempty"`
-	ToolCalls        []ChatToolCall  `json:"tool_calls,omitempty"`
-	ToolCallID       string          `json:"tool_call_id,omitempty"`
+	Role    string          `json:"role"` // "system" | "user" | "assistant" | "tool" | "function"
+	Content json.RawMessage `json:"content,omitempty"`
+	// Images carries generated image outputs for providers such as Gemini.
+	// Chat Completions clients commonly expose these as message.images while
+	// keeping message.content as the generated text.
+	Images           []ChatContentPart `json:"images,omitempty"`
+	ReasoningContent string            `json:"reasoning_content,omitempty"`
+	Name             string            `json:"name,omitempty"`
+	ToolCalls        []ChatToolCall    `json:"tool_calls,omitempty"`
+	ToolCallID       string            `json:"tool_call_id,omitempty"`
 
 	// Legacy function calling
 	FunctionCall *ChatFunctionCall `json:"function_call,omitempty"`
@@ -565,10 +569,11 @@ type ChatChunkChoice struct {
 
 // ChatDelta carries incremental content in a streaming chunk.
 type ChatDelta struct {
-	Role             string         `json:"role,omitempty"`
-	Content          *string        `json:"content,omitempty"` // pointer: omit when not present, null vs "" matters
-	ReasoningContent *string        `json:"reasoning_content,omitempty"`
-	ToolCalls        []ChatToolCall `json:"tool_calls,omitempty"`
+	Role             string            `json:"role,omitempty"`
+	Content          *string           `json:"content,omitempty"` // pointer: omit when not present, null vs "" matters
+	Images           []ChatContentPart `json:"images,omitempty"`
+	ReasoningContent *string           `json:"reasoning_content,omitempty"`
+	ToolCalls        []ChatToolCall    `json:"tool_calls,omitempty"`
 }
 
 // ---------------------------------------------------------------------------

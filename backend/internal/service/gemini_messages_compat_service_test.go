@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -117,6 +118,95 @@ func TestGeminiForwardAsChatCompletions_OAuthRoutesToGeminiAndReturnsChatFormat(
 	require.Equal(t, float64(10), usage["total_tokens"])
 }
 
+func TestGeminiForwardAsChatCompletions_ImageResponseIncludesDataURI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+			Body: io.NopCloser(strings.NewReader(`{
+				"candidates":[{"content":{"parts":[
+					{"text":"image generated"},
+					{"inlineData":{"mimeType":"image/png","data":"QUJD"}}
+				]},"finishReason":"STOP"}],
+				"usageMetadata":{"promptTokenCount":4,"candidatesTokenCount":8}
+			}`)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream: httpStub,
+		cfg:          &config.Config{},
+	}
+	account := &Account{
+		ID:       103,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "gemini-api-key",
+		},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body := []byte(`{"model":"gemini-3.1-flash-image-preview","messages":[{"role":"user","content":"draw a cat"}],"stream":false,"modalities":["text","image"]}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+
+	result, err := svc.ForwardAsChatCompletions(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var sent map[string]any
+	sentBody, err := io.ReadAll(httpStub.lastReq.Body)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(sentBody, &sent))
+	generationConfig, ok := sent["generationConfig"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, []any{"TEXT", "IMAGE"}, generationConfig["responseModalities"])
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &got))
+	choices, ok := got["choices"].([]any)
+	require.True(t, ok)
+	require.Len(t, choices, 1)
+	message := choices[0].(map[string]any)["message"].(map[string]any)
+	require.Equal(t, "image generated ![image](data:image/png;base64,QUJD)", message["content"])
+	images, ok := message["images"].([]any)
+	require.True(t, ok)
+	require.Len(t, images, 1)
+	image := images[0].(map[string]any)
+	require.Equal(t, "image_url", image["type"])
+	imageURL := image["image_url"].(map[string]any)
+	require.Equal(t, "data:image/png;base64,QUJD", imageURL["url"])
+}
+
+func TestAppendGeminiImageMarkdown_IsSingleLineForBase64Pipelines(t *testing.T) {
+	content := appendGeminiImageMarkdown(
+		json.RawMessage(`"first line\nsecond line"`),
+		[]apicompat.ChatContentPart{{
+			Type:     "image_url",
+			ImageURL: &apicompat.ChatImageURL{URL: "data:image/png;base64,QUJD"},
+		}},
+	)
+	require.Equal(t, `"first line second line ![image](data:image/png;base64,QUJD)"`, string(content))
+}
+
+func TestCollectGeminiSSE_PreservesImageFromEarlierChunk(t *testing.T) {
+	stream := strings.NewReader(
+		`data: {"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"QUJD"}}]}}]}` + "\n\n" +
+			`data: {"candidates":[{"content":{"parts":[{"text":"done"}]},"finishReason":"STOP"}]}` + "\n\n" +
+			"data: [DONE]\n\n",
+	)
+
+	collected, _, err := collectGeminiSSE(stream, false)
+	require.NoError(t, err)
+	images := extractGeminiImageOutputs(collected)
+	require.Len(t, images, 1)
+	require.Equal(t, "data:image/png;base64,QUJD", images[0].ImageURL.URL)
+}
+
 func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -168,6 +258,44 @@ func TestGeminiForwardAsChatCompletions_StreamsOpenAIChunksFromGeminiSSE(t *test
 	require.Contains(t, out, `"content":"lo"`)
 	require.Contains(t, out, `"usage":{"prompt_tokens":2,"completion_tokens":2,"total_tokens":4}`)
 	require.Contains(t, out, "data: [DONE]")
+}
+
+func TestGeminiForwardAsChatCompletions_StreamsImageChunk(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	upstreamBody := `data: {"candidates":[{"content":{"parts":[{"inlineData":{"mimeType":"image/png","data":"QUJD"}}]},"finishReason":"STOP"}]}` + "\n\n" +
+		"data: [DONE]\n\n"
+	httpStub := &geminiCompatHTTPUpstreamStub{
+		response: &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			Body:       io.NopCloser(strings.NewReader(upstreamBody)),
+		},
+	}
+	svc := &GeminiMessagesCompatService{
+		httpUpstream: httpStub,
+		cfg:          &config.Config{},
+	}
+	account := &Account{
+		ID:       104,
+		Platform: PlatformGemini,
+		Type:     AccountTypeAPIKey,
+		Credentials: map[string]any{
+			"api_key": "gemini-api-key",
+		},
+		Concurrency: 1,
+	}
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	body := []byte(`{"model":"gemini-3.1-flash-image","stream":true,"messages":[{"role":"user","content":"draw a cat"}]}`)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+
+	_, err := svc.ForwardAsChatCompletions(context.Background(), c, account, body)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"content":"![image](data:image/png;base64,QUJD)"`)
+	require.Contains(t, rec.Body.String(), `"images":[{"type":"image_url","image_url":{"url":"data:image/png;base64,QUJD"}}]`)
 }
 
 // TestConvertClaudeToolsToGeminiTools_CustomType 测试custom类型工具转换

@@ -92,6 +92,10 @@ func (s *GeminiMessagesCompatService) forwardClaudeBodyAsChatCompletions(
 	if err != nil {
 		return nil, s.writeChatCompletionsError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 	}
+	// Chat Completions exposes the requested output modalities at the top level,
+	// while Gemini expects them under generationConfig.responseModalities.
+	// Image models also need this flag when a client omits modalities.
+	geminiReq = ensureGeminiImageResponseModalities(geminiReq, originalChatBody, originalModel)
 	geminiReq = ensureGeminiFunctionCallThoughtSignatures(geminiReq)
 
 	proxyURL := ""
@@ -483,7 +487,166 @@ func geminiResponseToChatCompletions(
 		return nil, nil, err
 	}
 	responsesResp := apicompat.AnthropicToResponsesResponse(&anthropicResp)
-	return apicompat.ResponsesToChatCompletions(responsesResp, originalModel), usage, nil
+	chatResp := apicompat.ResponsesToChatCompletions(responsesResp, originalModel)
+	if len(chatResp.Choices) > 0 {
+		images := extractGeminiImageOutputs(geminiResp)
+		if len(images) > 0 {
+			// Keep the image in message.content as a Markdown data URI. This is
+			// compatible with clients that only read the standard content field,
+			// including simple curl/jq/base64 pipelines.
+			chatResp.Choices[0].Message.Content = appendGeminiImageMarkdown(
+				chatResp.Choices[0].Message.Content,
+				images,
+			)
+			chatResp.Choices[0].Message.Images = images
+		}
+	}
+	return chatResp, usage, nil
+}
+
+// appendGeminiImageMarkdown adds generated images to a Chat Completions text
+// response as Markdown image links backed by data URIs. A string content field
+// is intentional: many lightweight clients only inspect message.content and
+// cannot consume provider-specific message.images fields.
+func appendGeminiImageMarkdown(content json.RawMessage, images []apicompat.ChatContentPart) json.RawMessage {
+	var text string
+	if len(content) > 0 && string(content) != "null" {
+		_ = json.Unmarshal(content, &text)
+	}
+	if text != "" {
+		// Keep the image-bearing content on one physical line. The common
+		// jq/sed/base64 extraction pipeline is line-oriented and would otherwise
+		// pass preceding text lines to base64 as invalid input.
+		text = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
+	}
+
+	for _, image := range images {
+		if image.ImageURL == nil || strings.TrimSpace(image.ImageURL.URL) == "" {
+			continue
+		}
+		imageMarkdown := "![image](" + image.ImageURL.URL + ")"
+		// Avoid duplicating an image if a compatibility layer already embedded
+		// the same data URI in the generated text.
+		if strings.Contains(text, imageMarkdown) {
+			continue
+		}
+		if text != "" {
+			text += " "
+		}
+		text += imageMarkdown
+	}
+
+	encoded, err := json.Marshal(text)
+	if err != nil {
+		return content
+	}
+	return encoded
+}
+
+// ensureGeminiImageResponseModalities translates the OpenAI-compatible
+// modalities request into Gemini's native generationConfig field. Gemini image
+// models otherwise commonly return only text even when the model name implies
+// image generation.
+func ensureGeminiImageResponseModalities(geminiReq, originalBody []byte, model string) []byte {
+	var request struct {
+		Modalities []string `json:"modalities"`
+	}
+	_ = json.Unmarshal(originalBody, &request)
+
+	requestedImage := false
+	for _, modality := range request.Modalities {
+		if strings.EqualFold(strings.TrimSpace(modality), "image") {
+			requestedImage = true
+			break
+		}
+	}
+	imageModel := isImageGenerationModel(model)
+	if !imageModel && !requestedImage {
+		return geminiReq
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(geminiReq, &payload); err != nil {
+		return geminiReq
+	}
+	generationConfig, ok := payload["generationConfig"].(map[string]any)
+	if !ok || generationConfig == nil {
+		generationConfig = make(map[string]any)
+		payload["generationConfig"] = generationConfig
+	}
+
+	// Gemini's image generation examples request both text and image. Use the
+	// explicit client modalities for non-image models, but always include TEXT
+	// for a recognized image model so explanatory text remains valid.
+	if imageModel {
+		generationConfig["responseModalities"] = []string{"TEXT", "IMAGE"}
+	} else {
+		modalities := make([]string, 0, len(request.Modalities))
+		for _, modality := range request.Modalities {
+			modality = strings.ToUpper(strings.TrimSpace(modality))
+			if modality == "TEXT" || modality == "IMAGE" || modality == "AUDIO" {
+				modalities = append(modalities, modality)
+			}
+		}
+		if len(modalities) > 0 {
+			generationConfig["responseModalities"] = modalities
+		}
+	}
+
+	updated, err := json.Marshal(payload)
+	if err != nil {
+		return geminiReq
+	}
+	return updated
+}
+
+// extractGeminiImageOutputs converts Gemini inlineData parts to the
+// OpenAI-compatible message.images representation. The base64 payload is kept
+// intact so callers can either display the data URI or decode it themselves.
+func extractGeminiImageOutputs(geminiResp map[string]any) []apicompat.ChatContentPart {
+	parts := extractGeminiParts(geminiResp)
+	if len(parts) == 0 {
+		return nil
+	}
+
+	images := make([]apicompat.ChatContentPart, 0)
+	seen := make(map[string]struct{})
+	for _, part := range parts {
+		image, ok := geminiPartToChatImage(part)
+		if !ok || image.ImageURL == nil {
+			continue
+		}
+		key := image.ImageURL.URL
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		images = append(images, image)
+	}
+	return images
+}
+
+func geminiPartToChatImage(part map[string]any) (apicompat.ChatContentPart, bool) {
+	inline, ok := geminiInlineData(part)
+	if !ok {
+		return apicompat.ChatContentPart{}, false
+	}
+	mimeType, _ := inline["mimeType"].(string)
+	if mimeType == "" {
+		mimeType, _ = inline["mime_type"].(string)
+	}
+	data, _ := inline["data"].(string)
+	mimeType = strings.ToLower(strings.TrimSpace(mimeType))
+	data = strings.TrimSpace(data)
+	if data == "" || !strings.HasPrefix(strings.ToLower(mimeType), "image/") {
+		return apicompat.ChatContentPart{}, false
+	}
+	return apicompat.ChatContentPart{
+		Type: "image_url",
+		ImageURL: &apicompat.ChatImageURL{
+			URL: "data:" + mimeType + ";base64," + data,
+		},
+	}, true
 }
 
 func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFromGemini(
@@ -527,6 +690,32 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 			return true
 		}
 		return false
+	}
+	seenImages := make(map[string]struct{})
+	emitImagePart := func(part map[string]any) bool {
+		image, ok := geminiPartToChatImage(part)
+		if !ok || image.ImageURL == nil {
+			return false
+		}
+		if _, exists := seenImages[image.ImageURL.URL]; exists {
+			return false
+		}
+		seenImages[image.ImageURL.URL] = struct{}{}
+		imageMarkdown := "![image](" + image.ImageURL.URL + ")"
+		return writeChatChunk(apicompat.ChatCompletionsChunk{
+			ID:      ccState.ID,
+			Object:  "chat.completion.chunk",
+			Created: ccState.Created,
+			Model:   originalModel,
+			Choices: []apicompat.ChatChunkChoice{{
+				Index: 0,
+				Delta: apicompat.ChatDelta{
+					Content: &imageMarkdown,
+					Images:  []apicompat.ChatContentPart{image},
+				},
+				FinishReason: nil,
+			}},
+		})
 	}
 
 	emitAnthropicEvent := func(evt *apicompat.AnthropicStreamEvent) bool {
@@ -618,6 +807,7 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 						}
 
 						for _, part := range extractGeminiParts(geminiResp) {
+							_, hasImage := geminiPartToChatImage(part)
 							if text, ok := part["text"].(string); ok && text != "" {
 								if openToolIndex >= 0 {
 									if closeOpenTool() {
@@ -627,6 +817,12 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 								delta, newSeen := computeGeminiTextDelta(seenText, text)
 								seenText = newSeen
 								if delta == "" {
+									if hasImage {
+										if emitImagePart(part) {
+											return &geminiStreamResult{usage: &usage, firstTokenMs: firstTokenMs}, nil
+										}
+										flusher.Flush()
+									}
 									continue
 								}
 								if openBlockType != "text" {
@@ -657,6 +853,20 @@ func (s *GeminiMessagesCompatService) handleChatCompletionsStreamingResponseFrom
 								}) {
 									return &geminiStreamResult{usage: &usage, firstTokenMs: firstTokenMs}, nil
 								}
+								if hasImage {
+									if emitImagePart(part) {
+										return &geminiStreamResult{usage: &usage, firstTokenMs: firstTokenMs}, nil
+									}
+									flusher.Flush()
+								}
+								continue
+							}
+
+							if hasImage {
+								if emitImagePart(part) {
+									return &geminiStreamResult{usage: &usage, firstTokenMs: firstTokenMs}, nil
+								}
+								flusher.Flush()
 								continue
 							}
 
