@@ -2285,7 +2285,8 @@ func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsag
 
 	var last map[string]any
 	var lastWithParts map[string]any
-	var collectedTextParts []string // Collect all text parts for aggregation
+	var collectedTextParts []string          // Collect all text parts for aggregation
+	var collectedImageParts []map[string]any // Image parts may arrive before the final SSE chunk.
 	usage := &ClaudeUsage{}
 
 	for {
@@ -2297,7 +2298,8 @@ func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsag
 				switch payload {
 				case "", "[DONE]":
 					if payload == "[DONE]" {
-						return mergeCollectedTextParts(pickGeminiCollectResult(last, lastWithParts), collectedTextParts), usage, nil
+						result := mergeCollectedTextParts(pickGeminiCollectResult(last, lastWithParts), collectedTextParts)
+						return mergeCollectedImageParts(result, collectedImageParts), usage, nil
 					}
 				default:
 					var parsed map[string]any
@@ -2319,10 +2321,14 @@ func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsag
 						}
 						if parts := extractGeminiParts(parsed); len(parts) > 0 {
 							lastWithParts = parsed
-							// Collect text from each part for aggregation
+							// Collect text and image parts for aggregation. Image parts are
+							// often emitted in a separate chunk from the final text/usage.
 							for _, part := range parts {
 								if text, ok := part["text"].(string); ok && text != "" {
 									collectedTextParts = append(collectedTextParts, text)
+								}
+								if _, ok := geminiInlineData(part); ok {
+									collectedImageParts = append(collectedImageParts, part)
 								}
 							}
 						}
@@ -2339,7 +2345,8 @@ func collectGeminiSSE(body io.Reader, isOAuth bool) (map[string]any, *ClaudeUsag
 		}
 	}
 
-	return mergeCollectedTextParts(pickGeminiCollectResult(last, lastWithParts), collectedTextParts), usage, nil
+	result := mergeCollectedTextParts(pickGeminiCollectResult(last, lastWithParts), collectedTextParts)
+	return mergeCollectedImageParts(result, collectedImageParts), usage, nil
 }
 
 func pickGeminiCollectResult(last map[string]any, lastWithParts map[string]any) map[string]any {
@@ -2427,6 +2434,89 @@ func mergeCollectedTextParts(response map[string]any, textParts []string) map[st
 	result["candidates"] = candidates
 
 	return result
+}
+
+// mergeCollectedImageParts appends image parts collected from earlier SSE
+// chunks to the final Gemini response. This is needed for non-streaming client
+// requests that are served through an upstream stream (notably Gemini OAuth).
+func mergeCollectedImageParts(response map[string]any, imageParts []map[string]any) map[string]any {
+	if len(imageParts) == 0 {
+		return response
+	}
+
+	result := make(map[string]any, len(response))
+	for k, v := range response {
+		result[k] = v
+	}
+
+	candidates, ok := result["candidates"].([]any)
+	if !ok || len(candidates) == 0 {
+		candidates = []any{map[string]any{}}
+	}
+	candidate, ok := candidates[0].(map[string]any)
+	if !ok {
+		candidate = make(map[string]any)
+		candidates[0] = candidate
+	}
+	content, ok := candidate["content"].(map[string]any)
+	if !ok {
+		content = map[string]any{"role": "model"}
+		candidate["content"] = content
+	}
+	existingParts, ok := content["parts"].([]any)
+	if !ok {
+		existingParts = []any{}
+	}
+
+	seen := make(map[string]struct{})
+	for _, rawPart := range existingParts {
+		part, ok := rawPart.(map[string]any)
+		if !ok {
+			continue
+		}
+		if inline, ok := geminiInlineData(part); ok {
+			seen[geminiInlineDataKey(inline)] = struct{}{}
+		}
+	}
+	for _, part := range imageParts {
+		inline, ok := geminiInlineData(part)
+		if !ok {
+			continue
+		}
+		key := geminiInlineDataKey(inline)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		existingParts = append(existingParts, part)
+	}
+	content["parts"] = existingParts
+	result["candidates"] = candidates
+	return result
+}
+
+// geminiInlineData accepts both the public Gemini camelCase spelling and the
+// snake_case spelling used by a few compatibility layers.
+func geminiInlineData(part map[string]any) (map[string]any, bool) {
+	if inline, ok := part["inlineData"].(map[string]any); ok && inline != nil {
+		return inline, true
+	}
+	if inline, ok := part["inline_data"].(map[string]any); ok && inline != nil {
+		return inline, true
+	}
+	return nil, false
+}
+
+func geminiInlineDataKey(inline map[string]any) string {
+	if inline == nil {
+		return ""
+	}
+	mimeType, _ := inline["mimeType"].(string)
+	if mimeType == "" {
+		mimeType, _ = inline["mime_type"].(string)
+	}
+	data, _ := inline["data"].(string)
+	return strings.TrimSpace(mimeType) + "|" + strings.TrimSpace(data)
 }
 
 type geminiNativeStreamResult struct {
