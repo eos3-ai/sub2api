@@ -5,7 +5,23 @@ import router from './router'
 import i18n, { initI18n } from './i18n'
 import { useAppStore } from '@/stores/app'
 import { captureBaiduTrackingFromLocation } from '@/utils/baiduTracking'
+import { updateFavicon } from '@/utils/branding'
+import { isIOSDevice } from '@/utils/device'
 import './style.css'
+
+function initIOSViewportZoomFix() {
+  // iOS Safari 在输入框字号小于 16px 时聚焦会自动放大页面，且失焦后不会恢复。
+  // 限制 maximum-scale 可阻止该行为；iOS 10+ 用户仍可双指手动缩放，不影响可访问性。
+  // 仅在 iOS 设备上注入，避免影响 Android Chrome 的手动缩放能力。
+  if (!isIOSDevice()) return
+
+  const viewport = document.querySelector('meta[name="viewport"]')
+  if (!viewport) return
+
+  const content = viewport.getAttribute('content') || ''
+  if (/maximum-scale/i.test(content)) return
+  viewport.setAttribute('content', `${content}, maximum-scale=1.0`)
+}
 
 function initThemeClass() {
   const savedTheme = localStorage.getItem('theme')
@@ -16,9 +32,10 @@ function initThemeClass() {
 }
 
 async function bootstrap() {
-  // Apply theme class globally before app mount to keep all routes consistent.
-  initThemeClass()
-  captureBaiduTrackingFromLocation()
+	// Apply theme class globally before app mount to keep all routes consistent.
+	initThemeClass()
+	captureBaiduTrackingFromLocation()
+	initIOSViewportZoomFix()
 
   const app = createApp(App)
   const pinia = createPinia()
@@ -33,6 +50,7 @@ async function bootstrap() {
   if (appStore.siteName && appStore.siteName !== 'TokenCloud') {
     document.title = `${appStore.siteName} - AI API Gateway`
   }
+  updateFavicon(appStore.siteLogo)
 
   await initI18n()
 

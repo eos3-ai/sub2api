@@ -5,6 +5,8 @@
 
 import { apiClient } from './client'
 import { getBdLandingUrl, getBdVid } from '@/utils/baiduTracking'
+import { refreshAuthTokens, type RefreshTokenResponse } from './tokenRefresh'
+export type { RefreshTokenResponse } from './tokenRefresh'
 import type {
   LoginRequest,
   RegisterRequest,
@@ -13,6 +15,7 @@ import type {
   SendVerifyCodeRequest,
   SendVerifyCodeResponse,
   PublicSettings,
+  ActionCaptchaRequestProof,
   TotpLoginResponse,
   TotpLogin2FARequest
 } from '@/types'
@@ -32,6 +35,43 @@ function withBaiduTracking<T extends LoginRequest | RegisterRequest>(
     ...(bdVid ? { bd_vid: bdVid } : {}),
     ...(bdLandingUrl ? { bd_landing_url: bdLandingUrl } : {})
   }
+}
+
+export type OAuthLoginProvider =
+  | 'github'
+  | 'google'
+  | 'linuxdo'
+  | 'dingtalk'
+  | 'wechat'
+  | 'oidc'
+
+export interface OAuthLoginStart {
+  provider: OAuthLoginProvider
+  params: Record<string, string>
+}
+
+export interface OAuthLoginStartResponse {
+  authorize_url: string
+}
+
+export function buildOAuthLoginStartURL(request: OAuthLoginStart): string {
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '/api/v1'
+  const normalized = apiBase.replace(/\/$/, '')
+  const query = new URLSearchParams(request.params).toString()
+  const path = `${normalized}/auth/oauth/${request.provider}/start`
+  return query ? `${path}?${query}` : path
+}
+
+export async function startOAuthLogin(
+  request: OAuthLoginStart,
+  proof: ActionCaptchaRequestProof
+): Promise<OAuthLoginStartResponse> {
+  const { data } = await apiClient.post<OAuthLoginStartResponse>(
+    `/auth/oauth/${request.provider}/start`,
+    proof,
+    { params: request.params }
+  )
+  return data
 }
 
 /**
@@ -192,13 +232,6 @@ export async function logout(): Promise<void> {
 /**
  * Refresh token response
  */
-export interface RefreshTokenResponse {
-  access_token: string
-  refresh_token: string
-  expires_in: number
-  token_type: string
-}
-
 export interface OAuthTokenResponse {
   access_token: string
   refresh_token?: string
@@ -306,21 +339,7 @@ export async function prepareOAuthBindAccessTokenCookie(): Promise<void> {
  * @returns New token pair
  */
 export async function refreshToken(): Promise<RefreshTokenResponse> {
-  const currentRefreshToken = getRefreshToken()
-  if (!currentRefreshToken) {
-    throw new Error('No refresh token available')
-  }
-
-  const { data } = await apiClient.post<RefreshTokenResponse>('/auth/refresh', {
-    refresh_token: currentRefreshToken
-  })
-
-  // Update tokens in localStorage
-  setAuthToken(data.access_token)
-  setRefreshToken(data.refresh_token)
-  setTokenExpiresAt(data.expires_in)
-
-  return data
+  return refreshAuthTokens()
 }
 
 /**
@@ -525,6 +544,8 @@ export async function validateInvitationCode(code: string): Promise<ValidateInvi
 export interface ForgotPasswordRequest {
   email: string
   turnstile_token?: string
+  tencent_captcha_ticket?: string
+  tencent_captcha_randstr?: string
 }
 
 /**

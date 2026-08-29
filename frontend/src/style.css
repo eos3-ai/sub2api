@@ -30,6 +30,11 @@
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
   }
 
   body {
@@ -226,6 +231,14 @@
     outline: none;
     --tw-ring-color: rgba(196, 74, 44, 0.3) !important;
     box-shadow: 0 0 0 3px rgba(196, 74, 44, 0.3);
+  }
+
+  .dark .input[type='date'],
+  .dark .input[type='time'],
+  .dark .input[type='datetime-local'],
+  .dark .input[type='month'],
+  .dark .input[type='week'] {
+    color-scheme: dark;
   }
 
   .input-error {

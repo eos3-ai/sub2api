@@ -7,7 +7,7 @@
 # =============================================================================
 
 ARG NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
-ARG GOLANG_IMAGE=docker.m.daocloud.io/library/golang:1.26.4-alpine
+ARG GOLANG_IMAGE=docker.m.daocloud.io/library/golang:1.27.0-alpine
 ARG ALPINE_IMAGE=docker.m.daocloud.io/library/alpine:3.20
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
@@ -20,6 +20,7 @@ FROM ${NODE_IMAGE} AS frontend-builder
 ARG PNPM_VERSION
 
 WORKDIR /app/frontend
+ENV NODE_OPTIONS=--max-old-space-size=1536
 
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
@@ -103,8 +104,9 @@ RUN addgroup -g 1000 sub2api && \
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder
+# Copy binary and runtime fallback resources from builder
 COPY --from=backend-builder /app/sub2api /app/sub2api
+COPY --from=backend-builder --chown=sub2api:sub2api /app/backend/resources /app/resources
 
 # Create data directory
 RUN mkdir -p /app/data && chown -R sub2api:sub2api /app
