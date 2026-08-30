@@ -1,5 +1,52 @@
 export default {
 
+  // Invoice pages
+  invoice: {
+    description: 'Manage invoice requests and invoice details',
+    adminDescription: 'Review, reject, issue, and export invoice requests'
+  },
+
+  // Model pricing page
+  modelPricing: {
+    title: 'Model Rates',
+    description: 'View model rate multipliers and billing conversion rules',
+    tabs: {
+      claudeCode: 'Claude Code',
+      codex: 'Codex',
+      gemini: 'Gemini'
+    },
+    fullFormulaText: 'Final billing combines official token prices, cache prices, and channel discounts.',
+    fullFormulaNote: 'The rates below are a quick conversion guide between CNY balance and USD usage quota.',
+    officialPrice: 'Official Pricing',
+    officialPriceHint: 'Official pricing may change. Token prices are subject to the official provider page.',
+    officialPriceLink: 'View Official Pricing',
+    colType: 'Type',
+    colRate: 'Model Rate',
+    colFormula: 'Simple Formula',
+    rows: {
+      claudeLow: {
+        type: 'claude code-low-price',
+        formula: '1 CNY = 1 USD usage quota'
+      },
+      claudeStandard: {
+        type: 'claude code',
+        formula: '2 CNY = 1 USD usage quota'
+      },
+      claudeVip: {
+        type: 'claude code VIP',
+        formula: '3 CNY = 1 USD usage quota'
+      },
+      codex: {
+        type: 'Codex',
+        formula: '1 CNY = 1 USD usage quota'
+      },
+      gemini: {
+        type: 'Gemini',
+        formula: '4 CNY = 1 USD usage quota'
+      }
+    }
+  },
+
   // Subscription Progress (Header component)
   subscriptionProgress: {
     title: 'My Subscriptions',
@@ -496,6 +543,11 @@ export default {
       weeks: 'weeks',
       months: 'months',
       searchOrders: 'Search orders...',
+      summaryTotalOrders: 'Total Orders',
+      summaryPaidOrders: 'Paid Orders',
+      summaryPayAmount: 'Paid Total',
+      summaryRefundAmount: 'Refund Total',
+      summaryNetAmount: 'Net Paid',
       allStatuses: 'All Statuses',
       allPaymentTypes: 'All Payment Types',
       allOrderTypes: 'All Order Types',

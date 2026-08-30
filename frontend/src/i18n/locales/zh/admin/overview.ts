@@ -462,6 +462,7 @@ export default {
       searchUsers: '邮箱/用户名/备注/API Key 模糊搜索',
       roleFilter: '角色筛选',
       allRoles: '全部角色',
+      sales: '销售',
       allStatus: '全部状态',
       allGroups: '全部分组',
       searchGroups: '搜索分组...',
@@ -559,8 +560,10 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
+        sales: '销售',
         user: '用户'
       },
+      passwordCopied: '密码已复制',
       form: {
         emailLabel: '邮箱',
         emailPlaceholder: '请输入邮箱',

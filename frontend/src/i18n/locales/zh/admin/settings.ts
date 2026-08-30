@@ -800,6 +800,8 @@ export default {
         limitsNoLimit: '不限制',
         productNamePrefix: '商品名前缀',
         productNameSuffix: '商品名后缀',
+        orderPrefix: '订单号前缀',
+        orderPrefixHint: '用于生成支付订单号 out_trade_no，留空则使用默认前缀 sub2_。',
         preview: '预览',
         loadBalanceStrategy: '负载均衡策略',
         strategyRoundRobin: '轮询',

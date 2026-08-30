@@ -462,6 +462,7 @@ export default {
       searchUsers: 'Search by email, username, notes, or API key',
       roleFilter: 'Role Filter',
       allRoles: 'All Roles',
+      sales: 'Sales',
       allStatus: 'All Status',
       allGroups: 'All Groups',
       searchGroups: 'Search groups...',
@@ -670,8 +671,10 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        sales: 'Sales',
         user: 'User'
       },
+      passwordCopied: 'Password copied',
       // Settings Dropdowns
       filterSettings: 'Filter Settings',
       columnSettings: 'Column Settings',

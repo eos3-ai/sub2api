@@ -805,6 +805,8 @@ export default {
         limitsNoLimit: 'No limit',
         productNamePrefix: 'Product Name Prefix',
         productNameSuffix: 'Product Name Suffix',
+        orderPrefix: 'Order Number Prefix',
+        orderPrefixHint: 'Used for payment out_trade_no values. Leave empty to use the default sub2_ prefix.',
         preview: 'Preview',
         loadBalanceStrategy: 'Load Balance Strategy',
         strategyRoundRobin: 'Round Robin',
