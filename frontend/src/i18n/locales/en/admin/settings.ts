@@ -14,6 +14,21 @@ export default {
         payment: 'Payment',
       },
       features: {
+        payloadLog: {
+          title: 'Gateway Payload Capture',
+          description: 'Write gateway request and response bodies to ClickHouse for administrator troubleshooting.',
+          enabled: 'Enable payload capture',
+          enabledHint: 'Only actual gateway requests are captured; administrative account tests are excluded. Payloads may contain sensitive data, so restrict ClickHouse access and retention.',
+          storeStatus: 'ClickHouse storage',
+          available: 'Available',
+          unavailableShort: 'Unavailable',
+          unavailable: 'ClickHouse payload storage is unavailable. Confirm that it is running, then restart Sub2API to establish the connection.',
+          dropped: 'Dropped records',
+          enabledSuccess: 'Payload capture enabled',
+          disabledSuccess: 'Payload capture disabled',
+          loadFailed: 'Failed to load payload capture status',
+          saveFailed: 'Failed to update payload capture status',
+        },
         channelMonitor: {
           title: 'Channel Monitor',
           description: 'Choose either V1 active probes or V2 passive usage monitoring. When disabled, both background jobs stop and the user entry is hidden.',

@@ -14,6 +14,21 @@ export default {
         payment: '支付设置',
       },
       features: {
+        payloadLog: {
+          title: '网关正文采集',
+          description: '将网关请求和响应正文写入 ClickHouse，供管理员排查请求与上游响应。',
+          enabled: '启用正文采集',
+          enabledHint: '仅采集实际网关请求；账号测试等管理接口不在采集范围内。正文可能包含敏感信息，请控制 ClickHouse 的访问权限与保留周期。',
+          storeStatus: 'ClickHouse 存储',
+          available: '可用',
+          unavailableShort: '不可用',
+          unavailable: 'ClickHouse 正文存储不可用，无法开启采集。请确认服务已启动，并重启 Sub2API 完成连接。',
+          dropped: '丢弃记录',
+          enabledSuccess: '正文采集已开启',
+          disabledSuccess: '正文采集已关闭',
+          loadFailed: '加载正文采集状态失败',
+          saveFailed: '更新正文采集状态失败',
+        },
         channelMonitor: {
           title: '渠道监控',
           description: '启用后在 V1 主动探测与 V2 被动用量监控中二选一。关闭后两种模式的后台任务均停止，用户端入口隐藏。',
