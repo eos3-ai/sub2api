@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker.m.daocloud.io/docker/dockerfile:1.7
 # =============================================================================
 # Sub2API Multi-Stage Dockerfile
 # =============================================================================
@@ -7,12 +7,14 @@
 # Stage 3: Final minimal image
 # =============================================================================
 
-# Use DaoCloud's Docker Hub mirror by default. These remain build args so
-# CI or an air-gapped builder can override them with an internal registry.
-ARG NODE_IMAGE=docker.m.daocloud.io/library/node:24-alpine
-ARG GOLANG_IMAGE=docker.m.daocloud.io/library/golang:1.27.2-alpine
-ARG ALPINE_IMAGE=docker.m.daocloud.io/library/alpine:3.21
-ARG POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:18-alpine
+# Keep image names configurable so Docker can use the daemon's configured
+# mirror chain; CI or air-gapped builders can override them with build args.
+# Keep official image names here so Docker can use the daemon's configured
+# mirror chain (and fall back when one mirror returns a transient 502).
+ARG NODE_IMAGE=node:24-alpine
+ARG GOLANG_IMAGE=golang:1.27.2-alpine
+ARG ALPINE_IMAGE=alpine:3.21
+ARG POSTGRES_IMAGE=postgres:18-alpine
 ARG GOPROXY=https://goproxy.cn,direct
 ARG GOSUMDB=sum.golang.google.cn
 ARG NPM_CONFIG_REGISTRY=
