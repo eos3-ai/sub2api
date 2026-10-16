@@ -7162,6 +7162,65 @@
 	        <!-- Tab: Features (功能开关) -->
         <div v-show="activeTab === 'features'" class="space-y-6">
 
+        <div class="card" data-testid="payload-log-settings">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.features.payloadLog.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.features.payloadLog.description') }}
+            </p>
+          </div>
+          <div class="space-y-4 p-6">
+            <div v-if="payloadLogLoading" class="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+              <div class="h-4 w-4 animate-spin rounded-full border-b-2 border-primary-600"></div>
+              {{ t('common.loading') }}
+            </div>
+            <template v-else>
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                  <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('admin.settings.features.payloadLog.enabled') }}
+                  </label>
+                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('admin.settings.features.payloadLog.enabledHint') }}
+                  </p>
+                </div>
+                <Toggle
+                  :model-value="payloadLogStatus.enabled"
+                  :disabled="payloadLogSaving || !payloadLogStatus.store_available"
+                  data-testid="payload-log-toggle"
+                  @update:model-value="updatePayloadLogEnabled"
+                />
+              </div>
+
+              <div
+                v-if="!payloadLogStatus.store_available"
+                class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
+                data-testid="payload-log-unavailable"
+              >
+                <p class="font-medium">{{ t('admin.settings.features.payloadLog.unavailable') }}</p>
+                <p v-if="payloadLogStatus.store_error" class="mt-1 break-words font-mono text-xs">
+                  {{ payloadLogStatus.store_error }}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-x-6 gap-y-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>
+                  {{ t('admin.settings.features.payloadLog.storeStatus') }}:
+                  <strong :class="payloadLogStatus.store_available ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
+                    {{ payloadLogStatus.store_available ? t('admin.settings.features.payloadLog.available') : t('admin.settings.features.payloadLog.unavailableShort') }}
+                  </strong>
+                </span>
+                <span>
+                  {{ t('admin.settings.features.payloadLog.dropped') }}:
+                  <strong class="text-gray-700 dark:text-gray-200">{{ payloadLogStatus.dropped }}</strong>
+                </span>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
@@ -9176,6 +9235,15 @@ const registrationEmailSuffixWhitelistTags = ref<string[]>([]);
 const registrationEmailSuffixWhitelistDraft = ref("");
 const forwardedClientIpHeaderDraft = ref("");
 const tablePageSizeOptionsInput = ref("10, 20, 50, 100");
+
+const payloadLogLoading = ref(true);
+const payloadLogSaving = ref(false);
+const payloadLogStatus = reactive({
+  enabled: false,
+  store_available: false,
+  store_error: "",
+  dropped: 0,
+});
 
 // Admin API Key 状态
 const adminApiKeyLoading = ref(true);
@@ -12028,6 +12096,52 @@ async function loadAdminApiKey() {
   }
 }
 
+async function loadPayloadLogStatus() {
+  payloadLogLoading.value = true;
+  try {
+    Object.assign(
+      payloadLogStatus,
+      await adminAPI.settings.getPayloadLogStatus(),
+    );
+  } catch (error: unknown) {
+    payloadLogStatus.enabled = false;
+    payloadLogStatus.store_available = false;
+    payloadLogStatus.store_error = extractApiErrorMessage(
+      error,
+      t("admin.settings.features.payloadLog.loadFailed"),
+    );
+  } finally {
+    payloadLogLoading.value = false;
+  }
+}
+
+async function updatePayloadLogEnabled(enabled: boolean) {
+  if (payloadLogSaving.value || !payloadLogStatus.store_available) return;
+  payloadLogSaving.value = true;
+  try {
+    Object.assign(
+      payloadLogStatus,
+      await adminAPI.settings.updatePayloadLogStatus(enabled),
+    );
+    appStore.showSuccess(
+      t(
+        enabled
+          ? "admin.settings.features.payloadLog.enabledSuccess"
+          : "admin.settings.features.payloadLog.disabledSuccess",
+      ),
+    );
+  } catch (error: unknown) {
+    appStore.showError(
+      extractApiErrorMessage(
+        error,
+        t("admin.settings.features.payloadLog.saveFailed"),
+      ),
+    );
+  } finally {
+    payloadLogSaving.value = false;
+  }
+}
+
 async function createAdminApiKey() {
   adminApiKeyOperating.value = true;
   try {
@@ -12918,6 +13032,7 @@ async function handleDeleteProvider() {
 
 onMounted(() => {
   loadSettings();
+  loadPayloadLogStatus();
   loadSubscriptionGroups();
   loadAdminApiKey();
   loadUpstreamBillingProbeSettings();

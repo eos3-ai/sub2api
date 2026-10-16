@@ -14,6 +14,8 @@ const {
   getWebSearchEmulationConfig,
   updateWebSearchEmulationConfig,
   getAdminApiKey,
+  getPayloadLogStatus,
+  updatePayloadLogStatus,
   getOverloadCooldownSettings,
   getRateLimit429CooldownSettings,
   updateRateLimit429CooldownSettings,
@@ -42,6 +44,18 @@ const {
   getWebSearchEmulationConfig: vi.fn(),
   updateWebSearchEmulationConfig: vi.fn(),
   getAdminApiKey: vi.fn(),
+  getPayloadLogStatus: vi.fn().mockResolvedValue({
+    enabled: false,
+    store_available: true,
+    store_error: "",
+    dropped: 0,
+  }),
+  updatePayloadLogStatus: vi.fn().mockImplementation(async (enabled: boolean) => ({
+    enabled,
+    store_available: true,
+    store_error: "",
+    dropped: 0,
+  })),
   getOverloadCooldownSettings: vi.fn(),
   getRateLimit429CooldownSettings: vi.fn(),
   updateRateLimit429CooldownSettings: vi.fn(),
@@ -89,6 +103,8 @@ vi.mock("@/api", () => ({
       getWebSearchEmulationConfig,
       updateWebSearchEmulationConfig,
       getAdminApiKey,
+      getPayloadLogStatus,
+      updatePayloadLogStatus,
       getOverloadCooldownSettings,
       getRateLimit429CooldownSettings,
       updateRateLimit429CooldownSettings,
@@ -608,6 +624,16 @@ async function openUsersTab(wrapper: ReturnType<typeof mountView>) {
   await flushPromises();
 }
 
+async function openFeaturesTab(wrapper: ReturnType<typeof mountView>) {
+  const featuresTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.features"));
+
+  expect(featuresTabButton).toBeDefined();
+  await featuresTabButton?.trigger("click");
+  await flushPromises();
+}
+
 describe("admin SettingsView email domain quota copy", () => {
   it("documents the email domain quota and empty-whitelist behavior in both locales", () => {
     expect(zhCommon.auth.emailDomainRegistrationLimit).toContain("主流邮箱");
@@ -637,6 +663,8 @@ describe("admin SettingsView payment visible method controls", () => {
     getWebSearchEmulationConfig.mockReset();
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
+    getPayloadLogStatus.mockReset();
+    updatePayloadLogStatus.mockReset();
     getOverloadCooldownSettings.mockReset();
     getRateLimit429CooldownSettings.mockReset();
     updateRateLimit429CooldownSettings.mockReset();
@@ -676,6 +704,18 @@ describe("admin SettingsView payment visible method controls", () => {
       exists: false,
       masked_key: "",
     });
+    getPayloadLogStatus.mockResolvedValue({
+      enabled: false,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    });
+    updatePayloadLogStatus.mockImplementation(async (enabled: boolean) => ({
+      enabled,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    }));
     getOverloadCooldownSettings.mockResolvedValue({
       enabled: true,
       cooldown_minutes: 10,
@@ -747,6 +787,45 @@ describe("admin SettingsView payment visible method controls", () => {
       ],
     }));
     wrapper.unmount();
+  });
+
+  it("loads and immediately updates gateway payload capture", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+    await openFeaturesTab(wrapper);
+
+    const toggle = wrapper.get<HTMLInputElement>('[data-testid="payload-log-toggle"]');
+    expect(getPayloadLogStatus).toHaveBeenCalledTimes(1);
+    expect(toggle.element.checked).toBe(false);
+    expect(toggle.element.disabled).toBe(false);
+
+    await toggle.setValue(true);
+    await flushPromises();
+
+    expect(updatePayloadLogStatus).toHaveBeenCalledWith(true);
+    expect(toggle.element.checked).toBe(true);
+    expect(showSuccess).toHaveBeenCalled();
+  });
+
+  it("disables payload capture when ClickHouse storage is unavailable", async () => {
+    getPayloadLogStatus.mockResolvedValueOnce({
+      enabled: false,
+      store_available: false,
+      store_error: "payload log store unavailable",
+      dropped: 3,
+    });
+
+    const wrapper = mountView();
+    await flushPromises();
+    await openFeaturesTab(wrapper);
+
+    expect(
+      wrapper.get<HTMLInputElement>('[data-testid="payload-log-toggle"]').element.disabled,
+    ).toBe(true);
+    expect(wrapper.get('[data-testid="payload-log-unavailable"]').text()).toContain(
+      "payload log store unavailable",
+    );
+    expect(wrapper.get('[data-testid="payload-log-settings"]').text()).toContain("3");
   });
 
   it("submits the compact home page toggle", async () => {
@@ -1733,6 +1812,8 @@ describe("admin SettingsView wechat connect controls", () => {
     getWebSearchEmulationConfig.mockReset();
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
+    getPayloadLogStatus.mockReset();
+    updatePayloadLogStatus.mockReset();
     getOverloadCooldownSettings.mockReset();
     getRateLimit429CooldownSettings.mockReset();
     updateRateLimit429CooldownSettings.mockReset();
@@ -1771,6 +1852,18 @@ describe("admin SettingsView wechat connect controls", () => {
       exists: false,
       masked_key: "",
     });
+    getPayloadLogStatus.mockResolvedValue({
+      enabled: false,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    });
+    updatePayloadLogStatus.mockImplementation(async (enabled: boolean) => ({
+      enabled,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    }));
     getOverloadCooldownSettings.mockResolvedValue({
       enabled: true,
       cooldown_minutes: 10,
@@ -1979,6 +2072,8 @@ describe("admin SettingsView platform quota matrix", () => {
     getWebSearchEmulationConfig.mockReset();
     updateWebSearchEmulationConfig.mockReset();
     getAdminApiKey.mockReset();
+    getPayloadLogStatus.mockReset();
+    updatePayloadLogStatus.mockReset();
     getOverloadCooldownSettings.mockReset();
     getRateLimit429CooldownSettings.mockReset();
     updateRateLimit429CooldownSettings.mockReset();
@@ -2005,6 +2100,18 @@ describe("admin SettingsView platform quota matrix", () => {
     getWebSearchEmulationConfig.mockResolvedValue({ enabled: false, providers: [] });
     updateWebSearchEmulationConfig.mockResolvedValue({ enabled: false, providers: [] });
     getAdminApiKey.mockResolvedValue({ exists: false, masked_key: "" });
+    getPayloadLogStatus.mockResolvedValue({
+      enabled: false,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    });
+    updatePayloadLogStatus.mockImplementation(async (enabled: boolean) => ({
+      enabled,
+      store_available: true,
+      store_error: "",
+      dropped: 0,
+    }));
     getOverloadCooldownSettings.mockResolvedValue({});
     getRateLimit429CooldownSettings.mockResolvedValue({});
     updateRateLimit429CooldownSettings.mockResolvedValue({});

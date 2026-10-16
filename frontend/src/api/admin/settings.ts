@@ -1096,6 +1096,32 @@ export async function updateSettings(
   return data;
 }
 
+// ==================== Gateway Payload Logging ====================
+
+export interface PayloadLogStatus {
+  enabled: boolean;
+  store_available: boolean;
+  store_error: string;
+  dropped: number;
+}
+
+export async function getPayloadLogStatus(): Promise<PayloadLogStatus> {
+  const { data } = await apiClient.get<PayloadLogStatus>(
+    "/admin/payload-logs/settings",
+  );
+  return data;
+}
+
+export async function updatePayloadLogStatus(
+  enabled: boolean,
+): Promise<PayloadLogStatus> {
+  const { data } = await apiClient.put<PayloadLogStatus>(
+    "/admin/payload-logs/settings",
+    { enabled },
+  );
+  return data;
+}
+
 /**
  * Test SMTP connection request
  */
@@ -1589,6 +1615,8 @@ export async function resetWebSearchUsage(payload: {
 export const settingsAPI = {
   getSettings,
   updateSettings,
+  getPayloadLogStatus,
+  updatePayloadLogStatus,
   testSmtpConnection,
   sendTestEmail,
   getEmailTemplates,
