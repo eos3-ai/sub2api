@@ -456,6 +456,9 @@ const (
 
 	// SettingKeyOpsMonitoringEnabled is a DB-backed soft switch to enable/disable ops module at runtime.
 	SettingKeyOpsMonitoringEnabled = "ops_monitoring_enabled"
+	// SettingKeyPayloadLogEnabled is the runtime recording switch. The
+	// deployment-level feature gate remains PAYLOAD_LOG_ENABLED.
+	SettingKeyPayloadLogEnabled = "payload_log_enabled"
 
 	// SettingKeyOpsRealtimeMonitoringEnabled controls realtime features (e.g. WS/QPS push).
 	SettingKeyOpsRealtimeMonitoringEnabled = "ops_realtime_monitoring_enabled"

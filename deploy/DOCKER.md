@@ -88,3 +88,23 @@ Docker restores existing containers after a host restart.
 
 - [GitHub Repository](https://github.com/weishaw/sub2api)
 - [Documentation](https://github.com/weishaw/sub2api#readme)
+# Payload logging (optional)
+
+Set `PAYLOAD_LOG_ENABLED=true` and change `PAYLOAD_LOG_CLICKHOUSE_PASSWORD`
+from its development default before starting the stack:
+
+```bash
+docker compose up -d
+```
+
+After the service is healthy, enable recording with an administrator key:
+
+```bash
+curl -X PUT https://your-domain.example.com/api/v1/admin/payload-logs/settings \
+  -H 'x-api-key: <admin-api-key>' -H 'Content-Type: application/json' \
+  -d '{"enabled":true}'
+```
+
+ClickHouse is intentionally not exposed on a host port. Payload data is kept
+in `sub2api_logs.payload_logs` and is not automatically deleted; operators can
+drop old daily partitions with ClickHouse `ALTER TABLE ... DROP PARTITION`.

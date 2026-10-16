@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
+	"github.com/Wei-Shaw/sub2api/internal/repository/payloadlog"
 	"github.com/google/wire"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -51,6 +52,20 @@ func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, b
 // ProvideEmailQueueService creates EmailQueueService with default worker count
 func ProvideEmailQueueService(emailService *EmailService) *EmailQueueService {
 	return NewEmailQueueService(emailService, 3)
+}
+
+func ProvidePayloadLogService(cfg *config.Config, settingRepo SettingRepository) *PayloadLogService {
+	if !cfg.PayloadLog.Enabled {
+		return NewPayloadLogService(cfg.PayloadLog, nil, settingRepo)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), cfg.PayloadLog.ClickHouse.DialTimeout)
+	defer cancel()
+	store, err := payloadlog.NewClickHouseStore(ctx, cfg.PayloadLog.ClickHouse)
+	if err != nil {
+		zap.L().Error("payload log ClickHouse unavailable; gateway will continue without capture", zap.Error(err))
+		return NewPayloadLogService(cfg.PayloadLog, nil, settingRepo)
+	}
+	return NewPayloadLogService(cfg.PayloadLog, store, settingRepo)
 }
 
 // ProvideAuthService wires the optional captcha providers into AuthService while
@@ -918,6 +933,7 @@ var ProviderSet = wire.NewSet(
 	ProvideOllamaCloudUsageService,
 	ProvideOpenCodeGoUsageService,
 	ProvideSettingService,
+	ProvidePayloadLogService,
 	NewDataManagementService,
 	ProvideBackupService,
 	ProvideOpsSystemLogSink,

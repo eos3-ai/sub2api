@@ -75,6 +75,7 @@ type Config struct {
 	Database                DatabaseConfig                `mapstructure:"database"`
 	Redis                   RedisConfig                   `mapstructure:"redis"`
 	Ops                     OpsConfig                     `mapstructure:"ops"`
+	PayloadLog              PayloadLogConfig              `mapstructure:"payload_log"`
 	JWT                     JWTConfig                     `mapstructure:"jwt"`
 	Totp                    TotpConfig                    `mapstructure:"totp"`
 	WebAuthn                WebAuthnConfig                `mapstructure:"webauthn"`
@@ -1648,6 +1649,33 @@ type OpsConfig struct {
 	Aggregation OpsAggregationConfig `mapstructure:"aggregation"`
 }
 
+// PayloadLogConfig configures the optional, ClickHouse-backed gateway payload
+// log. Enabled is a deployment-level feature gate; the runtime recording
+// switch is stored separately in the settings table.
+type PayloadLogConfig struct {
+	Enabled       bool                       `mapstructure:"enabled"`
+	ClickHouse    PayloadLogClickHouseConfig `mapstructure:"clickhouse"`
+	QueueSize     int                        `mapstructure:"queue_size"`
+	WorkerCount   int                        `mapstructure:"worker_count"`
+	BatchSize     int                        `mapstructure:"batch_size"`
+	BatchMaxBytes int64                      `mapstructure:"batch_max_bytes"`
+	FlushInterval time.Duration              `mapstructure:"flush_interval"`
+	WriteTimeout  time.Duration              `mapstructure:"write_timeout"`
+	WriteRetries  int                        `mapstructure:"write_retries"`
+	QueryTimeout  time.Duration              `mapstructure:"query_timeout"`
+}
+
+type PayloadLogClickHouseConfig struct {
+	Addr         string        `mapstructure:"addr"`
+	Database     string        `mapstructure:"database"`
+	Username     string        `mapstructure:"username"`
+	Password     string        `mapstructure:"password"`
+	TLS          bool          `mapstructure:"tls"`
+	DialTimeout  time.Duration `mapstructure:"dial_timeout"`
+	MaxOpenConns int           `mapstructure:"max_open_conns"`
+	Compression  string        `mapstructure:"compression"`
+}
+
 type OpsCleanupConfig struct {
 	Enabled  bool   `mapstructure:"enabled"`
 	Schedule string `mapstructure:"schedule"`
@@ -1862,6 +1890,7 @@ func load(allowMissingJWTSecret bool) (*Config, error) {
 	if err := viper.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal config error: %w", err)
 	}
+	normalizePayloadLogConfig(&cfg.PayloadLog)
 	if trustedProxiesEnvConfigured {
 		cfg.Server.TrustedProxies = normalizeStringSlice(strings.Split(trustedProxiesEnv, ","))
 	}
@@ -2037,6 +2066,26 @@ func setDefaults() {
 	viper.SetDefault("run_mode", RunModeStandard)
 	viper.SetDefault("simple_mode.auto_create_default_groups", true)
 	viper.SetDefault("simple_mode_key_rate_limit_enabled", false)
+
+	// Optional gateway payload logging. Every key is registered so AutomaticEnv
+	// can discover and override it even when no config file is present.
+	viper.SetDefault("payload_log.enabled", false)
+	viper.SetDefault("payload_log.clickhouse.addr", "clickhouse:9000")
+	viper.SetDefault("payload_log.clickhouse.database", "sub2api_logs")
+	viper.SetDefault("payload_log.clickhouse.username", "sub2api")
+	viper.SetDefault("payload_log.clickhouse.password", "sub2api_payload_log")
+	viper.SetDefault("payload_log.clickhouse.tls", false)
+	viper.SetDefault("payload_log.clickhouse.dial_timeout", 5*time.Second)
+	viper.SetDefault("payload_log.clickhouse.max_open_conns", 10)
+	viper.SetDefault("payload_log.clickhouse.compression", "lz4")
+	viper.SetDefault("payload_log.queue_size", 1000)
+	viper.SetDefault("payload_log.worker_count", 2)
+	viper.SetDefault("payload_log.batch_size", 50)
+	viper.SetDefault("payload_log.batch_max_bytes", int64(32*1024*1024))
+	viper.SetDefault("payload_log.flush_interval", time.Second)
+	viper.SetDefault("payload_log.write_timeout", 30*time.Second)
+	viper.SetDefault("payload_log.write_retries", 3)
+	viper.SetDefault("payload_log.query_timeout", 30*time.Second)
 
 	// Server
 	viper.SetDefault("server.host", "0.0.0.0")
@@ -2704,6 +2753,46 @@ func setEnvReachableDefaults() {
 	viper.SetDefault("dingtalk_connect.sync_corp_email", false)
 	viper.SetDefault("dingtalk_connect.sync_corp_email_attr_key", "")
 	viper.SetDefault("dingtalk_connect.sync_corp_email_attr_name", "")
+}
+
+func normalizePayloadLogConfig(c *PayloadLogConfig) {
+	fallbackInt := func(name string, value *int, min, max, fallback int) {
+		if *value < min || *value > max {
+			slog.Warn("payload log configuration out of range; using default", "key", name, "value", *value, "default", fallback)
+			*value = fallback
+		}
+	}
+	fallbackDuration := func(name string, value *time.Duration, min, max, fallback time.Duration) {
+		if *value < min || *value > max {
+			slog.Warn("payload log configuration out of range; using default", "key", name, "value", *value, "default", fallback)
+			*value = fallback
+		}
+	}
+	c.ClickHouse.Addr = strings.TrimSpace(c.ClickHouse.Addr)
+	c.ClickHouse.Database = strings.TrimSpace(c.ClickHouse.Database)
+	c.ClickHouse.Username = strings.TrimSpace(c.ClickHouse.Username)
+	c.ClickHouse.Password = strings.TrimSpace(c.ClickHouse.Password)
+	c.ClickHouse.Compression = strings.ToLower(strings.TrimSpace(c.ClickHouse.Compression))
+	if c.ClickHouse.Compression != "none" && c.ClickHouse.Compression != "lz4" && c.ClickHouse.Compression != "zstd" {
+		slog.Warn("invalid payload log ClickHouse compression; using default", "value", c.ClickHouse.Compression, "default", "lz4")
+		c.ClickHouse.Compression = "lz4"
+	}
+	fallbackDuration("payload_log.clickhouse.dial_timeout", &c.ClickHouse.DialTimeout, time.Second, 60*time.Second, 5*time.Second)
+	fallbackInt("payload_log.clickhouse.max_open_conns", &c.ClickHouse.MaxOpenConns, 1, 100, 10)
+	fallbackInt("payload_log.queue_size", &c.QueueSize, 10, 100000, 1000)
+	fallbackInt("payload_log.worker_count", &c.WorkerCount, 1, 32, 2)
+	fallbackInt("payload_log.batch_size", &c.BatchSize, 1, 10000, 50)
+	if c.BatchMaxBytes < 1024*1024 || c.BatchMaxBytes > 256*1024*1024 {
+		slog.Warn("payload log configuration out of range; using default", "key", "payload_log.batch_max_bytes", "value", c.BatchMaxBytes, "default", 32*1024*1024)
+		c.BatchMaxBytes = 32 * 1024 * 1024
+	}
+	fallbackDuration("payload_log.flush_interval", &c.FlushInterval, 100*time.Millisecond, 60*time.Second, time.Second)
+	fallbackDuration("payload_log.write_timeout", &c.WriteTimeout, time.Second, 300*time.Second, 30*time.Second)
+	fallbackInt("payload_log.write_retries", &c.WriteRetries, 0, 10, 3)
+	fallbackDuration("payload_log.query_timeout", &c.QueryTimeout, time.Second, 300*time.Second, 30*time.Second)
+	if c.Enabled && c.ClickHouse.Password == "sub2api_payload_log" {
+		slog.Warn("payload log uses the default ClickHouse password; change it in production")
+	}
 }
 
 func (c *Config) Validate() error {

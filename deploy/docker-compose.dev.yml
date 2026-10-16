@@ -43,6 +43,23 @@ services:
       - REDIS_USERNAME=${REDIS_USERNAME:-}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - REDIS_DB=${REDIS_DB:-0}
+      - PAYLOAD_LOG_ENABLED=${PAYLOAD_LOG_ENABLED:-false}
+      - PAYLOAD_LOG_CLICKHOUSE_ADDR=${PAYLOAD_LOG_CLICKHOUSE_ADDR:-clickhouse:9000}
+      - PAYLOAD_LOG_CLICKHOUSE_DATABASE=${PAYLOAD_LOG_CLICKHOUSE_DATABASE:-sub2api_logs}
+      - PAYLOAD_LOG_CLICKHOUSE_USERNAME=${PAYLOAD_LOG_CLICKHOUSE_USERNAME:-sub2api}
+      - PAYLOAD_LOG_CLICKHOUSE_PASSWORD=${PAYLOAD_LOG_CLICKHOUSE_PASSWORD:-sub2api_payload_log}
+      - PAYLOAD_LOG_CLICKHOUSE_TLS=${PAYLOAD_LOG_CLICKHOUSE_TLS:-false}
+      - PAYLOAD_LOG_CLICKHOUSE_DIAL_TIMEOUT=${PAYLOAD_LOG_CLICKHOUSE_DIAL_TIMEOUT:-5s}
+      - PAYLOAD_LOG_CLICKHOUSE_MAX_OPEN_CONNS=${PAYLOAD_LOG_CLICKHOUSE_MAX_OPEN_CONNS:-10}
+      - PAYLOAD_LOG_CLICKHOUSE_COMPRESSION=${PAYLOAD_LOG_CLICKHOUSE_COMPRESSION:-lz4}
+      - PAYLOAD_LOG_QUEUE_SIZE=${PAYLOAD_LOG_QUEUE_SIZE:-1000}
+      - PAYLOAD_LOG_WORKER_COUNT=${PAYLOAD_LOG_WORKER_COUNT:-2}
+      - PAYLOAD_LOG_BATCH_SIZE=${PAYLOAD_LOG_BATCH_SIZE:-50}
+      - PAYLOAD_LOG_BATCH_MAX_BYTES=${PAYLOAD_LOG_BATCH_MAX_BYTES:-33554432}
+      - PAYLOAD_LOG_FLUSH_INTERVAL=${PAYLOAD_LOG_FLUSH_INTERVAL:-1s}
+      - PAYLOAD_LOG_WRITE_TIMEOUT=${PAYLOAD_LOG_WRITE_TIMEOUT:-30s}
+      - PAYLOAD_LOG_WRITE_RETRIES=${PAYLOAD_LOG_WRITE_RETRIES:-3}
+      - PAYLOAD_LOG_QUERY_TIMEOUT=${PAYLOAD_LOG_QUERY_TIMEOUT:-30s}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
       - JWT_SECRET=${JWT_SECRET:-}
@@ -111,6 +128,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+        required: false
     networks:
       - sub2api-network
     healthcheck:
@@ -169,6 +189,34 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
+  clickhouse:
+    image: docker.m.daocloud.io/clickhouse/clickhouse-server:25.8
+    container_name: sub2api-clickhouse-dev
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - ./clickhouse_data:/var/lib/clickhouse:Z
+      - ./clickhouse_logs:/var/log/clickhouse-server:Z
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
+    environment:
+      - CLICKHOUSE_DB=${PAYLOAD_LOG_CLICKHOUSE_DATABASE:-sub2api_logs}
+      - CLICKHOUSE_USER=${PAYLOAD_LOG_CLICKHOUSE_USERNAME:-sub2api}
+      - CLICKHOUSE_PASSWORD=${PAYLOAD_LOG_CLICKHOUSE_PASSWORD:-sub2api_payload_log}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=0
+      - CLICKHOUSE_MAX_MEMORY_RATIO=${CLICKHOUSE_MAX_MEMORY_RATIO:-0.4}
+      - TZ=${TZ:-Asia/Shanghai}
+    networks:
+      - sub2api-network
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$$CLICKHOUSE_USER\" --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 networks:
   sub2api-network:
