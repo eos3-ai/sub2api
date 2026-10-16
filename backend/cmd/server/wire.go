@@ -133,6 +133,7 @@ func provideCleanup(
 	openAIAutoReset *service.OpenAIQuotaAutoResetService,
 	promptAudit *securityaudit.PromptService,
 	pluginManager *service.PluginManager,
+	payloadLogService *service.PayloadLogService,
 ) func() {
 	return func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -154,6 +155,12 @@ func provideCleanup(
 			{"BalanceNotifyService", func() error {
 				if balanceNotify != nil {
 					balanceNotify.Stop()
+				}
+				return nil
+			}},
+			{"PayloadLogService", func() error {
+				if payloadLogService != nil {
+					payloadLogService.Close()
 				}
 				return nil
 			}},
