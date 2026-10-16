@@ -1,4 +1,5 @@
-FROM golang:1.27.2-alpine
+ARG GOLANG_IMAGE=docker.m.daocloud.io/library/golang:1.27.2-alpine
+FROM ${GOLANG_IMAGE}
 
 WORKDIR /app
 

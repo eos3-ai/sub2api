@@ -5,8 +5,10 @@
 # It only packages the pre-built binary, no compilation needed.
 # =============================================================================
 
-ARG ALPINE_IMAGE=alpine:3.21
-ARG POSTGRES_IMAGE=postgres:18-alpine
+# Use DaoCloud's Docker Hub mirror by default for reliable builds in mainland
+# China. These remain build args so CI or private registries can override them.
+ARG ALPINE_IMAGE=docker.m.daocloud.io/library/alpine:3.21
+ARG POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:18-alpine
 
 FROM ${POSTGRES_IMAGE} AS pg-client
 
