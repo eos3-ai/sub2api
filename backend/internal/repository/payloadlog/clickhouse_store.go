@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	_ "embed"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 
@@ -95,9 +96,14 @@ func (s *ClickHouseStore) InsertBatch(ctx context.Context, logs []*PayloadLog) e
 
 func (s *ClickHouseStore) List(ctx context.Context, f PayloadLogFilter, p Pagination) ([]PayloadLogMeta, int64, error) {
 	where, args := filters(f)
-	var total int64
+	// ClickHouse count() returns UInt64. The native driver intentionally does not
+	// convert it into *int64 while scanning, even when the value would fit.
+	var total uint64
 	if err := s.conn.QueryRow(ctx, "SELECT count() FROM "+s.database+".payload_logs"+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
+	}
+	if total > math.MaxInt64 {
+		return nil, 0, fmt.Errorf("payload log count %d exceeds int64", total)
 	}
 	if p.Page < 1 {
 		p.Page = 1
@@ -122,7 +128,7 @@ func (s *ClickHouseStore) List(ctx context.Context, f PayloadLogFilter, p Pagina
 		}
 		out = append(out, m)
 	}
-	return out, total, rows.Err()
+	return out, int64(total), rows.Err()
 }
 
 func filters(f PayloadLogFilter) (string, []any) {
