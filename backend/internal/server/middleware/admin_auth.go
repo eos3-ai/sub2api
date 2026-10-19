@@ -22,8 +22,8 @@ func NewAdminAuthMiddleware(
 }
 
 // adminAuth 管理员认证中间件实现
-// 支持两种认证方式（通过不同的 header 区分）：
-// 1. Admin API Key: x-api-key: <admin-api-key>
+// 支持两种认证方式：
+// 1. Admin API Key: x-api-key: <admin-api-key> 或 Authorization: Bearer <admin-api-key>
 // 2. JWT Token: Authorization: Bearer <jwt-token> (需要管理员角色)
 func adminAuth(
 	authService *service.AuthService,
@@ -46,7 +46,9 @@ func adminAuth(
 			}
 		}
 
-		// 检查 x-api-key header（Admin API Key 认证）
+		// Admin API Key 认证：优先 x-api-key，其次 Authorization: Bearer。
+		// Bearer 凭证先按 Admin API Key 校验；仅当不是 admin- 前缀时才回退到 JWT，
+		// 避免 admin 形态的 key 被误判为 JWT 错误，同时保持 JWT 行为兼容。
 		apiKey := c.GetHeader("x-api-key")
 		if apiKey != "" {
 			if !validateAdminAPIKey(c, apiKey, settingService, userService) {
@@ -56,22 +58,28 @@ func adminAuth(
 			return
 		}
 
-		// 检查 Authorization header（JWT 认证）
-		authHeader := c.GetHeader("Authorization")
-		if authHeader != "" {
+		bearerCredential := ""
+		if authHeader := c.GetHeader("Authorization"); authHeader != "" {
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
-				token := strings.TrimSpace(parts[1])
-				if token == "" {
-					AbortWithError(c, 401, "UNAUTHORIZED", "Authorization required")
-					return
-				}
-				if !validateJWTForAdmin(c, token, authService, userService, settingService, auditService) {
-					return
-				}
-				c.Next()
+				bearerCredential = strings.TrimSpace(parts[1])
+			}
+		}
+		if strings.HasPrefix(bearerCredential, "admin-") {
+			if !validateAdminAPIKey(c, bearerCredential, settingService, userService) {
 				return
 			}
+			c.Next()
+			return
+		}
+
+		// 检查 Authorization header（JWT 认证）
+		if bearerCredential != "" {
+			if !validateJWTForAdmin(c, bearerCredential, authService, userService, settingService, auditService) {
+				return
+			}
+			c.Next()
+			return
 		}
 
 		// 无有效认证信息

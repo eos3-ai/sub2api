@@ -92,7 +92,7 @@ settings_http_code="$(
     --max-time 30 \
     -o "$settings_file" \
     -w '%{http_code}' \
-    -H "x-api-key: ${ADMIN_API_KEY}" \
+    -H "Authorization: Bearer ${ADMIN_API_KEY}" \
     "$BASE_URL/api/v1/admin/payload-logs/settings"
 )"
 
@@ -181,7 +181,7 @@ for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
       --max-time 30 \
       -o "$payload_detail_file" \
       -w '%{http_code}' \
-      -H "x-api-key: ${ADMIN_API_KEY}" \
+      -H "Authorization: Bearer ${ADMIN_API_KEY}" \
       "$BASE_URL/api/v1/admin/payload-logs/$request_id"
   )"
 

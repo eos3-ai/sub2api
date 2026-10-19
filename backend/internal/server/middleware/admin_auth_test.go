@@ -123,8 +123,41 @@ func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
 	})
 }
 
+func TestAdminAuthAcceptsAdminAPIKeyAsBearer(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const adminKey = "admin-test-key"
+	admin := &service.User{ID: 7, Email: "admin@example.com", Role: service.RoleAdmin, Status: service.StatusActive, Concurrency: 1}
+	userRepo := &stubUserRepo{
+		getFirstAdmin: func(context.Context) (*service.User, error) { return admin, nil },
+	}
+	userService := service.NewUserService(userRepo, nil, nil, nil)
+	settingService := service.NewSettingService(fakeSettingRepo{values: map[string]string{service.SettingKeyAdminAPIKey: adminKey}}, &config.Config{})
+	authService := service.NewAuthService(nil, nil, nil, nil, &config.Config{}, nil, nil, nil, nil, nil, nil, nil, nil)
+	router := gin.New()
+	router.Use(gin.HandlerFunc(NewAdminAuthMiddleware(authService, userService, settingService, nil)))
+	router.GET("/t", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	for _, tc := range []struct {
+		name   string
+		header string
+		value  string
+	}{
+		{name: "bearer", header: "Authorization", value: "Bearer " + adminKey},
+		{name: "legacy_header", header: "x-api-key", value: adminKey},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/t", nil)
+			req.Header.Set(tc.header, tc.value)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+	}
+}
+
 type stubUserRepo struct {
-	getByID func(ctx context.Context, id int64) (*service.User, error)
+	getByID       func(ctx context.Context, id int64) (*service.User, error)
+	getFirstAdmin func(ctx context.Context) (*service.User, error)
 }
 
 func (s *stubUserRepo) Create(ctx context.Context, user *service.User) error {
@@ -147,7 +180,10 @@ func (s *stubUserRepo) GetByEmail(ctx context.Context, email string) (*service.U
 }
 
 func (s *stubUserRepo) GetFirstAdmin(ctx context.Context) (*service.User, error) {
-	panic("unexpected GetFirstAdmin call")
+	if s.getFirstAdmin == nil {
+		panic("unexpected GetFirstAdmin call")
+	}
+	return s.getFirstAdmin(ctx)
 }
 
 func (s *stubUserRepo) Update(ctx context.Context, user *service.User, fields service.UserUpdateFields) error {
