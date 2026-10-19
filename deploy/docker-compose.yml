@@ -346,13 +346,11 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - clickhouse_logs:/var/log/clickhouse-server
-      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
     environment:
       - CLICKHOUSE_DB=${PAYLOAD_LOG_CLICKHOUSE_DATABASE:-sub2api_logs}
       - CLICKHOUSE_USER=${PAYLOAD_LOG_CLICKHOUSE_USERNAME:-sub2api}
       - CLICKHOUSE_PASSWORD=${PAYLOAD_LOG_CLICKHOUSE_PASSWORD:-sub2api_payload_log}
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=0
-      - CLICKHOUSE_MAX_MEMORY_RATIO=${CLICKHOUSE_MAX_MEMORY_RATIO:-0.4}
       - TZ=${TZ:-Asia/Shanghai}
     networks:
       - sub2api-network

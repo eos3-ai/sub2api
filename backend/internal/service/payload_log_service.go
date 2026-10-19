@@ -88,6 +88,7 @@ func (s *PayloadLogService) SetEnabled(ctx context.Context, on bool) error {
 	}
 	if s.settings != nil {
 		if err := s.settings.Set(ctx, SettingKeyPayloadLogEnabled, strconv.FormatBool(on)); err != nil {
+			slog.Error("failed to persist payload log runtime switch", "enabled", on, "error", err)
 			return err
 		}
 	}
