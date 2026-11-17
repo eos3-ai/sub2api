@@ -166,3 +166,8 @@ issues/
 .vite/
 # 本地闭源插件开发目录及构建产物不进入 Sub2API 仓库
 /plugins/
+
+# 本地开发脚本与临时技能数据
+/backend/start-dev.sh
+/frontend/start-dev.sh
+/skill/
